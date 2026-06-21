@@ -1,0 +1,42 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "workspace": {
+            "type": "String"
+        }
+    },
+    "resources": [
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces', parameters('workspace')), '/savedSearches/cdbd9a91-c374-4824-9550-2bd346be4982')]",
+            "name": "[concat(parameters('workspace'), '/cdbd9a91-c374-4824-9550-2bd346be4982')]",
+            "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+            "apiVersion": "2023-09-01",
+            "properties": {
+                "Category": "Hunting Queries",
+                "DisplayName": "UAV S1 - EKF Variance Baseline (정상 잔차 측정)",
+                "Query": "// S1 Baseline 측정용 헌팅 쿼리 — 정상 비행 시 EKF 잔차 분포 확인\n// 목적: P99를 보고 S1 룰 게이트(현재 0.05) 적절성 검증. 게이트는 P99보다 위에 둘 것.\n// Recommended Action: P99_PosVar / P99_VelVar 확인 후, S1 룰의 posVarGate/velVarGate를\n//   해당 P99보다 충분히 위(예: P99 x 1.5~2)로 설정. 정상 비행 데이터에서만 실행할 것.\nUAVTelemetry_CL\n| where TimeGenerated > ago(24h)\n| where MsgType == \"EKF_STATUS_REPORT\"\n| summarize\n    SampleCount = count(),\n    AvgPosVar  = avg(PosHorizVariance),\n    MaxPosVar  = max(PosHorizVariance),\n    P50_PosVar = percentile(PosHorizVariance, 50),\n    P95_PosVar = percentile(PosHorizVariance, 95),\n    P99_PosVar = percentile(PosHorizVariance, 99),\n    AvgVelVar  = avg(VelocityVariance),\n    MaxVelVar  = max(VelocityVariance),\n    P50_VelVar = percentile(VelocityVariance, 50),\n    P95_VelVar = percentile(VelocityVariance, 95),\n    P99_VelVar = percentile(VelocityVariance, 99)\n  by UAVId\n| extend SuggestedPosGate = round(P99_PosVar * 1.5, 4),\n         SuggestedVelGate = round(P99_VelVar * 1.5, 4)",
+                "Version": 2,
+                "FunctionAlias": "",
+                "Tags": [
+                    {
+                        "Name": "description",
+                        "Value": "S1 게이트 임계값 검증용. 정상 비행 데이터에서 PosHorizVariance/VelocityVariance의 P50/P95/P99 분포와 권장 게이트(P99 x 1.5)를 산출. 게이트는 P99 초과로 설정."
+                    },
+                    {
+                        "Name": "tactics",
+                        "Value": "Reconnaissance"
+                    },
+                    {
+                        "Name": "techniques",
+                        "Value": "T1592"
+                    },
+                    {
+                        "Name": "entityMappings",
+                        "Value": "Host:HostName:UAVId"
+                    }
+                ]
+            }
+        }
+    ]
+}

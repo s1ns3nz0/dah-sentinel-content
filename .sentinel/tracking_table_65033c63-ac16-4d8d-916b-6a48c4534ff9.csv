@@ -1,2 +1,5 @@
 FileName, CommitSha
+AnalyticsRules/S7_Weapon_TwoPersonViolation.json,fb9c560a685af9f91295ce8943f1251e28eed54d
+AnalyticsRules/S1_GNSS_Spoofing.json,cad45b93201a7cee405b18d3ae40b054e2bff6a4
+AnalyticsRules/S6_Operator_BruteForce.json,3950fa8e496bb2beca510309514bd8319b5c61bc
 

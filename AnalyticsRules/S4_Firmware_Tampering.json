@@ -27,8 +27,8 @@
                 "suppressionEnabled": false,
                 "startTimeUtc": null,
                 "tactics": [
-                    "Persistence",
-                    "Impact"
+                    "InitialAccess",
+                    "Persistence"
                 ],
                 "techniques": [
                     "T1195",

@@ -1,0 +1,14 @@
+# Editor
+.DS_Store
+*.swp
+.vscode/
+.idea/
+
+# Local Sentinel CLI / artifacts
+.sentinel/
+*.bicep.json
+*.arm.json.tmp
+
+# Secrets (Logic App connections may carry tokens at build time)
+**/connection-keys.json
+**/*.secret.yaml

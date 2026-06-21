@@ -1,0 +1,20 @@
+id: 00000000-0000-0000-0000-000000000001
+name: TemplateHuntingQuery
+displayName: "[TEMPLATE] Hunting query template"
+description: |
+  탐지 룰이 아닌 능동 헌팅 쿼리. 룰로 자동 알람 띄우지 않고, 분석가가 정기적으로 실행.
+tactics:
+  - Reconnaissance
+techniques:
+  - T1592
+tags:
+  - dah
+  - uav
+  - template
+query: |
+  UAVOperator_CL
+  | where TimeGenerated > ago(7d)
+  | where ActionName == "arm_disarm"
+  | summarize ArmCount = count() by SourceSystemId, bin(TimeGenerated, 1d)
+  | order by ArmCount desc
+version: 1.0.0

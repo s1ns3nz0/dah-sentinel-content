@@ -54,7 +54,7 @@
                 },
                 "alertDetailsOverride": {
                     "alertDisplayNameFormat": "GNSS Spoofing Detected - {{UAVId}}",
-                    "alertDescriptionFormat": "EKF variance spike: PosVar={{AvgPosVar}} (gate {{PosGate}}), VelVar={{AvgVelVar}} (gate {{VelGate}}) | Confidence={{ConfidenceLevel}}",
+                    "alertDescriptionFormat": "EKF variance spike: PosVar={{AvgPosVar}}, VelVar={{AvgVelVar}} | Confidence={{ConfidenceLevel}}",
                     "alertDynamicProperties": []
                 },
                 "customDetails": {

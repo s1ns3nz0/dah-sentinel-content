@@ -1,0 +1,79 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "workspace": {
+            "type": "String"
+        }
+    },
+    "resources": [
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/e83c7fc0-1d2f-4790-ab42-79750e944a1a')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/e83c7fc0-1d2f-4790-ab42-79750e944a1a')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2023-12-01-preview",
+            "properties": {
+                "displayName": "UAV S6 - Operator Brute Force / Unauthorized Access",
+                "description": "UAV 운영자 인증 공격 탐지. [A] 단일 IP 1분 내 로그인 실패 5회 이상(brute force) [B] 로그인 성공 직전 실패 3회 이상(credential stuffing) [C] 알 수 없는 세션 토큰 사용. UAVOpAudit_CL 기반. MITRE ATT&CK: T1110·T1078",
+                "severity": "Medium",
+                "enabled": true,
+                "query": "let lookback = 1h;\n// [블록 A] Brute Force - 1분 내 동일 IP 5회 이상 실패\nlet BruteForce =\n    UAVOpAudit_CL\n    | where TimeGenerated > ago(lookback)\n    | where EventType == \"login_failure\"\n    | summarize FailCount = count(), Operators = make_set(Operator)\n        by ClientIp, bin(TimeGenerated, 1m)\n    | where FailCount >= 5\n    | extend TriggerReason = \"BruteForce_Login_Failure\"\n    | extend DetectionDetail = strcat(\n        \"ClientIp:\", ClientIp,\n        \"|FailCount:\", FailCount,\n        \"|Operators:\", tostring(Operators)\n    )\n    | extend UAVId = \"SOC-AUTH\"\n    | project TimeGenerated, UAVId, TriggerReason, DetectionDetail, ClientIp;\n// [블록 B] Credential Stuffing - 실패 3회 후 성공\nlet CredStuffing =\n    UAVOpAudit_CL\n    | where TimeGenerated > ago(lookback)\n    | where EventType in (\"login_failure\", \"login_success\")\n    | summarize\n        FailCount = countif(EventType == \"login_failure\"),\n        SuccessCount = countif(EventType == \"login_success\")\n        by Operator, ClientIp, bin(TimeGenerated, 5m)\n    | where FailCount >= 3 and SuccessCount >= 1\n    | extend TriggerReason = \"CredentialStuffing_FailThenSuccess\"\n    | extend DetectionDetail = strcat(\n        \"Operator:\", Operator,\n        \"|ClientIp:\", ClientIp,\n        \"|Failures:\", FailCount\n    )\n    | extend UAVId = \"SOC-AUTH\"\n    | project TimeGenerated, UAVId, TriggerReason, DetectionDetail, ClientIp;\n// [블록 C] 알 수 없는 세션 토큰\nlet UnknownSession =\n    UAVOpAudit_CL\n    | where TimeGenerated > ago(lookback)\n    | where EventType == \"logout_unknown\"\n    | extend TriggerReason = \"Unknown_Session_Token\"\n    | extend DetectionDetail = strcat(\n        \"Operator:\", Operator,\n        \"|ClientIp:\", ClientIp,\n        \"|FailReason:\", FailReason\n    )\n    | extend UAVId = \"SOC-AUTH\"\n    | project TimeGenerated, UAVId, TriggerReason, DetectionDetail, ClientIp;\nBruteForce\n| union CredStuffing\n| union UnknownSession\n| sort by TimeGenerated desc",
+                "queryFrequency": "PT10M",
+                "queryPeriod": "PT1H",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "startTimeUtc": null,
+                "tactics": [
+                    "CredentialAccess",
+                    "InitialAccess"
+                ],
+                "techniques": [
+                    "T1110",
+                    "T1078"
+                ],
+                "subTechniques": [],
+                "alertRuleTemplateName": null,
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": {
+                    "alertDisplayNameFormat": "Operator Auth Attack [{{TriggerReason}}]",
+                    "alertDescriptionFormat": "Authentication attack detected: {{DetectionDetail}}",
+                    "alertDynamicProperties": []
+                },
+                "customDetails": {
+                    "TriggerReason": "TriggerReason",
+                    "ClientIp": "ClientIp"
+                },
+                "entityMappings": [
+                    {
+                        "entityType": "IP",
+                        "fieldMappings": [
+                            {
+                                "identifier": "Address",
+                                "columnName": "ClientIp"
+                            }
+                        ]
+                    }
+                ],
+                "sentinelEntitiesMappings": null,
+                "templateVersion": null
+            }
+        }
+    ]
+}

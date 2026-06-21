@@ -1,0 +1,80 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "workspace": {
+            "type": "String"
+        }
+    },
+    "resources": [
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/b3f2fe24-23fc-4060-a8c9-213036dc9c75')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/b3f2fe24-23fc-4060-a8c9-213036dc9c75')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2023-12-01-preview",
+            "properties": {
+                "displayName": "UAV S4 - Firmware Supply Chain Tampering",
+                "description": "UAV 펌웨어 공급망 변조 탐지. preflight_check에서 해시 불일치(HashMatch=false) 또는 금지 SBOM 컴포넌트 포함(SbomForbiddenCount>0) 또는 preflight 실패(Passed=false) 탐지. MITRE ICS ATT&CK: T0862·T0839·T0857 / EMB3D 공급망변조",
+                "severity": "High",
+                "enabled": true,
+                "query": "UAVPgse_CL\n| where TimeGenerated > ago(1d)\n| where EventType == \"preflight_check\"\n| where HashMatch == false or SbomForbiddenCount > 0 or Passed == false\n| extend TriggerReason = case(\n    HashMatch == false and SbomForbiddenCount > 0, \"HashMismatch_And_ForbiddenSBOM\",\n    HashMatch == false, \"FirmwareHash_Mismatch\",\n    SbomForbiddenCount > 0, \"Forbidden_SBOM_Component\",\n    \"Preflight_Failed\"\n)\n| extend DetectionDetail = strcat(\n    \"HashMatch:\", HashMatch,\n    \"|SbomForbiddenCount:\", SbomForbiddenCount,\n    \"|Passed:\", Passed,\n    \"|Operator:\", Operator,\n    \"|Serial:\", Serial\n)\n| project\n    TimeGenerated,\n    UAVId,\n    TriggerReason,\n    DetectionDetail,\n    Operator,\n    Serial,\n    ImageHashSubmitted,\n    ImageHashExpected,\n    SbomForbiddenCount,\n    StatusCode\n| sort by TimeGenerated desc",
+                "queryFrequency": "PT10M",
+                "queryPeriod": "P1D",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "startTimeUtc": null,
+                "tactics": [
+                    "Persistence",
+                    "Impact"
+                ],
+                "techniques": [
+                    "T1195",
+                    "T1542"
+                ],
+                "subTechniques": [],
+                "alertRuleTemplateName": null,
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": {
+                    "alertDisplayNameFormat": "Firmware Tampering - {{UAVId}} [{{TriggerReason}}]",
+                    "alertDescriptionFormat": "Supply chain attack detected: {{DetectionDetail}}",
+                    "alertDynamicProperties": []
+                },
+                "customDetails": {
+                    "TriggerReason": "TriggerReason",
+                    "Operator": "Operator",
+                    "Serial": "Serial"
+                },
+                "entityMappings": [
+                    {
+                        "entityType": "Host",
+                        "fieldMappings": [
+                            {
+                                "identifier": "HostName",
+                                "columnName": "UAVId"
+                            }
+                        ]
+                    }
+                ],
+                "sentinelEntitiesMappings": null,
+                "templateVersion": null
+            }
+        }
+    ]
+}

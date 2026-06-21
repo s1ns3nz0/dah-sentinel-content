@@ -1,0 +1,79 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "workspace": {
+            "type": "String"
+        }
+    },
+    "resources": [
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/cb68feaf-7b5d-4601-972b-fe7ea34d3cb9')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/cb68feaf-7b5d-4601-972b-fe7ea34d3cb9')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2023-12-01-preview",
+            "properties": {
+                "displayName": "UAV S2 - C2 Hijacking Detection",
+                "description": "UAV C2 재밍·하이재킹 탐지. 3개 블록 병렬 탐지: [A] 비인가 GCS 명령(UAVOperator_CL SourceSystemId Whitelist 불일치) [B] 링크 드롭 급증(UAVDatalink_CL RxDropped delta) [C] 5790 포트 비인가 접속(UAVDatalinkConn_CL). MITRE ICS ATT&CK: T0855·T0814·T0831·T0813 / EMB3D 약한인증",
+                "severity": "High",
+                "enabled": true,
+                "query": "let WhitelistedGCS = _GetWatchlist('C2_Whitelisted_GCS_List');\nlet KnownIPs = dynamic([\"10.50.0.10\"]);\nlet lookback = 1h;\nlet baselineWindow = 24h;\nlet dropThreshold = 100;\n// [블록 A] 비인가 GCS 명령\nlet UnauthorizedCmd =\n    UAVOperator_CL\n    | where TimeGenerated > ago(lookback)\n    | join kind=leftanti (\n        WhitelistedGCS\n        | project UAVId = UAVId_s, SourceSystemId = toint(SystemId_d)\n    ) on UAVId, SourceSystemId\n    | extend TriggerReason = \"Unauthorized_GCS_Command\"\n    | extend DetectionDetail = strcat(\n        \"SourceSystemId:\", SourceSystemId,\n        \"|Action:\", ActionName,\n        \"|Command:\", Command\n    )\n    | project TimeGenerated, UAVId, TriggerReason, DetectionDetail;\n// [블록 B] 링크 드롭 급증 (재밍 지표)\nlet LinkDrop =\n    UAVDatalink_CL\n    | where TimeGenerated > ago(lookback)\n    | order by TimeGenerated asc\n    | extend PrevDropped = prev(RxDropped)\n    | extend DroppedDelta = RxDropped - PrevDropped\n    | where isnotnull(DroppedDelta) and DroppedDelta > dropThreshold\n    | extend UAVId = \"MPD-001\"\n    | extend TriggerReason = \"Datalink_RxDrop_Spike\"\n    | extend DetectionDetail = strcat(\n        \"RxDropped:\", RxDropped,\n        \"|Delta:\", DroppedDelta,\n        \"|Container:\", ContainerName\n    )\n    | project TimeGenerated, UAVId, TriggerReason, DetectionDetail;\n// [블록 C] 5790 포트 비인가 접속 (MAVLink 평문 인젝션 채널)\nlet UnauthorizedConn =\n    UAVDatalinkConn_CL\n    | where TimeGenerated > ago(lookback)\n    | where LocalPort == 5790\n    | where PeerIp !in (KnownIPs)\n    | extend UAVId = \"MPD-001\"\n    | extend TriggerReason = \"Unauthorized_5790_Connection\"\n    | extend DetectionDetail = strcat(\n        \"PeerIp:\", PeerIp,\n        \"|PeerPort:\", PeerPort,\n        \"|State:\", State\n    )\n    | project TimeGenerated, UAVId, TriggerReason, DetectionDetail;\nUnauthorizedCmd\n| union LinkDrop\n| union UnauthorizedConn\n| sort by TimeGenerated desc",
+                "queryFrequency": "PT10M",
+                "queryPeriod": "P1D",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "startTimeUtc": null,
+                "tactics": [
+                    "Collection",
+                    "Impact"
+                ],
+                "techniques": [
+                    "T1557",
+                    "T1498"
+                ],
+                "subTechniques": [],
+                "alertRuleTemplateName": null,
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": {
+                    "alertDisplayNameFormat": "C2 Hijacking - {{UAVId}} [{{TriggerReason}}]",
+                    "alertDescriptionFormat": "C2 attack detected: {{DetectionDetail}}",
+                    "alertDynamicProperties": []
+                },
+                "customDetails": {
+                    "TriggerReason": "TriggerReason",
+                    "DetectionDetail": "DetectionDetail"
+                },
+                "entityMappings": [
+                    {
+                        "entityType": "Host",
+                        "fieldMappings": [
+                            {
+                                "identifier": "HostName",
+                                "columnName": "UAVId"
+                            }
+                        ]
+                    }
+                ],
+                "sentinelEntitiesMappings": null,
+                "templateVersion": null
+            }
+        }
+    ]
+}

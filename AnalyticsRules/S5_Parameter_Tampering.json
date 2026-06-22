@@ -27,12 +27,10 @@
                 "suppressionEnabled": false,
                 "startTimeUtc": null,
                 "tactics": [
-                    "Persistence",
-                    "ImpairProcessControl"
+                    "DefenseEvasion"
                 ],
                 "techniques": [
-                    "T1562",
-                    "T1195"
+                    "T1562"
                 ],
                 "subTechniques": [],
                 "alertRuleTemplateName": null,

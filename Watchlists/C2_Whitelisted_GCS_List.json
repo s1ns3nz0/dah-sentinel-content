@@ -15,7 +15,7 @@
                 "displayName": "C2_Whitelisted_GCS_List",
                 "source": "C2_Whitelisted_GCS_List.csv",
                 "provider": "DAH-BlueTeam",
-                "description": "S2 C2 Hijacking 탐지용. MPD-001의 정상 명령 발신자(SystemId) 화이트리스트. 1=차량(SITL), 255=정상 GCS. 이 목록에 없는 SystemId 명령은 비인가로 탐지.",
+                "description": "S2 C2 Hijacking 탐지용. MPD-001의 정상 명령 발신자(SystemId) 화이트리스트. 1=차량(SITL), 255=정상 GCS. 이 목록에 없는 SystemId 명령은 비인가로 탐지.. ",
                 "itemsSearchKey": "EntryKey_s",
                 "contentType": "text/csv",
                 "rawContent": "EntryKey_s,UAVId_s,SystemId_d,GCSName_s,Description_s,ValidationDate_t\nMPD-001-1,MPD-001,1,Vehicle-SITL,차량 자체 발신 (SITL 자동비행 명령),2026-06-21\nMPD-001-255,MPD-001,255,QGroundControl-Primary,정상 1차 지상통제소 (sim gcs-qgc),2026-06-21\n"

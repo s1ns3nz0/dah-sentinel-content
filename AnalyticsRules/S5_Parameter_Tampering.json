@@ -1,77 +1,77 @@
 {
-    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
-    "contentVersion": "1.0.0.0",
-    "parameters": {
-        "workspace": {
-            "type": "String"
-        }
-    },
-    "resources": [
-        {
-            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/8ae73b18-591c-4a4b-8cea-0bbbb00883f1')]",
-            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/8ae73b18-591c-4a4b-8cea-0bbbb00883f1')]",
-            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
-            "kind": "Scheduled",
-            "apiVersion": "2023-12-01-preview",
-            "properties": {
-                "displayName": "UAV S5 - Safety Parameter Tampering",
-                "description": "UAV 안전장치 파라미터 변조 탐지. 공격자가 MAVLink로 ARMING_CHECK/FS_*/BRD_SAFETYENABLE/SIM_GPS_* 파라미터를 변경해 안전장치 무력화 또는 GNSS 스푸핑 시도 탐지. UAVConfigAudit_CL 기반. MITRE ICS ATT&CK: T0836·T0839 / EMB3D 파라미터변조",
-                "severity": "High",
-                "enabled": true,
-                "query": "let DangerousParams = dynamic([\n    \"ARMING_CHECK\",\n    \"FS_GCS_ENABL\",\n    \"FS_THR_ENABLE\",\n    \"FS_BATT_ENABLE\",\n    \"BRD_SAFETYENABLE\",\n    \"SIM_GPS_DISABLE\",\n    \"SIM_GPS_GLITCH_X\",\n    \"SIM_GPS_GLITCH_Y\",\n    \"SIM_GPS_GLITCH_Z\"\n]);\nUAVConfigAudit_CL\n| where TimeGenerated > ago(1h)\n| where EventType == \"param_changed\"\n| where ParamId in (DangerousParams)\n| extend TriggerReason = case(\n    ParamId == \"ARMING_CHECK\" and ParamValueAfter == 0, \"Arming_Safety_Disabled\",\n    ParamId startswith \"FS_\" and ParamValueAfter == 0, \"Failsafe_Disabled\",\n    ParamId == \"BRD_SAFETYENABLE\" and ParamValueAfter == 0, \"HW_Safety_Disabled\",\n    ParamId startswith \"SIM_GPS_\", \"GNSS_Spoof_Param_Changed\",\n    \"Dangerous_Param_Changed\"\n)\n| extend DetectionDetail = strcat(\n    \"ParamId:\", ParamId,\n    \"|Before:\", ParamValueBefore,\n    \"|After:\", ParamValueAfter,\n    \"|Source:\", Source\n)\n| project\n    TimeGenerated,\n    UAVId,\n    TriggerReason,\n    DetectionDetail,\n    ParamId,\n    ParamValueBefore,\n    ParamValueAfter\n| sort by TimeGenerated desc",
-                "queryFrequency": "PT10M",
-                "queryPeriod": "PT1H",
-                "triggerOperator": "GreaterThan",
-                "triggerThreshold": 0,
-                "suppressionDuration": "PT5H",
-                "suppressionEnabled": false,
-                "startTimeUtc": null,
-                "tactics": [
-                    "DefenseEvasion"
-                ],
-                "techniques": [
-                    "T1562"
-                ],
-                "subTechniques": [],
-                "alertRuleTemplateName": null,
-                "incidentConfiguration": {
-                    "createIncident": true,
-                    "groupingConfiguration": {
-                        "enabled": false,
-                        "reopenClosedIncident": false,
-                        "lookbackDuration": "PT5H",
-                        "matchingMethod": "AllEntities",
-                        "groupByEntities": [],
-                        "groupByAlertDetails": [],
-                        "groupByCustomDetails": []
-                    }
-                },
-                "eventGroupingSettings": {
-                    "aggregationKind": "SingleAlert"
-                },
-                "alertDetailsOverride": {
-                    "alertDisplayNameFormat": "Parameter Tampering - {{UAVId}} [{{TriggerReason}}]",
-                    "alertDescriptionFormat": "Safety parameter changed: {{DetectionDetail}}",
-                    "alertDynamicProperties": []
-                },
-                "customDetails": {
-                    "TriggerReason": "TriggerReason",
-                    "ParamId": "ParamId"
-                },
-                "entityMappings": [
-                    {
-                        "entityType": "Host",
-                        "fieldMappings": [
-                            {
-                                "identifier": "HostName",
-                                "columnName": "UAVId"
-                            }
-                        ]
-                    }
-                ],
-                "sentinelEntitiesMappings": null,
-                "templateVersion": null
-            }
-        }
-    ]
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/8ae73b18-591c-4a4b-8cea-0bbbb00883f1')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/8ae73b18-591c-4a4b-8cea-0bbbb00883f1')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S5 - Safety Parameter Tampering",
+        "description": "UAV 안전장치 파라미터 변조 탐지. 공격자가 MAVLink로 ARMING_CHECK/FS_*/BRD_SAFETYENABLE/SIM_GPS_* 파라미터를 변경해 안전장치 무력화 또는 GNSS 스푸핑 시도 탐지. UAVConfigAudit_CL 기반. MITRE ICS ATT&CK: T0836·T0839 / EMB3D 파라미터변조",
+        "severity": "High",
+        "enabled": true,
+        "query": "let DangerousParams = dynamic([\n    \"ARMING_CHECK\",\n    \"FS_GCS_ENABL\",\n    \"FS_THR_ENABLE\",\n    \"FS_BATT_ENABLE\",\n    \"BRD_SAFETYENABLE\",\n    \"SIM_GPS_DISABLE\",\n    \"SIM_GPS_GLITCH_X\",\n    \"SIM_GPS_GLITCH_Y\",\n    \"SIM_GPS_GLITCH_Z\"\n]);\nUAVConfigAudit_CL\n| where UAVId startswith \"MUAV-AKS-SYS\"\n| where TimeGenerated > ago(1h)\n| where EventType == \"param_changed\"\n| where ParamId in (DangerousParams)\n| extend TriggerReason = case(\n    ParamId == \"ARMING_CHECK\" and ParamValueAfter == 0, \"Arming_Safety_Disabled\",\n    ParamId startswith \"FS_\" and ParamValueAfter == 0, \"Failsafe_Disabled\",\n    ParamId == \"BRD_SAFETYENABLE\" and ParamValueAfter == 0, \"HW_Safety_Disabled\",\n    ParamId startswith \"SIM_GPS_\", \"GNSS_Spoof_Param_Changed\",\n    \"Dangerous_Param_Changed\"\n)\n| extend DetectionDetail = strcat(\n    \"ParamId:\", ParamId,\n    \"|Before:\", ParamValueBefore,\n    \"|After:\", ParamValueAfter,\n    \"|Source:\", Source\n)\n| project\n    TimeGenerated,\n    UAVId,\n    TriggerReason,\n    DetectionDetail,\n    ParamId,\n    ParamValueBefore,\n    ParamValueAfter\n| sort by TimeGenerated desc",
+        "queryFrequency": "PT10M",
+        "queryPeriod": "PT1H",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT5H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "DefenseEvasion"
+        ],
+        "techniques": [
+          "T1562"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": true,
+          "groupingConfiguration": {
+            "enabled": false,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT5H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "Parameter Tampering - {{UAVId}} [{{TriggerReason}}]",
+          "alertDescriptionFormat": "Safety parameter changed: {{DetectionDetail}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "ParamId": "ParamId"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "UAVId"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
 }

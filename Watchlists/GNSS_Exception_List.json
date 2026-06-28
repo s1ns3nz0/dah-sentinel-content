@@ -1,0 +1,33 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspaceName": {
+      "type": "string",
+      "metadata": {
+        "description": "Workspace name for Log Analytics where Sentinel is setup"
+      }
+    }
+  },
+  "resources": [
+    {
+      "name": "[concat(parameters('workspaceName'), '/Microsoft.SecurityInsights/GNSS_Exception_List')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/Watchlists",
+      "kind": "",
+      "properties": {
+        "displayName": "GNSS_Exception_List",
+        "source": "GNSS_Exception_List.csv",
+        "description": "Known GNSS anomaly zones excluded from spoofing alerts — reduces false positives (T0835)",
+        "provider": "DAH-BlueTeam",
+        "isDeleted": false,
+        "labels": [],
+        "defaultDuration": "P1000Y",
+        "contentType": "Text/Csv",
+        "numberOfLinesToSkip": 0,
+        "itemsSearchKey": "ZoneId",
+        "rawContent": "ZoneId,MinLat,MaxLat,MinLon,MaxLon,Reason,ExpiryDate\r\ngnss-ex-001,36.68,36.72,126.10,126.14,안흥 시험장 로컬 RF 간섭,2026-12-31\r\ngnss-ex-002,36.70,36.71,126.12,126.13,지자기 이상 구역 (문서화됨),2026-12-31"
+      },
+      "apiVersion": "2022-08-01"
+    }
+  ]
+}

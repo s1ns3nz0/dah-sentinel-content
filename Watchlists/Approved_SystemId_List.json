@@ -1,0 +1,33 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspaceName": {
+      "type": "string",
+      "metadata": {
+        "description": "Workspace name for Log Analytics where Sentinel is setup"
+      }
+    }
+  },
+  "resources": [
+    {
+      "name": "[concat(parameters('workspaceName'), '/Microsoft.SecurityInsights/Approved_SystemId_List')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/Watchlists",
+      "kind": "",
+      "properties": {
+        "displayName": "Approved_SystemId_List",
+        "source": "Approved_SystemId_List.csv",
+        "description": "Approved UAV MAVLink SystemIDs — detects spoofed or hijacked C2 system identifiers (T1692, T1557)",
+        "provider": "DAH-BlueTeam",
+        "isDeleted": false,
+        "labels": [],
+        "defaultDuration": "P1000Y",
+        "contentType": "Text/Csv",
+        "numberOfLinesToSkip": 0,
+        "itemsSearchKey": "SystemId",
+        "rawContent": "SystemId,UAVId,CallSign,AssignedGCS,Description\r\n1,MPD-001,EAGLE-01,gcs-001,안흥 1번 UAV (pgse-stub SYS001)\r\n2,MPD-002,EAGLE-02,gcs-001,안흥 2번 UAV\r\n255,GCS-001,GROUNDSTATION,gcs-001,지상 통제국 (GCS 식별자)"
+      },
+      "apiVersion": "2022-08-01"
+    }
+  ]
+}

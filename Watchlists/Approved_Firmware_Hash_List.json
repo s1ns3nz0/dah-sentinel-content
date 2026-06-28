@@ -1,0 +1,33 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspaceName": {
+      "type": "string",
+      "metadata": {
+        "description": "Workspace name for Log Analytics where Sentinel is setup"
+      }
+    }
+  },
+  "resources": [
+    {
+      "name": "[concat(parameters('workspaceName'), '/Microsoft.SecurityInsights/Approved_Firmware_Hash_List')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/Watchlists",
+      "kind": "",
+      "properties": {
+        "displayName": "Approved_Firmware_Hash_List",
+        "source": "Approved_Firmware_Hash_List.csv",
+        "description": "Approved UAV firmware hashes — detects unauthorized firmware (B-6, T1542)",
+        "provider": "DAH-BlueTeam",
+        "isDeleted": false,
+        "labels": [],
+        "defaultDuration": "P1000Y",
+        "contentType": "Text/Csv",
+        "numberOfLinesToSkip": 0,
+        "itemsSearchKey": "Hash",
+        "rawContent": "Hash,UAVId,Version,ApprovedDate,Description\r\nsha256:0000000000000000000000000000000000000000000000000000000000000001,MPD-001,v1.0.0,2026-01-01,MPD 기본 펌웨어 (pgse-stub approved_firmware.json)"
+      },
+      "apiVersion": "2022-08-01"
+    }
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspaceName": {
+      "type": "string",
+      "metadata": {
+        "description": "Workspace name for Log Analytics where Sentinel is setup"
+      }
+    }
+  },
+  "resources": [
+    {
+      "name": "[concat(parameters('workspaceName'), '/Microsoft.SecurityInsights/Approved_Operators_List')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/Watchlists",
+      "kind": "",
+      "properties": {
+        "displayName": "Approved_Operators_List",
+        "source": "Approved_Operators_List.csv",
+        "description": "Approved GCS operator accounts — detects unauthorized access and privilege escalation (S6, T1078)",
+        "provider": "DAH-BlueTeam",
+        "isDeleted": false,
+        "labels": [],
+        "defaultDuration": "P1000Y",
+        "contentType": "Text/Csv",
+        "numberOfLinesToSkip": 0,
+        "itemsSearchKey": "OperatorId",
+        "rawContent": "OperatorId,DisplayName,Role,AllowedHours,Description\r\nop-001,admin,superadmin,always,기본 관리자 계정\r\nop-002,gcs-operator-1,operator,0600-2200,주간 운용 계정 1\r\nop-003,gcs-operator-2,operator,0600-2200,주간 운용 계정 2\r\nop-004,gcs-viewer,viewer,always,모니터링 전용 계정"
+      },
+      "apiVersion": "2022-08-01"
+    }
+  ]
+}

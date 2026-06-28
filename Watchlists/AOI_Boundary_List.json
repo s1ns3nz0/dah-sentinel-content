@@ -1,0 +1,33 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspaceName": {
+      "type": "string",
+      "metadata": {
+        "description": "Workspace name for Log Analytics where Sentinel is setup"
+      }
+    }
+  },
+  "resources": [
+    {
+      "name": "[concat(parameters('workspaceName'), '/Microsoft.SecurityInsights/AOI_Boundary_List')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/Watchlists",
+      "kind": "",
+      "properties": {
+        "displayName": "AOI_Boundary_List",
+        "source": "AOI_Boundary_List.csv",
+        "description": "UAV mission area boundary coordinates — detects area-of-interest violations (B-1, B-11, T0835)",
+        "provider": "DAH-BlueTeam",
+        "isDeleted": false,
+        "labels": [],
+        "defaultDuration": "P1000Y",
+        "contentType": "Text/Csv",
+        "numberOfLinesToSkip": 0,
+        "itemsSearchKey": "MissionId",
+        "rawContent": "MissionId,MinLat,MaxLat,MinLon,MaxLon,AltMin_m,AltMax_m,Description\r\nmpd_recon,36.70,36.73,126.12,126.15,50,500,안흥 기본 정찰 구역\r\nmpd_attack,36.65,36.75,126.10,126.20,100,800,안흥 확장 작전 구역\r\nmpd_escort,36.68,36.74,126.11,126.16,80,600,안흥 호위 비행 구역"
+      },
+      "apiVersion": "2022-08-01"
+    }
+  ]
+}

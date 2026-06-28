@@ -1,0 +1,33 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspaceName": {
+      "type": "string",
+      "metadata": {
+        "description": "Workspace name for Log Analytics where Sentinel is setup"
+      }
+    }
+  },
+  "resources": [
+    {
+      "name": "[concat(parameters('workspaceName'), '/Microsoft.SecurityInsights/Approved_Weapon_List')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/Watchlists",
+      "kind": "",
+      "properties": {
+        "displayName": "Approved_Weapon_List",
+        "source": "Approved_Weapon_List.csv",
+        "description": "Approved UAV weapon IDs — detects unauthorized weapon deployment (B-10, T0831)",
+        "provider": "DAH-BlueTeam",
+        "isDeleted": false,
+        "labels": [],
+        "defaultDuration": "P1000Y",
+        "contentType": "Text/Csv",
+        "numberOfLinesToSkip": 0,
+        "itemsSearchKey": "WeaponId",
+        "rawContent": "WeaponId,Type,AssignedUAV,ArmAuthority,Description\r\nMPD-001-PAYLOAD,870g_HE_Self_Destruct,MPD-001,two_person_rule,MPD 자폭 페이로드 (weapon-stub 기본 무장)"
+      },
+      "apiVersion": "2022-08-01"
+    }
+  ]
+}

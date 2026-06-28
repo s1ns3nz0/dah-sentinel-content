@@ -1,0 +1,33 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspaceName": {
+      "type": "string",
+      "metadata": {
+        "description": "Workspace name for Log Analytics where Sentinel is setup"
+      }
+    }
+  },
+  "resources": [
+    {
+      "name": "[concat(parameters('workspaceName'), '/Microsoft.SecurityInsights/UAV_Threshold_List')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/Watchlists",
+      "kind": "",
+      "properties": {
+        "displayName": "UAV_Threshold_List",
+        "source": "UAV_Threshold_List.csv",
+        "description": "Dynamic detection thresholds read by KQL rules — updated by Rule Update Agent (Type C)",
+        "provider": "DAH-BlueTeam",
+        "isDeleted": false,
+        "labels": [],
+        "defaultDuration": "P1000Y",
+        "contentType": "Text/Csv",
+        "numberOfLinesToSkip": 0,
+        "itemsSearchKey": "ThresholdKey",
+        "rawContent": "ThresholdKey,Value,Unit,Description,B_항목,MITRE\r\nMaxPosHorizVariance,5.0,,GNSS EKF 분산 임계 — 초과 시 스푸핑 의심,B-1,T0835\r\nMaxGpsJumpKmPerSec,1.0,km/s,GPS 순간 이동 임계 — 초과 시 스푸핑 의심,B-1,T0835\r\nMaxAirspeed_ms,70,m/s,순항 최대 속도 임계,B-2,T0835\r\nMinAirspeed_ms,9,m/s,실속 최소 속도 임계 (FBW_MIN),B-2,T0835\r\nMinCruiseAlt_m,100,m,AUTO 모드 최소 고도 — 미만 시 지형 충돌 위험,B-2,T0835\r\nMaxClimbRate_ms,20,m/s,수직속도 임계 — 초과 시 이상 조종 의심,B-2,T0835\r\nMaxMissionResetPerMin,5,count/min,미션 리셋 빈도 임계 — 초과 시 외부 조작 의심,B-3,T0821\r\nMaxParamSetPerMin,10,count/min,파라미터 변경 빈도 임계 — 초과 시 무단 변경 의심,B-3,T0836\r\nMaxJamIndicator,0.5,,RF 간섭 지표 임계 — 초과 시 재밍 의심,B-4,T0814\r\nMaxRttMs_SATCOM,5000,ms,SATCOM RTT 임계 — 초과 시 링크 품질 저하,B-5,T0830\r\nOffHoursStart,23,hour,야간 시간 시작 (23시 이후 명령/세션 이상),B-7/B-9,T1078\r\nOffHoursEnd,5,hour,야간 시간 종료 (5시 이전 명령/세션 이상),B-7/B-9,T1078\r\nMaxC4IOrderPerMin,20,count/min,C4I 명령 빈도 임계 — 초과 시 자동화 공격 의심,B-7,T0821\r\nMaxLoginFailurePerMin,5,count/min,로그인 실패 빈도 임계 — 초과 시 브루트포스 의심,B-9,T1110\r\nMaxCameraFramePerMin,50,count/min,카메라 트리거 빈도 임계 — 초과 시 영상 유출 의심,B-11,T1125\r\nMaxFormationDistance_km,5,km,편대 기체 간 최대 허용 거리,B-13,T0827\r\nMaxFormationAltStdDev_m,50,m,편대 고도 표준편차 임계,B-13,T0827"
+      },
+      "apiVersion": "2022-08-01"
+    }
+  ]
+}

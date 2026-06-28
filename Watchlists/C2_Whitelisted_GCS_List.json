@@ -1,0 +1,33 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspaceName": {
+      "type": "string",
+      "metadata": {
+        "description": "Workspace name for Log Analytics where Sentinel is setup"
+      }
+    }
+  },
+  "resources": [
+    {
+      "name": "[concat(parameters('workspaceName'), '/Microsoft.SecurityInsights/C2_Whitelisted_GCS_List')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/Watchlists",
+      "kind": "",
+      "properties": {
+        "displayName": "C2_Whitelisted_GCS_List",
+        "source": "C2_Whitelisted_GCS_List.csv",
+        "description": "Approved GCS IP addresses and hostnames — detects rogue C2 connections (T1133, T1557)",
+        "provider": "DAH-BlueTeam",
+        "isDeleted": false,
+        "labels": [],
+        "defaultDuration": "P1000Y",
+        "contentType": "Text/Csv",
+        "numberOfLinesToSkip": 0,
+        "itemsSearchKey": "GCS_IP",
+        "rawContent": "GCS_IP,GCS_Name,Protocol,AllowedPort,Description\r\n192.168.1.100,primary-gcs,MAVLink,14550,주 지상 통제국 (QGroundControl)\r\n192.168.1.101,backup-gcs,MAVLink,14551,백업 지상 통제국\r\n10.0.0.10,sim-gcs,MAVLink,14550,시뮬레이션 GCS (sim.pollak.store)"
+      },
+      "apiVersion": "2022-08-01"
+    }
+  ]
+}

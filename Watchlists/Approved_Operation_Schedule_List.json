@@ -1,0 +1,33 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspaceName": {
+      "type": "string",
+      "metadata": {
+        "description": "Workspace name for Log Analytics where Sentinel is setup"
+      }
+    }
+  },
+  "resources": [
+    {
+      "name": "[concat(parameters('workspaceName'), '/Microsoft.SecurityInsights/Approved_Operation_Schedule_List')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/Watchlists",
+      "kind": "",
+      "properties": {
+        "displayName": "Approved_Operation_Schedule_List",
+        "source": "Approved_Operation_Schedule_List.csv",
+        "description": "Mission-specific allowed operation hours by CT level — excludes off-hours detections from false positives (B-7/B-9, T1078)",
+        "provider": "DAH-BlueTeam",
+        "isDeleted": false,
+        "labels": [],
+        "defaultDuration": "P1000Y",
+        "contentType": "Text/Csv",
+        "numberOfLinesToSkip": 0,
+        "itemsSearchKey": "MissionId",
+        "rawContent": "MissionId,MissionType,AllowedStartHour,AllowedEndHour,CTLevel,Description\r\nmpd_recon,recon-only,6,22,CT-3,정찰 임무 — 주간 운용 (CT-3 평시)\r\nmpd_recon,recon-only,0,23,CT-2,정찰 임무 — 전시간 운용 가능 (CT-2 경계)\r\nmpd_recon,recon-only,0,23,CT-1,정찰 임무 — 전시간 운용 가능 (CT-1 위기)\r\nmpd_attack,engage-confirmed-hostile,6,22,CT-2,타격 임무 — CT-2 이상만 허용\r\nmpd_attack,engage-confirmed-hostile,0,23,CT-1,타격 임무 — CT-1 전시간 허용\r\nmpd_escort,recon-only,6,22,CT-3,호위 임무 — 주간 운용 (CT-3 평시)"
+      },
+      "apiVersion": "2022-08-01"
+    }
+  ]
+}

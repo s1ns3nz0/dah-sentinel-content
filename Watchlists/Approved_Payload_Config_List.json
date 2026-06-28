@@ -1,0 +1,33 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspaceName": {
+      "type": "string",
+      "metadata": {
+        "description": "Workspace name for Log Analytics where Sentinel is setup"
+      }
+    }
+  },
+  "resources": [
+    {
+      "name": "[concat(parameters('workspaceName'), '/Microsoft.SecurityInsights/Approved_Payload_Config_List')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/Watchlists",
+      "kind": "",
+      "properties": {
+        "displayName": "Approved_Payload_Config_List",
+        "source": "Approved_Payload_Config_List.csv",
+        "description": "Approved UAV payload configurations — detects unauthorized payload assignment in mission plans (mps-stub, T0821)",
+        "provider": "DAH-BlueTeam",
+        "isDeleted": false,
+        "labels": [],
+        "defaultDuration": "P1000Y",
+        "contentType": "Text/Csv",
+        "numberOfLinesToSkip": 0,
+        "itemsSearchKey": "PayloadConfig",
+        "rawContent": "PayloadConfig,AllowedROE,RequiredRole,Description\r\nEO_IR,recon-only,operator,EO/IR 짐벌 — 정찰 전용 페이로드 (기본)\r\nSAR,recon-only,approver,SAR 레이더 — 중대장 승인 필요\r\nSTRIKE_870G,engage-confirmed-hostile,superadmin,870g 자폭탄 — 대대장 승인 필요 + engage-confirmed-hostile ROE 필수"
+      },
+      "apiVersion": "2022-08-01"
+    }
+  ]
+}

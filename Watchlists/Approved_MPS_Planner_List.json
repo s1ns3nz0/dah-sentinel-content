@@ -1,0 +1,33 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspaceName": {
+      "type": "string",
+      "metadata": {
+        "description": "Workspace name for Log Analytics where Sentinel is setup"
+      }
+    }
+  },
+  "resources": [
+    {
+      "name": "[concat(parameters('workspaceName'), '/Microsoft.SecurityInsights/Approved_MPS_Planner_List')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/Watchlists",
+      "kind": "",
+      "properties": {
+        "displayName": "Approved_MPS_Planner_List",
+        "source": "Approved_MPS_Planner_List.csv",
+        "description": "Operators authorized to create/approve mission plans — two-person rule: planner != approver (mps-stub, T1078)",
+        "provider": "DAH-BlueTeam",
+        "isDeleted": false,
+        "labels": [],
+        "defaultDuration": "P1000Y",
+        "contentType": "Text/Csv",
+        "numberOfLinesToSkip": 0,
+        "itemsSearchKey": "OperatorId",
+        "rawContent": "OperatorId,PlannerAuthority,ApproverAuthority,MaxROE,Description\r\nsgt.yang,true,false,recon-only,분대장 — 임무계획 작성 전담 (승인 불가)\r\nlt.kim,true,false,recon-only,소대장 — 임무계획 작성 전담 (승인 불가)\r\ncapt.park,false,true,engage-confirmed-hostile,중대장 — 임무계획 승인 전담 (작성 불가)\r\nmaj.cho,false,true,engage-confirmed-hostile,작전장교 — 임무계획 승인 전담 (작성 불가)\r\ncol.lee,false,true,engage-confirmed-hostile,대대장 — 임무계획 승인 전담 (최종 권한)"
+      },
+      "apiVersion": "2022-08-01"
+    }
+  ]
+}

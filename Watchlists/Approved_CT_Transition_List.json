@@ -1,0 +1,33 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspaceName": {
+      "type": "string",
+      "metadata": {
+        "description": "Workspace name for Log Analytics where Sentinel is setup"
+      }
+    }
+  },
+  "resources": [
+    {
+      "name": "[concat(parameters('workspaceName'), '/Microsoft.SecurityInsights/Approved_CT_Transition_List')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/Watchlists",
+      "kind": "",
+      "properties": {
+        "displayName": "Approved_CT_Transition_List",
+        "source": "Approved_CT_Transition_List.csv",
+        "description": "Operators authorized to change cyber threat posture (CT-3/CT-2/CT-1) — detects unauthorized posture escalation (cyber-posture-stub, T1078)",
+        "provider": "DAH-BlueTeam",
+        "isDeleted": false,
+        "labels": [],
+        "defaultDuration": "P1000Y",
+        "contentType": "Text/Csv",
+        "numberOfLinesToSkip": 0,
+        "itemsSearchKey": "OperatorId",
+        "rawContent": "OperatorId,CanEscalate,CanDeescalate,MaxLevel,AllowedSource,Description\r\ncapt.park,true,true,CT-2,국정원;사이버사;internal,중대장 — CT-2까지 선언 가능\r\nmaj.cho,true,true,CT-2,국정원;사이버사;internal,작전장교 — CT-2까지 선언 가능\r\ncol.lee,true,true,CT-1,국정원;사이버사;internal,대대장 — CT-1 전시 선언 가능"
+      },
+      "apiVersion": "2022-08-01"
+    }
+  ]
+}

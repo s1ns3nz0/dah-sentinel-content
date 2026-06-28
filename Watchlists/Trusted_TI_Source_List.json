@@ -1,0 +1,33 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspaceName": {
+      "type": "string",
+      "metadata": {
+        "description": "Workspace name for Log Analytics where Sentinel is setup"
+      }
+    }
+  },
+  "resources": [
+    {
+      "name": "[concat(parameters('workspaceName'), '/Microsoft.SecurityInsights/Trusted_TI_Source_List')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/Watchlists",
+      "kind": "",
+      "properties": {
+        "displayName": "Trusted_TI_Source_List",
+        "source": "Trusted_TI_Source_List.csv",
+        "description": "Trusted threat intelligence sources — detects IOC injection from untrusted feeds (ti-stub, T1195)",
+        "provider": "DAH-BlueTeam",
+        "isDeleted": false,
+        "labels": [],
+        "defaultDuration": "P1000Y",
+        "contentType": "Text/Csv",
+        "numberOfLinesToSkip": 0,
+        "itemsSearchKey": "SourceId",
+        "rawContent": "SourceId,SourceType,ConfidenceThreshold,Description\r\ninternal,internal,70,내부 SOC 분석팀 생성 IOC\r\nsigint,government,80,신호정보 (SIGINT) 기반 IOC\r\nhumint,government,75,인간정보 (HUMINT) 기반 IOC\r\nuav-eoir,sensor,65,UAV EO/IR 센서 기반 표적 정보\r\ncisa-kev,external,90,CISA Known Exploited Vulnerabilities\r\nnvd,external,85,NVD CVE 피드\r\n사이버사,government,90,사이버작전사령부 IOC 피드\r\n국정원,government,95,국가정보원 IOC 피드"
+      },
+      "apiVersion": "2022-08-01"
+    }
+  ]
+}

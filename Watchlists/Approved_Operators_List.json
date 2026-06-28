@@ -25,7 +25,7 @@
         "contentType": "Text/Csv",
         "numberOfLinesToSkip": 0,
         "itemsSearchKey": "OperatorId",
-        "rawContent": "OperatorId,DisplayName,Role,AllowedHours,Description\r\nop-001,admin,superadmin,always,기본 관리자 계정\r\nop-002,gcs-operator-1,operator,0600-2200,주간 운용 계정 1\r\nop-003,gcs-operator-2,operator,0600-2200,주간 운용 계정 2\r\nop-004,gcs-viewer,viewer,always,모니터링 전용 계정"
+        "rawContent": "OperatorId,DisplayName,Role,AllowedHours,Description\r\nsgt.yang,SGT Yang,operator,0600-2200,분대급 조종사 — 정찰 임무 담당\r\nlt.kim,LT Kim,operator,0600-2200,소대장 — 임무계획 + 조종\r\ncapt.park,CAPT Park,approver,always,중대장 — 임무 승인 권한\r\nmaj.cho,MAJ Cho,approver,always,대대 작전장교 — 임무 승인 권한\r\ncol.lee,COL Lee,superadmin,always,대대장 — 전체 시스템 관리 권한"
       },
       "apiVersion": "2022-08-01"
     }

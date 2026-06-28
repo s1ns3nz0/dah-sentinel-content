@@ -25,7 +25,7 @@
         "contentType": "Text/Csv",
         "numberOfLinesToSkip": 0,
         "itemsSearchKey": "OperatorId",
-        "rawContent": "OperatorId,ArmAuthority,AssignedUAVId,ValidUntil\r\nop-001,true,MPD-001,2026-12-31\r\nop-001,true,MPD-002,2026-12-31"
+        "rawContent": "OperatorId,ArmAuthority,AssignedUAVId,ValidUntil\r\ncol.lee,true,MPD-001,2026-12-31\r\ncol.lee,true,MPD-002,2026-12-31\r\ncapt.park,true,MPD-001,2026-12-31"
       },
       "apiVersion": "2022-08-01"
     }

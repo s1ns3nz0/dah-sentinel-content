@@ -25,7 +25,7 @@
         "contentType": "Text/Csv",
         "numberOfLinesToSkip": 0,
         "itemsSearchKey": "OperatorId",
-        "rawContent": "OperatorId,AllowedUAVId,Role,ValidFrom,ValidUntil\r\nop-001,MPD-001,superadmin,2026-01-01,2026-12-31\r\nop-001,MPD-002,superadmin,2026-01-01,2026-12-31\r\nop-002,MPD-001,operator,2026-01-01,2026-12-31\r\nop-003,MPD-002,operator,2026-01-01,2026-12-31\r\nop-004,MPD-001,viewer,2026-01-01,2026-12-31\r\nop-004,MPD-002,viewer,2026-01-01,2026-12-31"
+        "rawContent": "OperatorId,AllowedUAVId,Role,ValidFrom,ValidUntil\r\ncol.lee,MPD-001,superadmin,2026-01-01,2026-12-31\r\ncol.lee,MPD-002,superadmin,2026-01-01,2026-12-31\r\nmaj.cho,MPD-001,approver,2026-01-01,2026-12-31\r\nmaj.cho,MPD-002,approver,2026-01-01,2026-12-31\r\ncapt.park,MPD-001,approver,2026-01-01,2026-12-31\r\ncapt.park,MPD-002,approver,2026-01-01,2026-12-31\r\nlt.kim,MPD-001,operator,2026-01-01,2026-12-31\r\nsgt.yang,MPD-001,operator,2026-01-01,2026-12-31"
       },
       "apiVersion": "2022-08-01"
     }

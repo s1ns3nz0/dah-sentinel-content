@@ -1,0 +1,33 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspaceName": {
+      "type": "string",
+      "metadata": {
+        "description": "Workspace name for Log Analytics where Sentinel is setup"
+      }
+    }
+  },
+  "resources": [
+    {
+      "name": "[concat(parameters('workspaceName'), '/Microsoft.SecurityInsights/Operator_UAV_Binding_List')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/Watchlists",
+      "kind": "",
+      "properties": {
+        "displayName": "Operator_UAV_Binding_List",
+        "source": "Operator_UAV_Binding_List.csv",
+        "description": "Operator-to-UAV binding — detects lateral movement via compromised accounts controlling unauthorized vehicles (S6, T1078)",
+        "provider": "DAH-BlueTeam",
+        "isDeleted": false,
+        "labels": [],
+        "defaultDuration": "P1000Y",
+        "contentType": "Text/Csv",
+        "numberOfLinesToSkip": 0,
+        "itemsSearchKey": "OperatorId",
+        "rawContent": "OperatorId,AllowedUAVId,Role,ValidFrom,ValidUntil\r\nop-001,MPD-001,superadmin,2026-01-01,2026-12-31\r\nop-001,MPD-002,superadmin,2026-01-01,2026-12-31\r\nop-002,MPD-001,operator,2026-01-01,2026-12-31\r\nop-003,MPD-002,operator,2026-01-01,2026-12-31\r\nop-004,MPD-001,viewer,2026-01-01,2026-12-31\r\nop-004,MPD-002,viewer,2026-01-01,2026-12-31"
+      },
+      "apiVersion": "2022-08-01"
+    }
+  ]
+}

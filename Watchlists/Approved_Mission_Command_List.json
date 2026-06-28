@@ -1,0 +1,33 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspaceName": {
+      "type": "string",
+      "metadata": {
+        "description": "Workspace name for Log Analytics where Sentinel is setup"
+      }
+    }
+  },
+  "resources": [
+    {
+      "name": "[concat(parameters('workspaceName'), '/Microsoft.SecurityInsights/Approved_Mission_Command_List')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/Watchlists",
+      "kind": "",
+      "properties": {
+        "displayName": "Approved_Mission_Command_List",
+        "source": "Approved_Mission_Command_List.csv",
+        "description": "Approved C4I mission command types and ROE — detects unauthorized mission orders (B-7, T0821)",
+        "provider": "DAH-BlueTeam",
+        "isDeleted": false,
+        "labels": [],
+        "defaultDuration": "P1000Y",
+        "contentType": "Text/Csv",
+        "numberOfLinesToSkip": 0,
+        "itemsSearchKey": "CommandType",
+        "rawContent": "CommandType,AllowedROE,IssuedByRole,Description\r\natcis_order,recon-only,approver,정찰 전용 작전 명령 — 교전 불가\r\natcis_order,engage-confirmed-hostile,superadmin,확인된 적대 목표 교전 명령 — 대대장급 이상만\r\nmims_target_update,recon-only,operator,MIMS 표적 정보 업데이트 — 정찰 중 표적 보고\r\nmims_target_update,engage-confirmed-hostile,approver,MIMS 표적 업데이트 (교전 ROE) — 중대장급 이상\r\natcis_friendly_position,recon-only,operator,아군 위치 보고 — 전원 허용"
+      },
+      "apiVersion": "2022-08-01"
+    }
+  ]
+}

@@ -17,7 +17,7 @@
       "properties": {
         "displayName": "Approved_Arm_Operator_List",
         "source": "Approved_Arm_Operator_List.csv",
-        "description": "Operators authorized to arm UAV weapons — login privilege != arm privilege (B-10, T0831)",
+        "description": "Operators authorized to arm/fire UAV weapons — two-person rule: ArmAuthority != FireAuthority (B-10, T0831)",
         "provider": "DAH-BlueTeam",
         "isDeleted": false,
         "labels": [],
@@ -25,7 +25,7 @@
         "contentType": "Text/Csv",
         "numberOfLinesToSkip": 0,
         "itemsSearchKey": "OperatorId",
-        "rawContent": "OperatorId,ArmAuthority,AssignedUAVId,ValidUntil\r\ncol.lee,true,MPD-001,2026-12-31\r\ncol.lee,true,MPD-002,2026-12-31\r\ncapt.park,true,MPD-001,2026-12-31"
+        "rawContent": "OperatorId,ArmAuthority,FireAuthority,AssignedUAVId,ValidUntil,Note\r\ncol.lee,true,false,MPD-001,2026-12-31,대대장 — ARM 전담 (2인통제 ARM역할)\r\ncol.lee,true,false,MPD-002,2026-12-31,대대장 — ARM 전담 (2인통제 ARM역할)\r\ncapt.park,true,false,MPD-001,2026-12-31,중대장 — ARM 전담 (2인통제 ARM역할)\r\nmaj.cho,false,true,MPD-001,2026-12-31,작전장교 — FIRE 전담 (2인통제 FIRE역할)\r\nmaj.cho,false,true,MPD-002,2026-12-31,작전장교 — FIRE 전담 (2인통제 FIRE역할)\r\nlt.kim,false,true,MPD-001,2026-12-31,소대장 — FIRE 전담 (2인통제 FIRE역할)"
       },
       "apiVersion": "2022-08-01"
     }

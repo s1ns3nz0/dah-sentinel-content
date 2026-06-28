@@ -1,0 +1,33 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspaceName": {
+      "type": "string",
+      "metadata": {
+        "description": "Workspace name for Log Analytics where Sentinel is setup"
+      }
+    }
+  },
+  "resources": [
+    {
+      "name": "[concat(parameters('workspaceName'), '/Microsoft.SecurityInsights/Approved_Agent_Action_List')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/Watchlists",
+      "kind": "",
+      "properties": {
+        "displayName": "Approved_Agent_Action_List",
+        "source": "Approved_Agent_Action_List.csv",
+        "description": "Approved LangGraph SOC agent actions by agent — detects agent overreach (ATLAS AML.T0051)",
+        "provider": "DAH-BlueTeam",
+        "isDeleted": false,
+        "labels": [],
+        "defaultDuration": "P1000Y",
+        "contentType": "Text/Csv",
+        "numberOfLinesToSkip": 0,
+        "itemsSearchKey": "AgentId",
+        "rawContent": "AgentId,AllowedAction,Scope,ApprovedBy,Notes\r\nTriage,severity_assessment,read-only,황준식,심각도(h/m/l/i) 산정 — SeverityEngine 정책엔진 사용 LLM 판정권 없음\r\nTriage,priority_ranking,read-only,황준식,우선순위 산정 — llm_suggested_severity 무시 가드레일 적용\r\nTriage,evidence_generation,read-only,황준식,탐지 근거 텍스트 생성\r\nInvestigation,rag_retrieval,read-only,황준식,RAG 지식베이스 검색 ContextRetriever.aretrieve — kb/ 출처만 신뢰\r\nInvestigation,source_verification,read-only,황준식,RAG 출처 검증 — Approved_RAG_Source_List 기반\r\nInvestigation,threat_intel_lookup,read-only,황준식,TI 조회 ThreatIntelTool.alookup — Trusted_TI_Source_List 기반\r\nInvestigation,signal_correlation,read-only,황준식,다중 신호 상관 분석\r\nInvestigation,confidence_scoring,read-only,황준식,confidence 점수 산정\r\nInvestigation,llm_summary,read-only,황준식,LLM 요약 생성 조건부 — RAG 장애 시 우아한 강등\r\nValidation,tp_fp_judgment,decision,황준식,오탐/정탐 판정 signal_judge / default_judge\r\nValidation,routing,decision,황준식,분기 라우팅 route_after_validation\r\nResponse,playbook_execution,action,황준식,플레이북 실행 playbook_id + actions 구성\r\nResponse,auto_response_config,action,황준식,등급별 auto_response / hitl 메타 구성\r\nRuleUpdate,rule_update_proposal,write-limited,황준식,탐지룰 수정 제안 rule update + reason — 오탐 룰 개선 루프\r\nRuleUpdate,pr_stub_creation,write-limited,황준식,GitHub PR stub 생성\r\nReport,report_assembly,write-limited,황준식,리포트 조립 등급별 차등\r\nReport,oscal_evidence,write-limited,황준식,OSCAL 증거 기록 action_taken 포함\r\nApproval,approval_gate,decision,황준식,severity=high 시 승인 대기 approve_auto_response — 방산 HITL 게이트\r\nApproval,auto_bypass,decision,황준식,--auto 모드 시 자동 통과"
+      },
+      "apiVersion": "2022-08-01"
+    }
+  ]
+}

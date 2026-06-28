@@ -1,0 +1,33 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspaceName": {
+      "type": "string",
+      "metadata": {
+        "description": "Workspace name for Log Analytics where Sentinel is setup"
+      }
+    }
+  },
+  "resources": [
+    {
+      "name": "[concat(parameters('workspaceName'), '/Microsoft.SecurityInsights/Approved_RAG_Source_List')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/Watchlists",
+      "kind": "",
+      "properties": {
+        "displayName": "Approved_RAG_Source_List",
+        "source": "Approved_RAG_Source_List.csv",
+        "description": "Approved RAG knowledge base sources — detects unauthorized source injection (S5 RAG poisoning, ATLAS AML.T0054)",
+        "provider": "DAH-BlueTeam",
+        "isDeleted": false,
+        "labels": [],
+        "defaultDuration": "P1000Y",
+        "contentType": "Text/Csv",
+        "numberOfLinesToSkip": 0,
+        "itemsSearchKey": "SourceId",
+        "rawContent": "SourceId,SourceType,SourceName,SourceUrl,ApprovedBy,ApprovedDate,ChunkCount,Notes\r\nincident_cases,internal,Incident Cases S1~S11 (LLM Evidence),internal,황준식,2026-06,13,자체 작성 사건사례 S1~S11 + LLM 근거\r\nmitre_ics_filtered,framework,MITRE ATT&CK for ICS (Filtered Export),https://attack.mitre.org,황준식,2026-06,104,ICS ATT&CK 프레임워크 export\r\niec62443_raw,standard,IEC 62443 Series Standards,https://www.isa.org/standards-and-publications/isa-standards/isa-iec-62443-series-of-standards,황준식,2026-06,2,IEC 62443 표준 문서 + 응답템플릿\r\naissou_gps_spoofing,dataset,Aissou GPS Spoofing Dataset,https://data.mendeley.com/datasets/z7dj3yyzt8/3,황준식,2026-06,2,\"GPS 스푸핑 데이터셋 카드 (XLSX 원천, CC BY 4.0)\"\r\nieee_uav_attack,dataset,IEEE UAV Attack Dataset,https://ieee-dataport.org/open-access/uav-attack-dataset,황준식,2026-06,3,\"UAV 공격 데이터셋 (PX4 ULOG/CSV, CC BY 4.0)\"\r\nuav_network_communication,dataset,UAV Network Communication Dataset,https://github.com/naiksrinu/UAV_DataSet_NetworkCommunication,황준식,2026-06-11,3,PCAP/PKL WiFi+GPS 네트워크 통신 데이터셋\r\nlig_drone_catalog,report,LIG Drone Catalog Report (PDF),internal-lig,황준식,2026-06,1,LIG 내부 드론 카탈로그 보고서\r\nuav_ugv_satcom_report,report,UAV/UGV SATCOM Report (PDF),internal-lig,황준식,2026-06,1,LIG 내부 UAV/UGV SATCOM 도메인 보고서"
+      },
+      "apiVersion": "2022-08-01"
+    }
+  ]
+}

@@ -27,8 +27,8 @@
         "suppressionEnabled": false,
         "startTimeUtc": null,
         "tactics": [
-          "CredentialAccess",
-          "InitialAccess"
+          "Credential Access",
+          "Initial Access"
         ],
         "techniques": [
           "T1110",

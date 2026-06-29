@@ -28,7 +28,7 @@
         "startTimeUtc": null,
         "tactics": [
           "Discovery",
-          "LateralMovement"
+          "Lateral Movement"
         ],
         "techniques": [
           "T1557",

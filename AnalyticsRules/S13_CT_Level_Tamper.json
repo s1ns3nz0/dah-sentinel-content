@@ -27,8 +27,8 @@
         "suppressionEnabled": false,
         "startTimeUtc": null,
         "tactics": [
-          "DefenseEvasion",
-          "CredentialAccess"
+          "Defense Evasion",
+          "Credential Access"
         ],
         "techniques": [
           "T1078"

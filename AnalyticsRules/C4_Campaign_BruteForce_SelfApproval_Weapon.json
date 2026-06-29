@@ -27,7 +27,7 @@
         "suppressionEnabled": false,
         "startTimeUtc": null,
         "tactics": [
-          "CredentialAccess",
+          "Credential Access",
           "Impact"
         ],
         "techniques": [

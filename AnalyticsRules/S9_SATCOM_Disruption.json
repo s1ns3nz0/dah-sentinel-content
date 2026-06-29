@@ -27,7 +27,7 @@
         "suppressionEnabled": false,
         "startTimeUtc": null,
         "tactics": [
-          "InitialAccess",
+          "Initial Access",
           "Impact"
         ],
         "techniques": [

@@ -27,8 +27,8 @@
         "suppressionEnabled": false,
         "startTimeUtc": null,
         "tactics": [
-          "DefenseEvasion",
-          "InitialAccess"
+          "Defense Evasion",
+          "Initial Access"
         ],
         "techniques": [
           "T1489",

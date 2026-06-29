@@ -1,0 +1,84 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/bed1abc0-6d8d-4698-b907-3c62c51fa037')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/bed1abc0-6d8d-4698-b907-3c62c51fa037')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV Campaign C5 - Failsafe Disable → MAVLink MITM → Container DoS → No RTL",
+        "description": "Failsafe 파라미터 비활성화(S19) → MAVLink 서명실패(S18) → 컨테이너 자원고갈(S25). 연결키: UAVId. 윈도우: 45m. MITRE: T0838, T0842, T1499",
+        "severity": "High",
+        "enabled": true,
+        "query": "let windowSize = 45m;\nlet fsParams = dynamic([\"FS_THR_ENABLE\",\"FS_GCS_ENABLE\",\"FS_EKF_ACTION\",\"FS_CRASH_CHECK\"]);\nlet cpuMax = toscalar(\n    _GetWatchlist('UAV_Threshold_List')\n    | where ThresholdKey == 'MaxCpuUsagePct'\n    | project toreal(Value));\n// S19: Failsafe 파라미터 비활성화\nlet S19 =\n    UAVConfigAudit_CL\n    | where TimeGenerated > ago(windowSize)\n    | where ParamId in (fsParams)\n    | where toreal(ParamValueAfter) == 0\n    | project T1=TimeGenerated, UAVId=tostring(UAVId), ParamId;\n// S18: MAVLink 서명실패 (중간자)\nlet S18 =\n    UAVMavsec_CL\n    | where TimeGenerated > ago(windowSize)\n    | where FailedCount > 0\n    | project T2=TimeGenerated, UAVId=tostring(UAVId);\n// S25: 컨테이너 자원고갈 DoS\nlet S25 =\n    UAVResourceMetrics_CL\n    | where TimeGenerated > ago(windowSize)\n    | where CpuUsagePct > cpuMax\n    | where ContainerName contains \"mavlink\"\n    | summarize T3=min(TimeGenerated) by ContainerName;\nS19\n| join kind=inner (S18) on UAVId\n| where T2 >= T1 and T2 <= T1 + 15m\n| join kind=inner (S25)\n    on $left.T2 <= $right.T3 and $right.T3 <= ($left.T2 + 10m)\n| extend CampaignType = \"C5_Failsafe무력화_MAVLink중간자_DoS_RTL없음\"\n| extend StepSummary = strcat(\"S19@\", tostring(T1), \"(\", ParamId, \"=0) → S18@\", tostring(T2), \" → S25@\", tostring(T3))\n| extend Severity = \"High\"\n| project T1, T2, T3, UAVId, ParamId, ContainerName, CampaignType, StepSummary, Severity",
+        "queryFrequency": "PT10M",
+        "queryPeriod": "PT1H",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "DefenseEvasion",
+          "Impact"
+        ],
+        "techniques": [
+          "T1562",
+          "T1557",
+          "T1499"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": true,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT2H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Host"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "[CAMPAIGN] UAV Campaign C5 - Failsafe Disable → MAVLink MITM → Container DoS → No RTL - {{UAVId}}",
+          "alertDescriptionFormat": "CampaignType={{CampaignType}} | Steps={{StepSummary}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "CampaignType": "CampaignType",
+          "StepSummary": "StepSummary",
+          "UAVId": "UAVId",
+          "ParamId": "ParamId"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "UAVId"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

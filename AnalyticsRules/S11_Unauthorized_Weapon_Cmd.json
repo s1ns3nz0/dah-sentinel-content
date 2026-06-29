@@ -1,0 +1,80 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/1da5d32f-08fe-4f8e-b3b2-6c5dfb02188c')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/1da5d32f-08fe-4f8e-b3b2-6c5dfb02188c')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S11 - Unauthorized Weapon Command (ARM/FIRE without 2-person control)",
+        "description": "2인통제 우회 또는 비인가 운영자/페이로드/무기로 ARM/FIRE 명령 탐지. armed_by == fire_requester(자기승인), 비인가 OperatorId, 비인가 WeaponId, 비인가 PayloadConfig. MITRE: T0831 Manipulation of Control",
+        "severity": "High",
+        "enabled": true,
+        "query": "let alertWindow = 10m;\nlet ApprovedArm = _GetWatchlist('Approved_Arm_Operator_List') | project OperatorId;\nlet ApprovedWeapons = _GetWatchlist('Approved_Weapon_List') | project WeaponId;\nlet ApprovedPayloads = _GetWatchlist('Approved_Payload_Config_List') | project PayloadConfig;\nUAVWeapon_CL\n| where TimeGenerated > ago(alertWindow)\n| where EventType in ('arm', 'fire')\n| extend isSelfApproval = (armed_by == fire_requester)\n| extend isUnknownOp = OperatorId !in (ApprovedArm)\n| extend isUnknownWeapon = WeaponId !in (ApprovedWeapons)\n| extend isUnknownPayload = PayloadConfig !in (ApprovedPayloads)\n| where isSelfApproval or isUnknownOp or isUnknownWeapon or isUnknownPayload\n| extend TriggerReason = case(\n    isSelfApproval, \"무장_2인통제_자기승인\",\n    isUnknownOp, strcat(\"무장_비인가_운영자_\", OperatorId),\n    isUnknownWeapon, strcat(\"무장_비인가_WeaponId_\", WeaponId),\n    strcat(\"무장_비인가_PayloadConfig_\", PayloadConfig))\n| extend Severity = \"High\"\n| project TimeGenerated, UAVId, OperatorId, WeaponId, PayloadConfig,\n    EventType, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "queryFrequency": "PT5M",
+        "queryPeriod": "PT15M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT1H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "Impact"
+        ],
+        "techniques": [
+          "T0831"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": true,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT1H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Account"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S11 - Unauthorized Weapon Command (ARM/FIRE without 2-person control) - {{OperatorId}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Severity={{Severity}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "WeaponId": "WeaponId",
+          "OperatorId": "OperatorId"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Account",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "OperatorId"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

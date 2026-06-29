@@ -1,0 +1,81 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/07f76e97-68cb-4810-ba9d-dcdba832eba9')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/07f76e97-68cb-4810-ba9d-dcdba832eba9')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S16 - AOI Excursion (Unauthorized Area of Interest Departure)",
+        "description": "UAV가 AOI_Boundary_List에 정의된 임무구역을 이탈하고 최소속도 이상으로 비행 중 3회 이상 연속 이탈 이벤트 탐지. MITRE: T0835 Manipulate I/O Image / Collection",
+        "severity": "Medium",
+        "enabled": true,
+        "query": "let alertWindow = 15m;\nlet minSpeed = toscalar(\n    _GetWatchlist('UAV_Threshold_List')\n    | where ThresholdKey == 'MinGroundspeed_ms'\n    | project toreal(Value));\nlet AoiBounds = _GetWatchlist('AOI_Boundary_List') | project MissionId;\nUAVTelemetry_CL\n| where TimeGenerated > ago(alertWindow)\n| where MsgType == 'GLOBAL_POSITION_INT'\n| where Groundspeed > minSpeed\n| join kind=leftanti (AoiBounds) on $left.MissionId == $right.MissionId\n| summarize ExcursionCount=count(), FirstSeen=min(TimeGenerated),\n    MaxSpeed=max(Groundspeed)\n    by UAVId, MissionId, bin(TimeGenerated, 5m)\n| where ExcursionCount >= 3\n| extend TriggerReason = strcat(\"AOI_이탈_\", tostring(ExcursionCount), \"회_MissionId_\", MissionId)\n| extend Severity = \"Medium\"\n| project FirstSeen, UAVId, MissionId, ExcursionCount, MaxSpeed, TriggerReason, Severity\n| order by FirstSeen desc",
+        "queryFrequency": "PT5M",
+        "queryPeriod": "PT20M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT1H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "Collection"
+        ],
+        "techniques": [
+          "T1557",
+          "T1020"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": true,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT1H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Host"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S16 - AOI Excursion (Unauthorized Area of Interest Departure) - {{UAVId}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Severity={{Severity}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "MissionId": "MissionId",
+          "ExcursionCount": "ExcursionCount"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "UAVId"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

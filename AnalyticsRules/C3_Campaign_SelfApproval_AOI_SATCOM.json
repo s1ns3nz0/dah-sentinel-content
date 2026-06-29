@@ -1,0 +1,85 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/8b96bb14-4005-472a-872e-f6d18e7fcb08')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/8b96bb14-4005-472a-872e-f6d18e7fcb08')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV Campaign C3 - Mission Self-Approval → AOI Excursion → SATCOM Exfil",
+        "description": "2인통제 우회 자기승인(S12) → AOI 이탈(S16) → SATCOM 무결성 이상(S3). 연결키: MissionId. 윈도우: 2h. MITRE: T1078, T0835, T1557",
+        "severity": "High",
+        "enabled": true,
+        "query": "let windowSize = 2h;\nlet AoiBounds = _GetWatchlist('AOI_Boundary_List') | project MissionId;\n// S12: 임무 자기승인\nlet S12 =\n    UAVMissionPlan_CL\n    | where TimeGenerated > ago(windowSize)\n    | where Planner == Approver\n    | project T1=TimeGenerated, MissionId=tostring(MissionId), OperatorId=Planner;\n// S16: AOI 이탈\nlet S16 =\n    UAVTelemetry_CL\n    | where TimeGenerated > ago(windowSize)\n    | where MsgType == 'GLOBAL_POSITION_INT'\n    | join kind=leftanti (AoiBounds) on $left.MissionId == $right.MissionId\n    | summarize ExcursionCount=count(), T2=min(TimeGenerated)\n        by MissionId=tostring(MissionId)\n    | where ExcursionCount >= 3;\n// S3: SATCOM 무결성 이상\nlet S3 =\n    UAVSatcomLink_CL\n    | where TimeGenerated > ago(windowSize)\n    | where IntegrityStatus != 'ok' or toreal(JamIndicator) > 0.15\n    | summarize T3=min(TimeGenerated) by SessionId;\nS12\n| join kind=inner (S16) on MissionId\n| where T2 >= T1 and T2 <= T1 + 60m\n| join kind=inner (S3)\n    on $left.T2 <= $right.T3 and $right.T3 <= ($left.T2 + 60m)\n| extend CampaignType = \"C3_자기승인임무_AOI이탈_SATCOM유출\"\n| extend StepSummary = strcat(\"S12@\", tostring(T1), \" → S16@\", tostring(T2), \" → S3@\", tostring(T3))\n| extend Severity = \"High\"\n| project T1, T2, T3, MissionId, OperatorId, CampaignType, StepSummary, Severity",
+        "queryFrequency": "PT15M",
+        "queryPeriod": "PT2H",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT4H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "CredentialAccess",
+          "Collection",
+          "Exfiltration"
+        ],
+        "techniques": [
+          "T1078",
+          "T1557",
+          "T1020"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": true,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT4H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Host"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "[CAMPAIGN] UAV Campaign C3 - Mission Self-Approval → AOI Excursion → SATCOM Exfil - {{MissionId}}",
+          "alertDescriptionFormat": "CampaignType={{CampaignType}} | Steps={{StepSummary}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "CampaignType": "CampaignType",
+          "StepSummary": "StepSummary",
+          "MissionId": "MissionId",
+          "OperatorId": "OperatorId"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "MissionId"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

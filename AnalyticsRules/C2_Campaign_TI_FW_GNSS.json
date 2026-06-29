@@ -1,0 +1,84 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/2a09858f-f659-4385-9a09-de12a2a1d32b')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/2a09858f-f659-4385-9a09-de12a2a1d32b')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV Campaign C2 - TI Poisoning → Firmware Tamper → GNSS Spoofing",
+        "description": "공급망 기반 킬체인: 비신뢰 TI 소스 주입(S14) → 펌웨어 해시 불일치(S4) → GNSS 스푸핑(S1). 연결키: UAVId. 윈도우: 4h. MITRE: T1195, T1542, T0835",
+        "severity": "High",
+        "enabled": true,
+        "query": "let windowSize = 4h;\nlet TrustedSrc = _GetWatchlist('Trusted_TI_Source_List') | project SourceId;\nlet posVarGate = toscalar(\n    _GetWatchlist('UAV_Threshold_List')\n    | where ThresholdKey == 'MaxPosHorizVariance'\n    | project toreal(Value));\n// S14: TI 소스 오염\nlet S14 =\n    UAVThreatIntel_CL\n    | where TimeGenerated > ago(windowSize)\n    | where Source !in (TrustedSrc)\n    | summarize T1=min(TimeGenerated) by UAVId=tostring(UAVId);\n// S4: 펌웨어 해시 불일치\nlet S4 =\n    UAVPgse_CL\n    | where TimeGenerated > ago(windowSize)\n    | where HashMatch == false or SbomForbiddenCount > 0\n    | project T2=TimeGenerated, UAVId=tostring(UAVId);\n// S1: GNSS 스푸핑\nlet S1 =\n    UAVTelemetry_CL\n    | where TimeGenerated > ago(windowSize)\n    | where MsgType == 'GPS_RAW_INT'\n    | where PosHorizVariance > posVarGate\n    | project T3=TimeGenerated, UAVId=tostring(UAVId);\nS14\n| join kind=inner (S4) on UAVId\n| where T2 >= T1 and T2 <= T1 + 2h\n| join kind=inner (S1) on UAVId\n| where T3 >= T2 and T3 <= T2 + 2h\n| extend CampaignType = \"C2_TI오염_펌웨어변조_GNSS스푸핑\"\n| extend StepSummary = strcat(\"S14@\", tostring(T1), \" → S4@\", tostring(T2), \" → S1@\", tostring(T3))\n| extend Severity = \"High\"\n| project T1, T2, T3, UAVId, CampaignType, StepSummary, Severity",
+        "queryFrequency": "PT15M",
+        "queryPeriod": "PT4H",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT6H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "InitialAccess",
+          "Persistence",
+          "Impact"
+        ],
+        "techniques": [
+          "T1195",
+          "T1542",
+          "T1565"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": true,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT6H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Host"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "[CAMPAIGN] UAV Campaign C2 - TI Poisoning → Firmware Tamper → GNSS Spoofing - {{UAVId}}",
+          "alertDescriptionFormat": "CampaignType={{CampaignType}} | Steps={{StepSummary}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "CampaignType": "CampaignType",
+          "StepSummary": "StepSummary",
+          "UAVId": "UAVId"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "UAVId"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

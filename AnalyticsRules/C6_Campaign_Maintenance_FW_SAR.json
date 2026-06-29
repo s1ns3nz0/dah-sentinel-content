@@ -1,0 +1,85 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/d7dac53a-04b5-45fb-9842-662be11ff8ba')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/d7dac53a-04b5-45fb-9842-662be11ff8ba')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV Campaign C6 - Maintenance Implant → Firmware Tamper → SAR Target Exfil",
+        "description": "장기 공급망 체인: 정비 중 임플란트(S21) → 펌웨어 해시 불일치 재확인(S4) → SAR 표적 허가구역 외 유출(S17). 연결키: UAVId. 윈도우: 24h. MITRE: T0864, T1542, T1020",
+        "severity": "High",
+        "enabled": true,
+        "query": "let windowSize = 24h;\n// S21: 정비 중 임플란트 (component_replace + HashMatch=false)\nlet S21 =\n    UAVMaintenance_CL\n    | where TimeGenerated > ago(windowSize)\n    | where EventType == 'component_replace'\n    | join kind=inner (\n        UAVPgse_CL\n        | where TimeGenerated > ago(windowSize)\n        | where HashMatch == false\n        | project T_pgse=TimeGenerated, UAVId=tostring(UAVId)\n    ) on UAVId\n    | where T_pgse >= TimeGenerated and T_pgse <= TimeGenerated + 30m\n    | project T1=TimeGenerated, UAVId=tostring(UAVId), ComponentName;\n// S4: 펌웨어 해시 불일치 재확인\nlet S4 =\n    UAVPgse_CL\n    | where TimeGenerated > ago(windowSize)\n    | where HashMatch == false\n    | project T2=TimeGenerated, UAVId=tostring(UAVId);\n// S17: SAR 표적 허가구역 외 유출\nlet AuthArea = UAVC4I_CL\n    | where TimeGenerated > ago(windowSize)\n    | summarize arg_max(TimeGenerated, AreaLat, AreaLon, AreaRadius_km) by MissionId;\nlet S17 =\n    UAVSarPayload_CL\n    | where TimeGenerated > ago(windowSize)\n    | join kind=leftouter (AuthArea) on MissionId\n    | extend distKm = geo_distance_2points(\n        toreal(TargetLon), toreal(TargetLat),\n        toreal(AreaLon), toreal(AreaLat)) / 1000.0\n    | where distKm > toreal(AreaRadius_km)\n    | project T3=TimeGenerated, UAVId=tostring(UAVId), distKm;\nS21\n| join kind=inner (S4) on UAVId\n| where T2 >= T1\n| join kind=inner (S17) on UAVId\n| where T3 >= T2\n| extend CampaignType = \"C6_정비임플란트_펌웨어변조_SAR표적유출\"\n| extend StepSummary = strcat(\"S21@\", tostring(T1), \"(\", ComponentName, \") → S4@\", tostring(T2), \" → S17@\", tostring(T3), \"(\", tostring(round(distKm,1)), \"km)\")\n| extend Severity = \"High\"\n| project T1, T2, T3, UAVId, ComponentName, distKm, CampaignType, StepSummary, Severity",
+        "queryFrequency": "PT30M",
+        "queryPeriod": "P1D",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT6H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "InitialAccess",
+          "Persistence",
+          "Exfiltration"
+        ],
+        "techniques": [
+          "T1195",
+          "T1542",
+          "T1020"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": true,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT6H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Host"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "[CAMPAIGN] UAV Campaign C6 - Maintenance Implant → Firmware Tamper → SAR Target Exfil - {{UAVId}}",
+          "alertDescriptionFormat": "CampaignType={{CampaignType}} | Steps={{StepSummary}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "CampaignType": "CampaignType",
+          "StepSummary": "StepSummary",
+          "UAVId": "UAVId",
+          "ComponentName": "ComponentName"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "UAVId"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

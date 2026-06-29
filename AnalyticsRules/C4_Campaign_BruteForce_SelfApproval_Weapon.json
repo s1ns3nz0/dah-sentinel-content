@@ -1,0 +1,84 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/a9fb772d-8001-4186-bf5c-fa6cca5afad0')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/a9fb772d-8001-4186-bf5c-fa6cca5afad0')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV Campaign C4 - Account Takeover → Mission Self-Approval → Weapon",
+        "description": "단시간 고위험 체인: GCS 계정탈취(S6) → 임무 자기승인(S12) → 비인가 무장(S11). 연결키: OperatorId. 윈도우: 90m. MITRE: T1078, T0831",
+        "severity": "High",
+        "enabled": true,
+        "query": "let windowSize = 90m;\nlet ApprovedArm = _GetWatchlist('Approved_Arm_Operator_List') | project OperatorId;\n// S6: GCS 계정 탈취 (브루트포스)\nlet S6 =\n    UAVOpAudit_CL\n    | where TimeGenerated > ago(windowSize)\n    | where EventType == 'login_failure'\n    | summarize FailCount=count(), T1=min(TimeGenerated) by OperatorId\n    | where FailCount >= 5;\n// S12: 임무 자기승인\nlet S12 =\n    UAVMissionPlan_CL\n    | where TimeGenerated > ago(windowSize)\n    | where Planner == Approver\n    | project T2=TimeGenerated, OperatorId=Planner, MissionId;\n// S11: 비인가 무장\nlet S11 =\n    UAVWeapon_CL\n    | where TimeGenerated > ago(windowSize)\n    | where EventType in ('arm','fire')\n    | where OperatorId !in (ApprovedArm)\n    | project T3=TimeGenerated, OperatorId, WeaponId;\nS6\n| join kind=inner (S12) on OperatorId\n| where T2 >= T1 and T2 <= T1 + 45m\n| join kind=inner (S11) on OperatorId\n| where T3 >= T2 and T3 <= T2 + 30m\n| extend CampaignType = \"C4_계정탈취_임무자기승인_무장\"\n| extend StepSummary = strcat(\"S6@\", tostring(T1), \"(실패:\", tostring(FailCount), \"회) → S12@\", tostring(T2), \" → S11@\", tostring(T3))\n| extend Severity = \"High\"\n| project T1, T2, T3, OperatorId, MissionId, WeaponId, FailCount, CampaignType, StepSummary, Severity",
+        "queryFrequency": "PT10M",
+        "queryPeriod": "PT2H",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT3H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "CredentialAccess",
+          "Impact"
+        ],
+        "techniques": [
+          "T1078",
+          "T1110",
+          "T0831"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": true,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT3H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Account"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "[CAMPAIGN] UAV Campaign C4 - Account Takeover → Mission Self-Approval → Weapon - {{OperatorId}}",
+          "alertDescriptionFormat": "CampaignType={{CampaignType}} | Steps={{StepSummary}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "CampaignType": "CampaignType",
+          "StepSummary": "StepSummary",
+          "WeaponId": "WeaponId",
+          "OperatorId": "OperatorId"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Account",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "OperatorId"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

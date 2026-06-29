@@ -1,0 +1,83 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/898c9091-9c8a-491c-9639-ed07afb82241')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/898c9091-9c8a-491c-9639-ed07afb82241')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV Campaign C7 - Container Kill → Detection Blind Spot → GCS Breach",
+        "description": "telemetry-tap 강제 중단(S23)으로 탐지 맹점 생성 후 GCS 비인가 로그인(S6). 연결키: 시간 인접성. 윈도우: 30m. MITRE: T0881, T1078",
+        "severity": "High",
+        "enabled": true,
+        "query": "let windowSize = 30m;\nlet ApprovedOps = _GetWatchlist('Approved_Operators_List') | project OperatorId;\n// S23: telemetry-tap 강제 중단\nlet S23 =\n    UAVServiceAudit_CL\n    | where TimeGenerated > ago(windowSize)\n    | where ContainerName == 'telemetry-tap'\n    | where Action in ('stop','kill')\n    | project T1=TimeGenerated, ContainerName;\n// S6: 탐지 맹점 구간 내 GCS 비인가 로그인\nlet S6 =\n    UAVOpAudit_CL\n    | where TimeGenerated > ago(windowSize)\n    | where EventType == 'login_success'\n    | where Operator !in (ApprovedOps)\n    | project T2=TimeGenerated, OperatorId=Operator;\nS23\n| join kind=inner (S6)\n    on $left.T1 <= $right.T2\n    and $right.T2 <= ($left.T1 + 20m)\n| extend BlindWindowMin = datetime_diff('minute', T2, T1)\n| extend CampaignType = \"C7_서비스중단_탐지맹점_GCS침해\"\n| extend StepSummary = strcat(\"S23@\", tostring(T1), \"(telemetry-tap종료) → S6@\", tostring(T2), \"(맹점\", tostring(BlindWindowMin), \"분후)\")\n| extend Severity = \"High\"\n| project T1, T2, ContainerName, OperatorId, BlindWindowMin, CampaignType, StepSummary, Severity",
+        "queryFrequency": "PT10M",
+        "queryPeriod": "PT1H",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "DefenseEvasion",
+          "InitialAccess"
+        ],
+        "techniques": [
+          "T1489",
+          "T1078"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": true,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT2H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Account"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "[CAMPAIGN] UAV Campaign C7 - Container Kill → Detection Blind Spot → GCS Breach - {{OperatorId}}",
+          "alertDescriptionFormat": "CampaignType={{CampaignType}} | Steps={{StepSummary}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "CampaignType": "CampaignType",
+          "StepSummary": "StepSummary",
+          "OperatorId": "OperatorId",
+          "BlindWindowMin": "BlindWindowMin"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Account",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "OperatorId"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

@@ -1,0 +1,80 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/2f2522aa-6532-48e8-87a1-05c07bc86e31')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/2f2522aa-6532-48e8-87a1-05c07bc86e31')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S25 - Container Resource Exhaustion DoS (CPU/Memory + Connection Burst)",
+        "description": "UAVResourceMetrics_CL에서 특정 컨테이너 CPU > MaxCpuUsagePct 또는 Memory > MaxMemoryUsageMb가 5분 이상 지속, 동시에 UAVDatalinkConn_CL에서 연결 폭증 탐지. MITRE: T1499 Endpoint DoS",
+        "severity": "High",
+        "enabled": true,
+        "query": "let alertWindow = 15m;\nlet cpuMax = toscalar(\n    _GetWatchlist('UAV_Threshold_List')\n    | where ThresholdKey == 'MaxCpuUsagePct'\n    | project toreal(Value));\nlet memMax = toscalar(\n    _GetWatchlist('UAV_Threshold_List')\n    | where ThresholdKey == 'MaxMemoryUsageMb'\n    | project toreal(Value));\nlet ResourceAlert =\n    UAVResourceMetrics_CL\n    | where TimeGenerated > ago(alertWindow)\n    | where CpuUsagePct > cpuMax or MemoryUsageMb > memMax\n    | summarize MaxCpu=max(CpuUsagePct), MaxMem=max(MemoryUsageMb),\n        DurationMin=datetime_diff('minute', max(TimeGenerated), min(TimeGenerated))\n        by ContainerName, bin(TimeGenerated, 5m)\n    | where DurationMin >= 5\n    | project TimeGenerated, ContainerName, MaxCpu, MaxMem;\nlet ConnBurst =\n    UAVDatalinkConn_CL\n    | where TimeGenerated > ago(alertWindow)\n    | summarize ConnCount=count() by PeerIp, bin(TimeGenerated, 1m)\n    | where ConnCount > 50\n    | project TimeGenerated, PeerIp, ConnCount;\nResourceAlert\n| join kind=leftouter (ConnBurst) on TimeGenerated\n| extend TriggerReason = case(\n    isnotnull(ConnCount), strcat(ContainerName, \"_자원고갈_연결폭증_동시_CPU:\", tostring(toint(MaxCpu)), \"%\"),\n    MaxCpu > cpuMax and MaxMem > memMax, strcat(ContainerName, \"_CPU_메모리_동시_임계초과\"),\n    strcat(ContainerName, \"_자원고갈_5분지속_CPU:\", tostring(toint(MaxCpu)), \"%\"))\n| extend Severity = \"High\"\n| project TimeGenerated, ContainerName, MaxCpu, MaxMem, ConnCount, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "queryFrequency": "PT5M",
+        "queryPeriod": "PT20M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT1H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "Impact"
+        ],
+        "techniques": [
+          "T1499"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": true,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT1H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Host"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S25 - Container Resource Exhaustion DoS (CPU/Memory + Connection Burst) - {{ContainerName}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Severity={{Severity}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "ContainerName": "ContainerName",
+          "MaxCpu": "MaxCpu"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "ContainerName"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

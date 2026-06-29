@@ -1,0 +1,80 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/1efae747-e13e-4044-af57-5c7af349c010')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/1efae747-e13e-4044-af57-5c7af349c010')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S17 - SAR Target Coordinate Exfiltration (Outside Authorized Area)",
+        "description": "UAVSarPayload_CL의 TargetLat/TargetLon이 UAVC4I_CL의 허가구역(AreaLat/AreaLon/AreaRadius_km) 외부인 경우 또는 단시간 프레임 버스트 탐지. MITRE: T1020 Automated Exfiltration",
+        "severity": "High",
+        "enabled": true,
+        "query": "let alertWindow = 15m;\nlet AuthArea = UAVC4I_CL\n    | where TimeGenerated > ago(1h)\n    | summarize arg_max(TimeGenerated, AreaLat, AreaLon, AreaRadius_km) by MissionId;\nUAVSarPayload_CL\n| where TimeGenerated > ago(alertWindow)\n| join kind=leftouter (AuthArea) on MissionId\n| extend distKm = geo_distance_2points(\n    toreal(TargetLon), toreal(TargetLat),\n    toreal(AreaLon), toreal(AreaLat)) / 1000.0\n| extend isOutsideArea = isnotnull(AreaLat) and distKm > toreal(AreaRadius_km)\n| summarize FrameCount=count(), OutsideCount=countif(isOutsideArea),\n    MaxSizeBytes=max(SizeBytes), MaxDistKm=max(distKm)\n    by UAVId, MissionId, bin(TimeGenerated, 5m)\n| where OutsideCount > 0 or FrameCount > 100\n| extend TriggerReason = case(\n    OutsideCount > 0, strcat(\"SAR_허가구역_외_표적좌표_\", tostring(OutsideCount), \"건_최대거리_\", tostring(round(MaxDistKm, 1)), \"km\"),\n    \"SAR_프레임_버스트_\" + tostring(FrameCount) + \"건/5min\")\n| extend Severity = \"High\"\n| project TimeGenerated, UAVId, MissionId, FrameCount, OutsideCount, MaxDistKm, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "queryFrequency": "PT5M",
+        "queryPeriod": "PT20M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT1H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "Exfiltration"
+        ],
+        "techniques": [
+          "T1020"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": true,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT1H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Host"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S17 - SAR Target Coordinate Exfiltration (Outside Authorized Area) - {{UAVId}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Severity={{Severity}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "MissionId": "MissionId",
+          "OutsideCount": "OutsideCount"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "UAVId"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

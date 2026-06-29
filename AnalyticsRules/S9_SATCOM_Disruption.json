@@ -1,0 +1,81 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/09df790e-d93b-4420-a516-371172981c0a')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/09df790e-d93b-4420-a516-371172981c0a')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S9 - SATCOM Terminal Disruption (Link Loss / Sustained RTT / Session Hijack)",
+        "description": "SATCOM 단말/관리망 무력화 탐지: 2분 이상 레코드 없음, RTT 지속 급등 3회+, JamIndicator 지속 상승, SessionId 강제 변경. 실측 기반 임계값. MITRE: T1133, T1542. ICS: T0814, T0881",
+        "severity": "High",
+        "enabled": true,
+        "query": "let rttThreshold = toscalar(\n    _GetWatchlist('UAV_Threshold_List')\n    | where ThresholdKey == 'MaxRttMs_SATCOM'\n    | project toreal(Value));\nlet jamThreshold = toscalar(\n    _GetWatchlist('UAV_Threshold_List')\n    | where ThresholdKey == 'MaxJamIndicator'\n    | project toreal(Value));\nlet alertWindow = 15m;\nlet LinkLost =\n    UAVSatcomLink_CL\n    | where TimeGenerated > ago(alertWindow)\n    | summarize LastRecord=max(TimeGenerated) by UAVId, LinkId\n    | where LastRecord < ago(2m)\n    | extend TriggerReason = \"SATCOM_링크_두절_2분초과\"\n    | extend Severity = \"High\";\nlet SustainedRtt =\n    UAVSatcomLink_CL\n    | where TimeGenerated > ago(alertWindow)\n    | where toreal(RttMs) > rttThreshold\n    | summarize HighRttCount=count(), MaxRtt=max(toreal(RttMs)),\n        DurationMin=datetime_diff('minute', max(TimeGenerated), min(TimeGenerated))\n        by UAVId, LinkId, SessionId\n    | where HighRttCount >= 3 and DurationMin >= 2\n    | extend TriggerReason = strcat(\"SATCOM_RTT_지속급증_\", tostring(toint(MaxRtt)), \"ms_\", tostring(DurationMin), \"분\")\n    | extend Severity = \"High\";\nlet SustainedJam =\n    UAVSatcomLink_CL\n    | where TimeGenerated > ago(alertWindow)\n    | where toreal(JamIndicator) > jamThreshold\n    | summarize JamCount=count(), MaxJam=max(toreal(JamIndicator))\n        by UAVId, LinkId, SessionId\n    | where JamCount >= 3\n    | extend TriggerReason = strcat(\"SATCOM_재밍_지속_MaxJam_\", tostring(round(MaxJam, 3)))\n    | extend Severity = \"High\";\nlet SessionChange =\n    UAVSatcomLink_CL\n    | where TimeGenerated > ago(alertWindow)\n    | order by UAVId, TimeGenerated asc\n    | extend PrevSessionId = prev(SessionId, 1)\n    | where SessionId != PrevSessionId and isnotnull(PrevSessionId)\n    | project TimeGenerated, UAVId, LinkId, OldSession=PrevSessionId, NewSession=SessionId\n    | extend TriggerReason = strcat(\"SATCOM_SessionId_변경_\", PrevSessionId, \"→\", SessionId)\n    | extend Severity = \"High\"\n    | summarize FirstSeen=min(TimeGenerated) by UAVId, LinkId, TriggerReason, Severity;\nunion\n    (LinkLost | project FirstSeen=LastRecord, UAVId, LinkId, TriggerReason, Severity),\n    (SustainedRtt | project FirstSeen=now(), UAVId, LinkId, TriggerReason, Severity),\n    (SustainedJam | project FirstSeen=now(), UAVId, LinkId, TriggerReason, Severity),\n    (SessionChange | project FirstSeen, UAVId, LinkId, TriggerReason, Severity)\n| extend IncidentType = \"S10_SATCOM_무력화\"\n| order by Severity desc, FirstSeen asc",
+        "queryFrequency": "PT5M",
+        "queryPeriod": "PT30M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT1H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "InitialAccess",
+          "Impact"
+        ],
+        "techniques": [
+          "T1133",
+          "T1542"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": true,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT1H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Host"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S9 - SATCOM Terminal Disruption (Link Loss / Sustained RTT / Session Hijack) - {{UAVId}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Severity={{Severity}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "Severity": "Severity"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "UAVId"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

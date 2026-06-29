@@ -1,0 +1,81 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/24f67db3-04a0-475e-a44c-22b9ad260040')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/24f67db3-04a0-475e-a44c-22b9ad260040')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S18 - MAVLink Unsigned Message Burst (MITM Indicator)",
+        "description": "UAVMavsec_CL에서 UnsignedCount z-score 이상 AND FailedCount > 0 동시 발생, 또는 비인가 PeerIp와 동시에 탐지. MITRE: T0842 Network Sniffing, T1692 Unauthorized Message",
+        "severity": "High",
+        "enabled": true,
+        "query": "let baselineWindow = 24h;\nlet alertWindow = 10m;\nlet zThreshold = 3.0;\nlet KnownGCS = _GetWatchlist('C2_Whitelisted_GCS_List') | project GCS_IP;\nlet MavsecAnomaly =\n    UAVMavsec_CL\n    | where TimeGenerated > ago(baselineWindow)\n    | make-series AvgUnsigned=avg(UnsignedCount), AvgFailed=avg(FailedCount)\n        on TimeGenerated step 5m by UAVId\n    | extend (UA, US, UB) = series_decompose_anomalies(AvgUnsigned, zThreshold)\n    | mv-expand TimeGenerated, AvgUnsigned=todouble(AvgUnsigned),\n        UA=toint(UA), AvgFailed=todouble(AvgFailed)\n    | where TimeGenerated > ago(alertWindow)\n    | where UA == 1 or AvgFailed > 0\n    | project TimeGenerated, UAVId, AvgUnsigned, AvgFailed;\nlet SuspectConn =\n    UAVDatalinkConn_CL\n    | where TimeGenerated > ago(alertWindow)\n    | join kind=leftanti (KnownGCS) on $left.PeerIp == $right.GCS_IP\n    | project TimeGenerated, UAVId, PeerIp;\nMavsecAnomaly\n| join kind=leftouter (SuspectConn) on UAVId\n| extend TriggerReason = case(\n    AvgFailed > 0 and isnotnull(PeerIp), \"MAVLink_서명실패_비인가IP_동시\",\n    AvgFailed > 0, \"MAVLink_서명검증_실패\",\n    \"MAVLink_무서명메시지_급증\")\n| extend Severity = \"High\"\n| project TimeGenerated, UAVId, AvgUnsigned, AvgFailed, PeerIp, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "queryFrequency": "PT10M",
+        "queryPeriod": "P1D",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT1H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "Discovery",
+          "LateralMovement"
+        ],
+        "techniques": [
+          "T1557",
+          "T1040"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": true,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT1H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Host"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S18 - MAVLink Unsigned Message Burst (MITM Indicator) - {{UAVId}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Severity={{Severity}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "PeerIp": "PeerIp"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "UAVId"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

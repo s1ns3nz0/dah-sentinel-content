@@ -1,0 +1,82 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/8e91637a-e1e2-42f5-9610-5bcd6ddb6d16')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/8e91637a-e1e2-42f5-9610-5bcd6ddb6d16')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S23 - Critical Container Service Stop/Kill (telemetry-tap / mavlink-router)",
+        "description": "UAVServiceAudit_CL에서 핵심 컨테이너(telemetry-tap, mavlink-router, pgse-stub, auth-stub)에 stop/kill 명령 탐지. telemetry-tap 중단 시 Sentinel 탐지 맹점 생성. MITRE: T0881 Service Stop",
+        "severity": "High",
+        "enabled": true,
+        "query": "let alertWindow = 10m;\nlet criticalContainers = dynamic([\"telemetry-tap\",\"mavlink-router\",\"pgse-stub\",\"auth-stub\"]);\nUAVServiceAudit_CL\n| where TimeGenerated > ago(alertWindow)\n| where ContainerName in (criticalContainers)\n| where Action in ('stop','kill','restart','exec')\n| summarize ActionCount=count(), Actions=make_set(Action), FirstEvent=min(TimeGenerated)\n    by ContainerName, UAVId, bin(TimeGenerated, 5m)\n| extend isCriticalStop = Actions has 'stop' or Actions has 'kill'\n| where isCriticalStop\n| extend TriggerReason = case(\n    ContainerName == 'telemetry-tap', \"telemetry-tap_강제중단_탐지맹점생성\",\n    ContainerName == 'mavlink-router', \"mavlink-router_강제중단_C2두절\",\n    strcat(ContainerName, \"_핵심컨테이너_강제중단\"))\n| extend Severity = \"High\"\n| project FirstEvent, UAVId, ContainerName, ActionCount, TriggerReason, Severity\n| order by FirstEvent desc",
+        "queryFrequency": "PT5M",
+        "queryPeriod": "PT15M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT1H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "Impact",
+          "DefenseEvasion"
+        ],
+        "techniques": [
+          "T1489",
+          "T1562"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": true,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT1H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Host"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S23 - Critical Container Service Stop/Kill (telemetry-tap / mavlink-router) - {{ContainerName}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Severity={{Severity}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "ContainerName": "ContainerName",
+          "ActionCount": "ActionCount"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "ContainerName"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

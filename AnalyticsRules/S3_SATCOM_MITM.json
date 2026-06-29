@@ -1,0 +1,82 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/24ebbba6-249a-4b26-a0bb-07adcebf2a7e')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/24ebbba6-249a-4b26-a0bb-07adcebf2a7e')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S3 - SATCOM MITM (IntegrityStatus Violation / RTT Spike / Jamming)",
+        "description": "SATCOM 링크에서 IntegrityStatus != 'ok', RTT > 650ms, JamIndicator > 0.15, SrcAddr 변경, Seq 대폭 건너뜀을 탐지. 실측 기반 임계값(정상: RTT 592~608ms / JamIndicator max 0.05). MITRE: T1557 AitM, T1565 Data Manipulation. ICS: T0830, T0887 (description 참조)",
+        "severity": "High",
+        "enabled": true,
+        "query": "let rttThreshold = toscalar(\n    _GetWatchlist('UAV_Threshold_List')\n    | where ThresholdKey == 'MaxRttMs_SATCOM'\n    | project toreal(Value));\nlet jamThreshold = toscalar(\n    _GetWatchlist('UAV_Threshold_List')\n    | where ThresholdKey == 'MaxJamIndicator'\n    | project toreal(Value));\nlet knownSrcAddr = dynamic([\"10.60.0.10\"]);\nlet alertWindow = 10m;\nlet IntegrityAlert =\n    UAVSatcomLink_CL\n    | where TimeGenerated > ago(alertWindow)\n    | where IntegrityStatus != 'ok'\n    | summarize Count=count(), FirstSeen=min(TimeGenerated)\n        by UAVId, LinkId, SessionId, IntegrityStatus\n    | extend TriggerReason = strcat(\"SATCOM_무결성_위반_\", IntegrityStatus)\n    | extend Severity = \"High\";\nlet RttAlert =\n    UAVSatcomLink_CL\n    | where TimeGenerated > ago(alertWindow)\n    | where toreal(RttMs) > rttThreshold\n    | summarize AvgRtt=avg(toreal(RttMs)), MaxRtt=max(toreal(RttMs)),\n        Count=count(), FirstSeen=min(TimeGenerated)\n        by UAVId, LinkId, SessionId\n    | extend TriggerReason = strcat(\"SATCOM_RTT_급증_\", tostring(toint(MaxRtt)), \"ms\")\n    | extend Severity = \"Medium\";\nlet JamAlert =\n    UAVSatcomLink_CL\n    | where TimeGenerated > ago(alertWindow)\n    | where toreal(JamIndicator) > jamThreshold\n    | summarize MaxJam=max(toreal(JamIndicator)), Count=count(), FirstSeen=min(TimeGenerated)\n        by UAVId, LinkId, SessionId\n    | extend TriggerReason = strcat(\"SATCOM_재밍_JamIndicator_\", tostring(MaxJam))\n    | extend Severity = \"High\";\nlet SrcAddrAlert =\n    UAVSatcomLink_CL\n    | where TimeGenerated > ago(alertWindow)\n    | where SrcAddr !in (knownSrcAddr)\n    | project TimeGenerated, UAVId, LinkId, SessionId, SrcAddr, DstAddr\n    | extend TriggerReason = strcat(\"SATCOM_비인가_SrcAddr_\", SrcAddr)\n    | extend Severity = \"High\"\n    | summarize FirstSeen=min(TimeGenerated), Count=count() by UAVId, LinkId, SessionId, TriggerReason, Severity;\nunion IntegrityAlert, JamAlert, SrcAddrAlert, RttAlert\n| extend IncidentType = \"S3_SATCOM_MITM\"\n| project FirstSeen, UAVId, LinkId, SessionId, TriggerReason, Severity, IncidentType\n| order by Severity desc, FirstSeen asc",
+        "queryFrequency": "PT10M",
+        "queryPeriod": "PT1H",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT1H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "Collection",
+          "Impact"
+        ],
+        "techniques": [
+          "T1557",
+          "T1565"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": true,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT1H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Host"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S3 - SATCOM MITM (IntegrityStatus Violation / RTT Spike / Jamming) - {{UAVId}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Severity={{Severity}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "Severity": "Severity",
+          "IncidentType": "IncidentType"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "UAVId"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

@@ -1,0 +1,81 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/bb05837a-1de0-42c6-8d7e-bd0df53554a5')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/bb05837a-1de0-42c6-8d7e-bd0df53554a5')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S13 - Cyber Posture CT Level Unauthorized Change",
+        "description": "비인가 변경자(ChangedBy not in Approved_CT_Transition_List)의 CT 레벨 변경 탐지. MITRE: T1078 Valid Accounts / Defense Evasion",
+        "severity": "High",
+        "enabled": true,
+        "query": "let alertWindow = 10m;\nlet ApprovedChangers = _GetWatchlist('Approved_CT_Transition_List') | project OperatorId;\nUAVCyberPosture_CL\n| where TimeGenerated > ago(alertWindow)\n| where ChangedBy !in (ApprovedChangers)\n| extend TriggerReason = strcat(\"CT레벨_비인가_변경자_\", ChangedBy, \"_\", LevelBefore, \"→\", LevelAfter)\n| extend Severity = \"High\"\n| project TimeGenerated, ChangedBy, LevelBefore, LevelAfter, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "queryFrequency": "PT5M",
+        "queryPeriod": "PT15M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT1H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "DefenseEvasion",
+          "CredentialAccess"
+        ],
+        "techniques": [
+          "T1078"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": true,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT1H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Account"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S13 - Cyber Posture CT Level Unauthorized Change - {{ChangedBy}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Severity={{Severity}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "LevelBefore": "LevelBefore",
+          "LevelAfter": "LevelAfter"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Account",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "ChangedBy"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

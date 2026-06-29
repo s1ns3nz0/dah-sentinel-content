@@ -27,7 +27,7 @@
         "suppressionEnabled": false,
         "startTimeUtc": null,
         "tactics": [
-          "Credential Access",
+          "CredentialAccess",
           "Impact"
         ],
         "techniques": [
@@ -70,7 +70,7 @@
             "entityType": "Account",
             "fieldMappings": [
               {
-                "identifier": "HostName",
+                "identifier": "Name",
                 "columnName": "OperatorId"
               }
             ]

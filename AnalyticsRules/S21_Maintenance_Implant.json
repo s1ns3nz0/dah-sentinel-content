@@ -27,7 +27,7 @@
         "suppressionEnabled": false,
         "startTimeUtc": null,
         "tactics": [
-          "Initial Access",
+          "InitialAccess",
           "Persistence"
         ],
         "techniques": [
@@ -68,7 +68,7 @@
             "entityType": "Account",
             "fieldMappings": [
               {
-                "identifier": "HostName",
+                "identifier": "Name",
                 "columnName": "Operator"
               }
             ]

@@ -28,7 +28,7 @@
         "startTimeUtc": null,
         "tactics": [
           "Impact",
-          "Defense Evasion"
+          "DefenseEvasion"
         ],
         "techniques": [
           "T1489",

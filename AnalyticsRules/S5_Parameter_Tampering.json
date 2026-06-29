@@ -27,7 +27,7 @@
         "suppressionEnabled": false,
         "startTimeUtc": null,
         "tactics": [
-          "Defense Evasion"
+          "DefenseEvasion"
         ],
         "techniques": [
           "T1562"

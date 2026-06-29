@@ -27,7 +27,7 @@
         "suppressionEnabled": false,
         "startTimeUtc": null,
         "tactics": [
-          "Command And Control",
+          "CommandAndControl",
           "Exfiltration"
         ],
         "techniques": [

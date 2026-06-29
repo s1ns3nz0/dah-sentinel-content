@@ -27,7 +27,7 @@
         "suppressionEnabled": false,
         "startTimeUtc": null,
         "tactics": [
-          "Credential Access"
+          "CredentialAccess"
         ],
         "techniques": [
           "T1078"
@@ -65,7 +65,7 @@
             "entityType": "Account",
             "fieldMappings": [
               {
-                "identifier": "HostName",
+                "identifier": "Name",
                 "columnName": "Planner"
               }
             ]

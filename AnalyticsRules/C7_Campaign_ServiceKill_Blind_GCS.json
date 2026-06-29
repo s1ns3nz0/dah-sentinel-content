@@ -27,8 +27,8 @@
         "suppressionEnabled": false,
         "startTimeUtc": null,
         "tactics": [
-          "Defense Evasion",
-          "Initial Access"
+          "DefenseEvasion",
+          "InitialAccess"
         ],
         "techniques": [
           "T1489",
@@ -69,7 +69,7 @@
             "entityType": "Account",
             "fieldMappings": [
               {
-                "identifier": "HostName",
+                "identifier": "Name",
                 "columnName": "OperatorId"
               }
             ]

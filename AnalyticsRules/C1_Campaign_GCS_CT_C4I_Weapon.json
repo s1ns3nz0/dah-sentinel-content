@@ -27,8 +27,8 @@
         "suppressionEnabled": false,
         "startTimeUtc": null,
         "tactics": [
-          "Credential Access",
-          "Defense Evasion",
+          "CredentialAccess",
+          "DefenseEvasion",
           "Execution",
           "Impact"
         ],
@@ -72,7 +72,7 @@
             "entityType": "Account",
             "fieldMappings": [
               {
-                "identifier": "HostName",
+                "identifier": "Name",
                 "columnName": "OperatorId"
               }
             ]

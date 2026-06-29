@@ -27,8 +27,8 @@
         "suppressionEnabled": false,
         "startTimeUtc": null,
         "tactics": [
-          "Defense Evasion",
-          "Credential Access"
+          "DefenseEvasion",
+          "CredentialAccess"
         ],
         "techniques": [
           "T1078"
@@ -67,7 +67,7 @@
             "entityType": "Account",
             "fieldMappings": [
               {
-                "identifier": "HostName",
+                "identifier": "Name",
                 "columnName": "ChangedBy"
               }
             ]

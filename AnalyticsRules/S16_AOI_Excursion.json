@@ -30,8 +30,7 @@
           "Collection"
         ],
         "techniques": [
-          "T1557",
-          "T1020"
+          "T0835"
         ],
         "subTechniques": [],
         "alertRuleTemplateName": null,

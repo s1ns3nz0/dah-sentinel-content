@@ -8,30 +8,28 @@
   },
   "resources": [
     {
-      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/07f76e97-68cb-4810-ba9d-dcdba832eba9')]",
-      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/07f76e97-68cb-4810-ba9d-dcdba832eba9')]",
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/a9cd00ab-7919-481e-a659-b06d34f9b64c')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/a9cd00ab-7919-481e-a659-b06d34f9b64c')]",
       "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
       "kind": "Scheduled",
       "apiVersion": "2023-12-01-preview",
       "properties": {
         "displayName": "UAV S16 - AOI Excursion (Unauthorized Area of Interest Departure)",
-        "description": "UAV가 AOI_Boundary_List에 정의된 임무구역을 이탈하고 최소속도 이상으로 비행 중 3회 이상 연속 이탈 이벤트 탐지. MITRE: T0835 Manipulate I/O Image / Collection",
+        "description": "UAV가 AOI_Boundary_List 구역을 이탈하고 최소속도 이상 비행 중 탐지. 실제 컬럼: Groundspeed_ms(Groundspeed 아님), MissionId 없음(UAVId 기반). AOI는 MinLat/MaxLat/MinLon/MaxLon 방식으로 판정. MITRE: T0835 (Collection — ICS description 참조)",
         "severity": "Medium",
         "enabled": true,
-        "query": "let alertWindow = 15m;\nlet minSpeed = toscalar(\n    _GetWatchlist('UAV_Threshold_List')\n    | where ThresholdKey == 'MinGroundspeed_ms'\n    | project toreal(Value));\nlet AoiBounds = _GetWatchlist('AOI_Boundary_List') | project MissionId;\nUAVTelemetry_CL\n| where TimeGenerated > ago(alertWindow)\n| where MsgType == 'GLOBAL_POSITION_INT'\n| where Groundspeed > minSpeed\n| join kind=leftanti (AoiBounds) on $left.MissionId == $right.MissionId\n| summarize ExcursionCount=count(), FirstSeen=min(TimeGenerated),\n    MaxSpeed=max(Groundspeed)\n    by UAVId, MissionId, bin(TimeGenerated, 5m)\n| where ExcursionCount >= 3\n| extend TriggerReason = strcat(\"AOI_이탈_\", tostring(ExcursionCount), \"회_MissionId_\", MissionId)\n| extend Severity = \"Medium\"\n| project FirstSeen, UAVId, MissionId, ExcursionCount, MaxSpeed, TriggerReason, Severity\n| order by FirstSeen desc",
+        "query": "let alertWindow = 15m;\nlet minSpeed = toscalar(\n    _GetWatchlist('UAV_Threshold_List')\n    | where ThresholdKey == 'MinGroundspeed_ms'\n    | project toreal(Value));\nlet AoiBounds = _GetWatchlist('AOI_Boundary_List')\n    | project MinLat=toreal(MinLat), MaxLat=toreal(MaxLat),\n              MinLon=toreal(MinLon), MaxLon=toreal(MaxLon), MissionId;\nUAVTelemetry_CL\n| where TimeGenerated > ago(alertWindow)\n| where MsgType == 'GLOBAL_POSITION_INT'\n| where Groundspeed_ms > minSpeed\n| where isnotnull(Lat) and isnotnull(Lon)\n| join kind=leftanti (\n    AoiBounds\n    | where isnotnull(MinLat)\n) on $left.Lat >= $right.MinLat and $left.Lat <= $right.MaxLat\n    and $left.Lon >= $right.MinLon and $left.Lon <= $right.MaxLon\n| summarize ExcursionCount=count(), FirstSeen=min(TimeGenerated),\n    AvgLat=avg(Lat), AvgLon=avg(Lon)\n    by UAVId, bin(TimeGenerated, 5m)\n| where ExcursionCount >= 3\n| extend TriggerReason = strcat(\"AOI_이탈_\", tostring(ExcursionCount), \"회_UAVId:\", UAVId)\n| extend Severity = \"Medium\"\n| project FirstSeen, UAVId, ExcursionCount, AvgLat, AvgLon, TriggerReason, Severity\n| order by FirstSeen desc",
         "queryFrequency": "PT5M",
         "queryPeriod": "PT20M",
         "triggerOperator": "GreaterThan",
         "triggerThreshold": 0,
-        "suppressionDuration": "PT1H",
+        "suppressionDuration": "PT2H",
         "suppressionEnabled": false,
         "startTimeUtc": null,
         "tactics": [
           "Collection"
         ],
-        "techniques": [
-          "T0835"
-        ],
+        "techniques": [],
         "subTechniques": [],
         "alertRuleTemplateName": null,
         "incidentConfiguration": {
@@ -39,7 +37,7 @@
           "groupingConfiguration": {
             "enabled": true,
             "reopenClosedIncident": false,
-            "lookbackDuration": "PT1H",
+            "lookbackDuration": "PT2H",
             "matchingMethod": "AllEntities",
             "groupByEntities": [
               "Host"
@@ -58,7 +56,6 @@
         },
         "customDetails": {
           "TriggerReason": "TriggerReason",
-          "MissionId": "MissionId",
           "ExcursionCount": "ExcursionCount"
         },
         "entityMappings": [

@@ -8,17 +8,17 @@
   },
   "resources": [
     {
-      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/d7dac53a-04b5-45fb-9842-662be11ff8ba')]",
-      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/d7dac53a-04b5-45fb-9842-662be11ff8ba')]",
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/76d2d0b3-ae34-4bf5-938a-836ff79199b8')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/76d2d0b3-ae34-4bf5-938a-836ff79199b8')]",
       "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
       "kind": "Scheduled",
       "apiVersion": "2023-12-01-preview",
       "properties": {
         "displayName": "UAV Campaign C6 - Maintenance Implant → Firmware Tamper → SAR Target Exfil",
-        "description": "장기 공급망 체인: 정비 중 임플란트(S21) → 펌웨어 해시 불일치 재확인(S4) → SAR 표적 허가구역 외 유출(S17). 연결키: UAVId. 윈도우: 24h. MITRE: T0864, T1542, T1020",
+        "description": "정비임플란트(S21, HashMatch==0 SByte) → 펌웨어 재확인(S4) → SAR 허가구역 외 유출(S17, AreaRadiusM meter단위). 연결키: UAVId. 실제 컬럼: MissionId 없음→UAVId, AreaRadiusM(meter). MITRE: T1195, T1020",
         "severity": "High",
         "enabled": true,
-        "query": "let windowSize = 24h;\n// S21: 정비 중 임플란트 (component_replace + HashMatch=false)\nlet S21 =\n    UAVMaintenance_CL\n    | where TimeGenerated > ago(windowSize)\n    | where EventType == 'component_replace'\n    | join kind=inner (\n        UAVPgse_CL\n        | where TimeGenerated > ago(windowSize)\n        | where HashMatch == false\n        | project T_pgse=TimeGenerated, UAVId=tostring(UAVId)\n    ) on UAVId\n    | where T_pgse >= TimeGenerated and T_pgse <= TimeGenerated + 30m\n    | project T1=TimeGenerated, UAVId=tostring(UAVId), ComponentName;\n// S4: 펌웨어 해시 불일치 재확인\nlet S4 =\n    UAVPgse_CL\n    | where TimeGenerated > ago(windowSize)\n    | where HashMatch == false\n    | project T2=TimeGenerated, UAVId=tostring(UAVId);\n// S17: SAR 표적 허가구역 외 유출\nlet AuthArea = UAVC4I_CL\n    | where TimeGenerated > ago(windowSize)\n    | summarize arg_max(TimeGenerated, AreaLat, AreaLon, AreaRadius_km) by MissionId;\nlet S17 =\n    UAVSarPayload_CL\n    | where TimeGenerated > ago(windowSize)\n    | join kind=leftouter (AuthArea) on MissionId\n    | extend distKm = geo_distance_2points(\n        toreal(TargetLon), toreal(TargetLat),\n        toreal(AreaLon), toreal(AreaLat)) / 1000.0\n    | where distKm > toreal(AreaRadius_km)\n    | project T3=TimeGenerated, UAVId=tostring(UAVId), distKm;\nS21\n| join kind=inner (S4) on UAVId\n| where T2 >= T1\n| join kind=inner (S17) on UAVId\n| where T3 >= T2\n| extend CampaignType = \"C6_정비임플란트_펌웨어변조_SAR표적유출\"\n| extend StepSummary = strcat(\"S21@\", tostring(T1), \"(\", ComponentName, \") → S4@\", tostring(T2), \" → S17@\", tostring(T3), \"(\", tostring(round(distKm,1)), \"km)\")\n| extend Severity = \"High\"\n| project T1, T2, T3, UAVId, ComponentName, distKm, CampaignType, StepSummary, Severity",
+        "query": "let windowSize = 24h;\n// S21: 정비 임플란트\nlet S21 =\n    UAVMaintenance_CL\n    | where TimeGenerated > ago(windowSize)\n    | where EventType == 'component_replace'\n    | join kind=inner (\n        UAVPgse_CL\n        | where TimeGenerated > ago(windowSize)\n        | where HashMatch == 0\n        | project T_pgse=TimeGenerated, UAVId=tostring(UAVId)\n    ) on UAVId\n    | where T_pgse >= TimeGenerated and T_pgse <= TimeGenerated + 30m\n    | project T1=TimeGenerated, UAVId=tostring(UAVId), ComponentName, Operator;\n// S4: 펌웨어 해시 재확인\nlet S4 =\n    UAVPgse_CL\n    | where TimeGenerated > ago(windowSize)\n    | where HashMatch == 0\n    | project T2=TimeGenerated, UAVId=tostring(UAVId);\n// S17: SAR 허가구역 외 유출 (AreaRadiusM = meter)\nlet AuthArea = UAVC4I_CL\n    | where TimeGenerated > ago(windowSize)\n    | summarize arg_max(TimeGenerated, AreaLat, AreaLon, AreaRadiusM) by UAVId=Callsign;\nlet S17 =\n    UAVSarPayload_CL\n    | where TimeGenerated > ago(windowSize)\n    | join kind=leftouter (AuthArea) on UAVId\n    | extend distM = geo_distance_2points(\n        toreal(TargetLon), toreal(TargetLat),\n        toreal(AreaLon), toreal(AreaLat))\n    | where distM > toreal(AreaRadiusM)\n    | project T3=TimeGenerated, UAVId=tostring(UAVId), distM;\nS21\n| join kind=inner (S4) on UAVId\n| where T2 >= T1\n| join kind=inner (S17) on UAVId\n| where T3 >= T2\n| extend CampaignType = \"C6_정비임플란트_펌웨어변조_SAR표적유출\"\n| extend StepSummary = strcat(\"S21@\", tostring(T1), \"(\", ComponentName, \")→S4@\", tostring(T2), \"→S17@\", tostring(T3), \"(\", tostring(toint(distM)), \"m)\")\n| extend Severity = \"High\"\n| project T1, T2, T3, UAVId, ComponentName, Operator, distM, CampaignType, StepSummary, Severity",
         "queryFrequency": "PT30M",
         "queryPeriod": "P1D",
         "triggerOperator": "GreaterThan",
@@ -27,13 +27,10 @@
         "suppressionEnabled": false,
         "startTimeUtc": null,
         "tactics": [
-          "InitialAccess",
-          "Persistence",
-          "Exfiltration"
+          "Exfiltration",
+          "Persistence"
         ],
         "techniques": [
-          "T1195",
-          "T1542",
           "T1020"
         ],
         "subTechniques": [],
@@ -46,7 +43,7 @@
             "lookbackDuration": "PT6H",
             "matchingMethod": "AllEntities",
             "groupByEntities": [
-              "Host"
+              "Account"
             ],
             "groupByAlertDetails": [],
             "groupByCustomDetails": []
@@ -56,7 +53,7 @@
           "aggregationKind": "SingleAlert"
         },
         "alertDetailsOverride": {
-          "alertDisplayNameFormat": "[CAMPAIGN] UAV Campaign C6 - Maintenance Implant → Firmware Tamper → SAR Target Exfil - {{UAVId}}",
+          "alertDisplayNameFormat": "[CAMPAIGN] UAV Campaign C6 - Maintenance Implant → Firmware Tamper → SAR Target Exfil - {{Operator}}",
           "alertDescriptionFormat": "CampaignType={{CampaignType}} | Steps={{StepSummary}}",
           "alertDynamicProperties": []
         },
@@ -68,11 +65,11 @@
         },
         "entityMappings": [
           {
-            "entityType": "Host",
+            "entityType": "Account",
             "fieldMappings": [
               {
-                "identifier": "HostName",
-                "columnName": "UAVId"
+                "identifier": "Name",
+                "columnName": "Operator"
               }
             ]
           }

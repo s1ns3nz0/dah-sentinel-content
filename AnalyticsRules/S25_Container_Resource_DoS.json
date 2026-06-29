@@ -8,22 +8,22 @@
   },
   "resources": [
     {
-      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/2f2522aa-6532-48e8-87a1-05c07bc86e31')]",
-      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/2f2522aa-6532-48e8-87a1-05c07bc86e31')]",
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/c3c8838a-82b0-4570-ae01-884b72dc3f59')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/c3c8838a-82b0-4570-ae01-884b72dc3f59')]",
       "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
       "kind": "Scheduled",
       "apiVersion": "2023-12-01-preview",
       "properties": {
-        "displayName": "UAV S25 - Container Resource Exhaustion DoS (CPU/Memory + Connection Burst)",
-        "description": "UAVResourceMetrics_CL에서 특정 컨테이너 CPU > MaxCpuUsagePct 또는 Memory > MaxMemoryUsageMb가 5분 이상 지속, 동시에 UAVDatalinkConn_CL에서 연결 폭증 탐지. MITRE: T1499 Endpoint DoS",
+        "displayName": "UAV S25 - Container Resource Exhaustion DoS (CPU + Connection Burst)",
+        "description": "UAVResourceMetrics_CL에서 CpuUsagePct 5분+ 지속 고갈, UAVDatalinkConn_CL 연결 폭증 동시 탐지. 실제 컬럼: MemoryUsageMb 없음→MemoryUsageBytes(bytes), UAVId 없음. MITRE: T1499 Endpoint DoS",
         "severity": "High",
         "enabled": true,
-        "query": "let alertWindow = 15m;\nlet cpuMax = toscalar(\n    _GetWatchlist('UAV_Threshold_List')\n    | where ThresholdKey == 'MaxCpuUsagePct'\n    | project toreal(Value));\nlet ResourceAlert =\n    UAVResourceMetrics_CL\n    | where TimeGenerated > ago(alertWindow)\n    | where CpuUsagePct > cpuMax\n    | summarize MaxCpu=max(CpuUsagePct),\n        DurationMin=datetime_diff('minute', max(TimeGenerated), min(TimeGenerated))\n        by ContainerName, bin(TimeGenerated, 5m)\n    | where DurationMin >= 5\n    | project TimeGenerated, ContainerName, MaxCpu;\nlet ConnBurst =\n    UAVDatalinkConn_CL\n    | where TimeGenerated > ago(alertWindow)\n    | summarize ConnCount=count() by PeerIp, bin(TimeGenerated, 1m)\n    | where ConnCount > 50\n    | project TimeGenerated, PeerIp, ConnCount;\nResourceAlert\n| join kind=leftouter (ConnBurst) on TimeGenerated\n| extend TriggerReason = case(\n    isnotnull(ConnCount), strcat(ContainerName, \"_자원고갈_연결폭증_동시_CPU:\", tostring(toint(MaxCpu)), \"%\"),\n    strcat(ContainerName, \"_CPU_고갈_5분지속_\", tostring(toint(MaxCpu)), \"%\"))\n| extend Severity = \"High\"\n| project TimeGenerated, ContainerName, MaxCpu, ConnCount, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "query": "let alertWindow = 15m;\nlet cpuMax = toscalar(\n    _GetWatchlist('UAV_Threshold_List')\n    | where ThresholdKey == 'MaxCpuUsagePct'\n    | project toreal(Value));\nlet ResourceAlert =\n    UAVResourceMetrics_CL\n    | where TimeGenerated > ago(alertWindow)\n    | where CpuUsagePct > cpuMax\n    | summarize MaxCpu=max(CpuUsagePct),\n        DurationMin=datetime_diff('minute', max(TimeGenerated), min(TimeGenerated))\n        by ContainerName, bin(TimeGenerated, 5m)\n    | where DurationMin >= 5\n    | project TimeGenerated, ContainerName, MaxCpu;\nlet ConnBurst =\n    UAVDatalinkConn_CL\n    | where TimeGenerated > ago(alertWindow)\n    | summarize ConnCount=count() by PeerIp, bin(TimeGenerated, 1m)\n    | where ConnCount > 50\n    | project TimeGenerated, PeerIp, ConnCount;\nResourceAlert\n| join kind=leftouter (ConnBurst) on TimeGenerated\n| extend TriggerReason = case(\n    isnotnull(ConnCount), strcat(ContainerName, \"_CPU고갈_연결폭증_동시_\", tostring(toint(MaxCpu)), \"%\"),\n    strcat(ContainerName, \"_CPU고갈_5분지속_\", tostring(toint(MaxCpu)), \"%\"))\n| extend Severity = \"High\"\n| project TimeGenerated, ContainerName, MaxCpu, ConnCount, TriggerReason, Severity\n| order by TimeGenerated desc",
         "queryFrequency": "PT5M",
         "queryPeriod": "PT20M",
         "triggerOperator": "GreaterThan",
         "triggerThreshold": 0,
-        "suppressionDuration": "PT1H",
+        "suppressionDuration": "PT2H",
         "suppressionEnabled": false,
         "startTimeUtc": null,
         "tactics": [
@@ -39,7 +39,7 @@
           "groupingConfiguration": {
             "enabled": true,
             "reopenClosedIncident": false,
-            "lookbackDuration": "PT1H",
+            "lookbackDuration": "PT2H",
             "matchingMethod": "AllEntities",
             "groupByEntities": [
               "Host"
@@ -52,7 +52,7 @@
           "aggregationKind": "SingleAlert"
         },
         "alertDetailsOverride": {
-          "alertDisplayNameFormat": "UAV S25 - Container Resource Exhaustion DoS (CPU/Memory + Connection Burst) - {{ContainerName}}",
+          "alertDisplayNameFormat": "UAV S25 - Container Resource Exhaustion DoS (CPU + Connection Burst) - {{ContainerName}}",
           "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Severity={{Severity}}",
           "alertDynamicProperties": []
         },

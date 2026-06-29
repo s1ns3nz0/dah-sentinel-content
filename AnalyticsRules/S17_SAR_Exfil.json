@@ -8,22 +8,22 @@
   },
   "resources": [
     {
-      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/1efae747-e13e-4044-af57-5c7af349c010')]",
-      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/1efae747-e13e-4044-af57-5c7af349c010')]",
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/8ba05597-9c1b-443d-a766-4a52ad7f8db2')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/8ba05597-9c1b-443d-a766-4a52ad7f8db2')]",
       "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
       "kind": "Scheduled",
       "apiVersion": "2023-12-01-preview",
       "properties": {
         "displayName": "UAV S17 - SAR Target Coordinate Exfiltration (Outside Authorized Area)",
-        "description": "UAVSarPayload_CL의 TargetLat/TargetLon이 UAVC4I_CL의 허가구역(AreaLat/AreaLon/AreaRadius_km) 외부인 경우 또는 단시간 프레임 버스트 탐지. MITRE: T1020 Automated Exfiltration",
+        "description": "UAVSarPayload_CL 표적 좌표가 UAVC4I_CL 허가구역(AreaRadiusM, meter단위) 밖인 경우 탐지. 실제 컬럼: MissionId 없음→UAVId 연결, AreaRadius는 AreaRadiusM(meter). MITRE: T1020 Automated Exfiltration",
         "severity": "High",
         "enabled": true,
-        "query": "let alertWindow = 15m;\nlet AuthArea = UAVC4I_CL\n    | where TimeGenerated > ago(1h)\n    | summarize arg_max(TimeGenerated, AreaLat, AreaLon, AreaRadius_km) by MissionId;\nUAVSarPayload_CL\n| where TimeGenerated > ago(alertWindow)\n| join kind=leftouter (AuthArea) on MissionId\n| extend distKm = geo_distance_2points(\n    toreal(TargetLon), toreal(TargetLat),\n    toreal(AreaLon), toreal(AreaLat)) / 1000.0\n| extend isOutsideArea = isnotnull(AreaLat) and distKm > toreal(AreaRadius_km)\n| summarize FrameCount=count(), OutsideCount=countif(isOutsideArea),\n    MaxSizeBytes=max(SizeBytes), MaxDistKm=max(distKm),\n    UAVId=any(UAVId)\n    by MissionId, bin(TimeGenerated, 5m)\n| where OutsideCount > 0 or FrameCount > 100\n| extend TriggerReason = case(\n    OutsideCount > 0, strcat(\"SAR_허가구역_외_표적좌표_\", tostring(OutsideCount), \"건_최대거리_\", tostring(round(MaxDistKm, 1)), \"km\"),\n    strcat(\"SAR_프레임_버스트_\", tostring(FrameCount), \"건/5min\"))\n| extend Severity = \"High\"\n| project TimeGenerated, UAVId, MissionId, FrameCount, OutsideCount, MaxDistKm, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "query": "let alertWindow = 15m;\nlet AuthArea = UAVC4I_CL\n    | where TimeGenerated > ago(1h)\n    | summarize arg_max(TimeGenerated, AreaLat, AreaLon, AreaRadiusM) by UAVId=Callsign;\nUAVSarPayload_CL\n| where TimeGenerated > ago(alertWindow)\n| join kind=leftouter (AuthArea) on UAVId\n| extend distM = geo_distance_2points(\n    toreal(TargetLon), toreal(TargetLat),\n    toreal(AreaLon), toreal(AreaLat))\n| extend isOutside = isnotnull(AreaLat) and distM > toreal(AreaRadiusM)\n| summarize FrameCount=count(), OutsideCount=countif(isOutside),\n    MaxDistM=max(distM), UAVId=any(UAVId)\n    by FrameId, bin(TimeGenerated, 5m)\n| where OutsideCount > 0 or FrameCount > 100\n| extend TriggerReason = case(\n    OutsideCount > 0, strcat(\"SAR_허가구역_외_\", tostring(OutsideCount), \"건_최대거리_\", tostring(toint(MaxDistM)), \"m\"),\n    strcat(\"SAR_프레임_버스트_\", tostring(FrameCount), \"건/5min\"))\n| extend Severity = \"High\"\n| project TimeGenerated, UAVId, FrameId, FrameCount, OutsideCount, MaxDistM, TriggerReason, Severity\n| order by TimeGenerated desc",
         "queryFrequency": "PT5M",
         "queryPeriod": "PT20M",
         "triggerOperator": "GreaterThan",
         "triggerThreshold": 0,
-        "suppressionDuration": "PT1H",
+        "suppressionDuration": "PT2H",
         "suppressionEnabled": false,
         "startTimeUtc": null,
         "tactics": [
@@ -39,7 +39,7 @@
           "groupingConfiguration": {
             "enabled": true,
             "reopenClosedIncident": false,
-            "lookbackDuration": "PT1H",
+            "lookbackDuration": "PT2H",
             "matchingMethod": "AllEntities",
             "groupByEntities": [
               "Host"
@@ -58,7 +58,6 @@
         },
         "customDetails": {
           "TriggerReason": "TriggerReason",
-          "MissionId": "MissionId",
           "OutsideCount": "OutsideCount"
         },
         "entityMappings": [

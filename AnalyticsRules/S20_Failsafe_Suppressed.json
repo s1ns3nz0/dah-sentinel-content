@@ -8,31 +8,28 @@
   },
   "resources": [
     {
-      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/c921fcab-8c22-4102-b759-91f725f2ba9b')]",
-      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/c921fcab-8c22-4102-b759-91f725f2ba9b')]",
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/4e8781ee-fdf4-4edd-a7ed-9f2bdb347547')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/4e8781ee-fdf4-4edd-a7ed-9f2bdb347547')]",
       "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
       "kind": "Scheduled",
       "apiVersion": "2023-12-01-preview",
       "properties": {
-        "displayName": "UAV S20 - Failsafe Suppressed During Low Battery (Loss of Safety)",
-        "description": "배터리 15% 이하(SYS_STATUS)인데 UAVFailsafe_CL에 RTL/LAND 이벤트 없음 — Failsafe 억제 의심. MITRE: T0880 Loss of Safety",
+        "displayName": "UAV S20 - Failsafe Suppressed (Arming Checks Disabled + Low Battery)",
+        "description": "UAVFailsafe_CL.Text에 'Arming Checks Disabled' 포함 + UAVTelemetry_CL 배터리 15% 이하 동시 탐지. 실제 컬럼: ModeBefore/ModeAfter 공백 → Text 필드 기반 탐지. MITRE: T0880 Loss of Safety (ICS — description 참조)",
         "severity": "High",
         "enabled": true,
-        "query": "let alertWindow = 15m;\nlet battThreshold = 15;\nlet BattLow =\n    UAVTelemetry_CL\n    | where TimeGenerated > ago(alertWindow)\n    | where MsgType == 'SYS_STATUS'\n    | where BatteryRemaining_pct < battThreshold\n    | project T_batt=TimeGenerated, UAVId;\nlet FailsafeEvent =\n    UAVFailsafe_CL\n    | where TimeGenerated > ago(alertWindow)\n    | where ModeAfter in~ ('RTL','LAND','QRTL','QLAND')\n    | project T_fs=TimeGenerated, UAVId;\nBattLow\n| join kind=leftanti (FailsafeEvent) on UAVId\n| summarize LowBattCount=count(), FirstLow=min(T_batt) by UAVId\n| where LowBattCount > 3\n| extend TriggerReason = strcat(\"배터리_\", tostring(battThreshold), \"%_이하_Failsafe_미발동_억제의심_\", tostring(LowBattCount), \"회\")\n| extend Severity = \"High\"\n| project FirstLow, UAVId, LowBattCount, TriggerReason, Severity\n| order by FirstLow desc",
+        "query": "let alertWindow = 15m;\nlet battThreshold = 15;\nlet SuppressEvent =\n    UAVFailsafe_CL\n    | where TimeGenerated > ago(alertWindow)\n    | where Text has_any (\"Arming Checks Disabled\", \"failsafe\", \"GCS Failsafe\")\n    | project T_suppress=TimeGenerated, UAVId, Text;\nlet BattLow =\n    UAVTelemetry_CL\n    | where TimeGenerated > ago(alertWindow)\n    | where MsgType == 'SYS_STATUS'\n    | where BatteryRemaining_pct < battThreshold\n    | summarize LowCount=count(), MinBatt=min(BatteryRemaining_pct) by UAVId;\nSuppressEvent\n| join kind=inner (BattLow) on UAVId\n| extend TriggerReason = strcat(\"Failsafe_억제_배터리_\", tostring(MinBatt), \"%_이하_Text:\", Text)\n| extend Severity = \"High\"\n| project T_suppress, UAVId, Text, LowCount, MinBatt, TriggerReason, Severity\n| order by T_suppress desc",
         "queryFrequency": "PT5M",
         "queryPeriod": "PT20M",
         "triggerOperator": "GreaterThan",
         "triggerThreshold": 0,
-        "suppressionDuration": "PT1H",
+        "suppressionDuration": "PT2H",
         "suppressionEnabled": false,
         "startTimeUtc": null,
         "tactics": [
           "Impact"
         ],
-        "techniques": [
-          "T1499",
-          "T1565"
-        ],
+        "techniques": [],
         "subTechniques": [],
         "alertRuleTemplateName": null,
         "incidentConfiguration": {
@@ -40,7 +37,7 @@
           "groupingConfiguration": {
             "enabled": true,
             "reopenClosedIncident": false,
-            "lookbackDuration": "PT1H",
+            "lookbackDuration": "PT2H",
             "matchingMethod": "AllEntities",
             "groupByEntities": [
               "Host"
@@ -53,13 +50,13 @@
           "aggregationKind": "SingleAlert"
         },
         "alertDetailsOverride": {
-          "alertDisplayNameFormat": "UAV S20 - Failsafe Suppressed During Low Battery (Loss of Safety) - {{UAVId}}",
+          "alertDisplayNameFormat": "UAV S20 - Failsafe Suppressed (Arming Checks Disabled + Low Battery) - {{UAVId}}",
           "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Severity={{Severity}}",
           "alertDynamicProperties": []
         },
         "customDetails": {
           "TriggerReason": "TriggerReason",
-          "LowBattCount": "LowBattCount"
+          "MinBatt": "MinBatt"
         },
         "entityMappings": [
           {

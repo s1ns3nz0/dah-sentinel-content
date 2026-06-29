@@ -8,29 +8,29 @@
   },
   "resources": [
     {
-      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/1da5d32f-08fe-4f8e-b3b2-6c5dfb02188c')]",
-      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/1da5d32f-08fe-4f8e-b3b2-6c5dfb02188c')]",
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/36345697-2824-49c1-94fa-7c8c71053dea')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/36345697-2824-49c1-94fa-7c8c71053dea')]",
       "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
       "kind": "Scheduled",
       "apiVersion": "2023-12-01-preview",
       "properties": {
-        "displayName": "UAV S11 - Unauthorized Weapon Command (ARM/FIRE without 2-person control)",
-        "description": "2인통제 우회 또는 비인가 운영자/페이로드/무기로 ARM/FIRE 명령 탐지. armed_by == fire_requester(자기승인), 비인가 OperatorId, 비인가 WeaponId, 비인가 PayloadConfig. MITRE: T0831 Manipulation of Control",
+        "displayName": "UAV S11 - Unauthorized Weapon Command (ARM/FIRE 2-person control bypass)",
+        "description": "2인통제 우회(ArmedBy == Operator 자기승인) 또는 비인가 Operator/WeaponId로 ARM/FIRE 탐지. MITRE: T0831 Manipulation of Control. 실제 컬럼: ArmedBy, Operator (armed_by/fire_requester 없음)",
         "severity": "High",
         "enabled": true,
-        "query": "let alertWindow = 10m;\nlet ApprovedArm = _GetWatchlist('Approved_Arm_Operator_List') | project OperatorId;\nlet ApprovedWeapons = _GetWatchlist('Approved_Weapon_List') | project WeaponId;\nlet ApprovedPayloads = _GetWatchlist('Approved_Payload_Config_List') | project PayloadConfig;\nUAVWeapon_CL\n| where TimeGenerated > ago(alertWindow)\n| where EventType in ('arm', 'fire')\n| extend isSelfApproval = (armed_by == fire_requester)\n| extend isUnknownOp = OperatorId !in (ApprovedArm)\n| extend isUnknownWeapon = WeaponId !in (ApprovedWeapons)\n| extend isUnknownPayload = PayloadConfig !in (ApprovedPayloads)\n| where isSelfApproval or isUnknownOp or isUnknownWeapon or isUnknownPayload\n| extend TriggerReason = case(\n    isSelfApproval, \"무장_2인통제_자기승인\",\n    isUnknownOp, strcat(\"무장_비인가_운영자_\", OperatorId),\n    isUnknownWeapon, strcat(\"무장_비인가_WeaponId_\", WeaponId),\n    strcat(\"무장_비인가_PayloadConfig_\", PayloadConfig))\n| extend Severity = \"High\"\n| project TimeGenerated, UAVId, OperatorId, WeaponId, PayloadConfig,\n    EventType, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "query": "let alertWindow = 10m;\nlet ApprovedArm = _GetWatchlist('Approved_Arm_Operator_List') | project OperatorId;\nlet ApprovedWeapons = _GetWatchlist('Approved_Weapon_List') | project WeaponId;\nlet ApprovedPayloads = _GetWatchlist('Approved_Payload_Config_List') | project PayloadConfig;\nUAVWeapon_CL\n| where TimeGenerated > ago(alertWindow)\n| where EventType in ('arm', 'fire')\n| extend isSelfApproval = (ArmedBy == Operator)\n| extend isUnknownOp = Operator !in (ApprovedArm)\n| extend isUnknownWeapon = WeaponId !in (ApprovedWeapons)\n| where isSelfApproval or isUnknownOp or isUnknownWeapon\n| extend TriggerReason = case(\n    isSelfApproval, strcat(\"무장_2인통제_자기승인_\", Operator),\n    isUnknownOp, strcat(\"무장_비인가_Operator_\", Operator),\n    strcat(\"무장_비인가_WeaponId_\", WeaponId))\n| extend Severity = \"High\"\n| project TimeGenerated, UAVId, Operator, WeaponId, ArmedBy, EventType, TriggerReason, Severity\n| order by TimeGenerated desc",
         "queryFrequency": "PT5M",
         "queryPeriod": "PT15M",
         "triggerOperator": "GreaterThan",
         "triggerThreshold": 0,
-        "suppressionDuration": "PT1H",
+        "suppressionDuration": "PT2H",
         "suppressionEnabled": false,
         "startTimeUtc": null,
         "tactics": [
           "Impact"
         ],
         "techniques": [
-          "T0831"
+          "T1499"
         ],
         "subTechniques": [],
         "alertRuleTemplateName": null,
@@ -39,7 +39,7 @@
           "groupingConfiguration": {
             "enabled": true,
             "reopenClosedIncident": false,
-            "lookbackDuration": "PT1H",
+            "lookbackDuration": "PT2H",
             "matchingMethod": "AllEntities",
             "groupByEntities": [
               "Account"
@@ -52,14 +52,14 @@
           "aggregationKind": "SingleAlert"
         },
         "alertDetailsOverride": {
-          "alertDisplayNameFormat": "UAV S11 - Unauthorized Weapon Command (ARM/FIRE without 2-person control) - {{OperatorId}}",
+          "alertDisplayNameFormat": "UAV S11 - Unauthorized Weapon Command (ARM/FIRE 2-person control bypass) - {{Operator}}",
           "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Severity={{Severity}}",
           "alertDynamicProperties": []
         },
         "customDetails": {
           "TriggerReason": "TriggerReason",
           "WeaponId": "WeaponId",
-          "OperatorId": "OperatorId"
+          "Operator": "Operator"
         },
         "entityMappings": [
           {
@@ -67,7 +67,7 @@
             "fieldMappings": [
               {
                 "identifier": "Name",
-                "columnName": "OperatorId"
+                "columnName": "Operator"
               }
             ]
           }

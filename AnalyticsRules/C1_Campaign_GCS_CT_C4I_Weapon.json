@@ -8,17 +8,17 @@
   },
   "resources": [
     {
-      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/36871e13-f6da-4403-8fa0-16f518a421d8')]",
-      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/36871e13-f6da-4403-8fa0-16f518a421d8')]",
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/2c38fc26-6e48-422f-b0f9-c30daaff1778')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/2c38fc26-6e48-422f-b0f9-c30daaff1778')]",
       "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
       "kind": "Scheduled",
       "apiVersion": "2023-12-01-preview",
       "properties": {
         "displayName": "UAV Campaign C1 - GCS Breach → CT Downgrade → Off-hours C4I → Weapon",
-        "description": "4단계 APT 킬체인: GCS 계정탈취(S6) → CT 레벨 하향(S13) → 야간 비인가 C4I 명령(S15) → 비인가 무장(S11). 연결키: OperatorId. 윈도우: 2h. MITRE: T1078, T0821, T0831",
+        "description": "4단계 APT 킬체인: GCS 계정탈취(S6) → CT 레벨 하향(S13) → 야간 비인가 C4I(S15) → 비인가 무장(S11). 연결키: Operator. 실제 컬럼: Operator(OperatorId 아님), ChangedBy, IssuedBy. MITRE: T1078 Credential Access, T0821, T0831",
         "severity": "High",
         "enabled": true,
-        "query": "let windowSize = 2h;\nlet ApprovedOps = _GetWatchlist('Approved_Operators_List') | project OperatorId;\nlet ApprovedCT = _GetWatchlist('Approved_CT_Transition_List') | project OperatorId;\nlet ApprovedCmds = _GetWatchlist('Approved_Mission_Command_List') | project CommandType;\nlet ApprovedArm = _GetWatchlist('Approved_Arm_Operator_List') | project OperatorId;\n// S6: GCS 침해\nlet S6 =\n    UAVOpAudit_CL\n    | where TimeGenerated > ago(windowSize)\n    | where EventType == 'login_failure'\n        or (EventType == 'login_success' and Operator !in (ApprovedOps))\n    | summarize S6_Count=count(), T1=min(TimeGenerated) by OperatorId;\n// S13: CT 레벨 하향\nlet S13 =\n    UAVCyberPosture_CL\n    | where TimeGenerated > ago(windowSize)\n    | where ChangedBy !in (ApprovedCT)\n    | project T2=TimeGenerated, OperatorId=ChangedBy;\n// S15: 야간 비인가 C4I 명령\nlet S15 =\n    UAVC4I_CL\n    | where TimeGenerated > ago(windowSize)\n    | where hourofday(TimeGenerated) >= 23 or hourofday(TimeGenerated) < 5\n    | where CommandType !in (ApprovedCmds)\n    | project T3=TimeGenerated, OperatorId;\n// S11: 비인가 무장\nlet S11 =\n    UAVWeapon_CL\n    | where TimeGenerated > ago(windowSize)\n    | where EventType in ('arm','fire')\n    | where OperatorId !in (ApprovedArm)\n    | project T4=TimeGenerated, OperatorId, WeaponId;\nS6\n| join kind=inner (S13) on OperatorId\n| where T2 >= T1 and T2 <= T1 + 60m\n| join kind=inner (S15) on OperatorId\n| where T3 >= T2 and T3 <= T2 + 60m\n| join kind=inner (S11) on OperatorId\n| where T4 >= T3 and T4 <= T3 + 30m\n| extend CampaignType = \"C1_GCS침해_CT하향_야간C4I_무장\"\n| extend StepSummary = strcat(\"S6@\", tostring(T1), \" → S13@\", tostring(T2), \" → S15@\", tostring(T3), \" → S11@\", tostring(T4))\n| extend Severity = \"High\"\n| project T1, T2, T3, T4, OperatorId, WeaponId, CampaignType, StepSummary, Severity",
+        "query": "let windowSize = 2h;\nlet ApprovedOps = _GetWatchlist('Approved_Arm_Operator_List') | project OperatorId;\nlet ApprovedCT  = _GetWatchlist('Approved_CT_Transition_List') | project OperatorId;\nlet ApprovedCmds = _GetWatchlist('Approved_Mission_Command_List') | project CommandType;\nlet ApprovedArm = _GetWatchlist('Approved_Arm_Operator_List') | project OperatorId;\n// S6: GCS 침해 — 비인가 Operator\nlet S6 =\n    UAVOpAudit_CL\n    | where TimeGenerated > ago(windowSize)\n    | where EventType == 'login_failure'\n        or (EventType == 'login_success' and Operator !in (ApprovedOps))\n    | summarize S6_Count=count(), T1=min(TimeGenerated) by Operator;\n// S13: CT 레벨 하향 — 비인가 ChangedBy\nlet S13 =\n    UAVCyberPosture_CL\n    | where TimeGenerated > ago(windowSize)\n    | where ChangedBy !in (ApprovedCT)\n    | summarize T2=min(TimeGenerated) by Operator=ChangedBy, PreviousLevel, Level;\n// S15: 야간 비인가 C4I\nlet S15 =\n    UAVC4I_CL\n    | where TimeGenerated > ago(windowSize)\n    | where hourofday(TimeGenerated) >= 23 or hourofday(TimeGenerated) < 5\n    | where EventType !in (ApprovedCmds)\n    | summarize T3=min(TimeGenerated) by Operator=IssuedBy, EventType;\n// S11: 비인가 무장 (ArmedBy==Operator 자기승인 or 비인가)\nlet S11 =\n    UAVWeapon_CL\n    | where TimeGenerated > ago(windowSize)\n    | where EventType in ('arm','fire')\n    | where ArmedBy == Operator or Operator !in (ApprovedArm)\n    | project T4=TimeGenerated, Operator, WeaponId, UAVId;\n// 체인 결합\nS6\n| join kind=inner (S13) on Operator\n| where T2 >= T1 and T2 <= T1 + 60m\n| join kind=inner (S15) on Operator\n| where T3 >= T2 and T3 <= T2 + 60m\n| join kind=inner (S11) on Operator\n| where T4 >= T3 and T4 <= T3 + 30m\n| extend CampaignType = \"C1_GCS침해_CT하향_야간C4I_무장\"\n| extend StepSummary = strcat(\"S6@\", tostring(T1), \"→S13@\", tostring(T2), \"→S15@\", tostring(T3), \"→S11@\", tostring(T4))\n| extend Severity = \"High\"\n| project T1, T2, T3, T4, Operator, UAVId, WeaponId, CampaignType, StepSummary, Severity",
         "queryFrequency": "PT15M",
         "queryPeriod": "PT2H",
         "triggerOperator": "GreaterThan",
@@ -27,16 +27,10 @@
         "suppressionEnabled": false,
         "startTimeUtc": null,
         "tactics": [
-          "CredentialAccess",
-          "DefenseEvasion",
           "Execution",
           "Impact"
         ],
-        "techniques": [
-          "T1078",
-          "T0821",
-          "T0831"
-        ],
+        "techniques": [],
         "subTechniques": [],
         "alertRuleTemplateName": null,
         "incidentConfiguration": {
@@ -57,7 +51,7 @@
           "aggregationKind": "SingleAlert"
         },
         "alertDetailsOverride": {
-          "alertDisplayNameFormat": "[CAMPAIGN] UAV Campaign C1 - GCS Breach → CT Downgrade → Off-hours C4I → Weapon - {{OperatorId}}",
+          "alertDisplayNameFormat": "[CAMPAIGN] UAV Campaign C1 - GCS Breach → CT Downgrade → Off-hours C4I → Weapon - {{Operator}}",
           "alertDescriptionFormat": "CampaignType={{CampaignType}} | Steps={{StepSummary}}",
           "alertDynamicProperties": []
         },
@@ -65,7 +59,7 @@
           "CampaignType": "CampaignType",
           "StepSummary": "StepSummary",
           "WeaponId": "WeaponId",
-          "OperatorId": "OperatorId"
+          "Operator": "Operator"
         },
         "entityMappings": [
           {
@@ -73,7 +67,7 @@
             "fieldMappings": [
               {
                 "identifier": "Name",
-                "columnName": "OperatorId"
+                "columnName": "Operator"
               }
             ]
           }

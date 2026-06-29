@@ -8,30 +8,28 @@
   },
   "resources": [
     {
-      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/7ae7799e-35c4-443a-93f0-4b0843acd431')]",
-      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/7ae7799e-35c4-443a-93f0-4b0843acd431')]",
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/6647ba69-84bf-4b30-a50e-a8a1b2303cec')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/6647ba69-84bf-4b30-a50e-a8a1b2303cec')]",
       "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
       "kind": "Scheduled",
       "apiVersion": "2023-12-01-preview",
       "properties": {
         "displayName": "UAV S14 - Threat Intel Source Poisoning (Untrusted Source Injection)",
-        "description": "Trusted_TI_Source_List 외부 소스에서 IOC 데이터 주입 또는 단시간 IOC 버스트 탐지. MITRE: T1195 Supply Chain Compromise",
+        "description": "Trusted_TI_Source_List 외부 소스에서 IOC 주입 또는 단시간 IOC 버스트 탐지. MITRE: T1195 Supply Chain Compromise",
         "severity": "High",
         "enabled": true,
-        "query": "let alertWindow = 10m;\nlet burstWindow = 5m;\nlet burstThreshold = 50;\nlet TrustedSources = _GetWatchlist('Trusted_TI_Source_List') | project SourceId;\nlet UnknownSource =\n    UAVThreatIntel_CL\n    | where TimeGenerated > ago(alertWindow)\n    | where Source !in (TrustedSources)\n    | summarize Count=count(), FirstSeen=min(TimeGenerated)\n        by Source\n    | extend TriggerReason = strcat(\"TI_비신뢰_소스_\", Source)\n    | extend Severity = \"High\";\nlet IocBurst =\n    UAVThreatIntel_CL\n    | where TimeGenerated > ago(burstWindow)\n    | summarize IocCount=count() by Source, bin(TimeGenerated, burstWindow)\n    | where IocCount > burstThreshold\n    | extend TriggerReason = strcat(\"TI_IOC_버스트_\", Source, \"_\", tostring(IocCount), \"건\")\n    | extend Severity = \"Medium\";\nunion\n    (UnknownSource | project FirstSeen, Source, TriggerReason, Severity),\n    (IocBurst | project FirstSeen=TimeGenerated, Source, TriggerReason, Severity)\n| extend IncidentType = \"S15_TI_소스_오염\"\n| order by Severity desc, FirstSeen asc",
+        "query": "let alertWindow = 10m;\nlet TrustedSources = _GetWatchlist('Trusted_TI_Source_List') | project SourceId;\nUAVThreatIntel_CL\n| where TimeGenerated > ago(alertWindow)\n| where Source !in (TrustedSources)\n| summarize Count=count(), FirstSeen=min(TimeGenerated) by Source\n| extend TriggerReason = strcat(\"TI_비신뢰_소스_\", Source)\n| extend Severity = \"High\"\n| project FirstSeen, Source, Count, TriggerReason, Severity\n| order by FirstSeen desc",
         "queryFrequency": "PT5M",
         "queryPeriod": "PT15M",
         "triggerOperator": "GreaterThan",
         "triggerThreshold": 0,
-        "suppressionDuration": "PT1H",
+        "suppressionDuration": "PT2H",
         "suppressionEnabled": false,
         "startTimeUtc": null,
         "tactics": [
-          "InitialAccess"
+          "Collection"
         ],
-        "techniques": [
-          "T1195"
-        ],
+        "techniques": [],
         "subTechniques": [],
         "alertRuleTemplateName": null,
         "incidentConfiguration": {
@@ -39,7 +37,7 @@
           "groupingConfiguration": {
             "enabled": true,
             "reopenClosedIncident": false,
-            "lookbackDuration": "PT1H",
+            "lookbackDuration": "PT2H",
             "matchingMethod": "AllEntities",
             "groupByEntities": [
               "Host"

@@ -8,17 +8,17 @@
   },
   "resources": [
     {
-      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/2a09858f-f659-4385-9a09-de12a2a1d32b')]",
-      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/2a09858f-f659-4385-9a09-de12a2a1d32b')]",
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/950219a7-b1c1-4b94-aa44-74e8b526bb50')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/950219a7-b1c1-4b94-aa44-74e8b526bb50')]",
       "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
       "kind": "Scheduled",
       "apiVersion": "2023-12-01-preview",
       "properties": {
         "displayName": "UAV Campaign C2 - TI Poisoning → Firmware Tamper → GNSS Spoofing",
-        "description": "공급망 기반 킬체인: 비신뢰 TI 소스 주입(S14) → 펌웨어 해시 불일치(S4) → GNSS 스푸핑(S1). 연결키: UAVId. 윈도우: 4h. MITRE: T1195, T1542, T0835",
+        "description": "공급망 기반 킬체인: 비신뢰 TI 소스(S14) → 펌웨어 HashMatch==0(S4, SByte타입) → GNSS 스푸핑(S1). 연결키: UAVId. MITRE: T1195, T1565",
         "severity": "High",
         "enabled": true,
-        "query": "let windowSize = 4h;\nlet TrustedSrc = _GetWatchlist('Trusted_TI_Source_List') | project SourceId;\nlet posVarGate = toscalar(\n    _GetWatchlist('UAV_Threshold_List')\n    | where ThresholdKey == 'MaxPosHorizVariance'\n    | project toreal(Value));\n// S14: TI 소스 오염\nlet S14 =\n    UAVThreatIntel_CL\n    | where TimeGenerated > ago(windowSize)\n    | where Source !in (TrustedSrc)\n    | summarize T1=min(TimeGenerated) by UAVId=tostring(UAVId);\n// S4: 펌웨어 해시 불일치\nlet S4 =\n    UAVPgse_CL\n    | where TimeGenerated > ago(windowSize)\n    | where HashMatch == false or SbomForbiddenCount > 0\n    | project T2=TimeGenerated, UAVId=tostring(UAVId);\n// S1: GNSS 스푸핑\nlet S1 =\n    UAVTelemetry_CL\n    | where TimeGenerated > ago(windowSize)\n    | where MsgType == 'GPS_RAW_INT'\n    | where PosHorizVariance > posVarGate\n    | project T3=TimeGenerated, UAVId=tostring(UAVId);\nS14\n| join kind=inner (S4) on UAVId\n| where T2 >= T1 and T2 <= T1 + 2h\n| join kind=inner (S1) on UAVId\n| where T3 >= T2 and T3 <= T2 + 2h\n| extend CampaignType = \"C2_TI오염_펌웨어변조_GNSS스푸핑\"\n| extend StepSummary = strcat(\"S14@\", tostring(T1), \" → S4@\", tostring(T2), \" → S1@\", tostring(T3))\n| extend Severity = \"High\"\n| project T1, T2, T3, UAVId, CampaignType, StepSummary, Severity",
+        "query": "let windowSize = 4h;\nlet TrustedSrc = _GetWatchlist('Trusted_TI_Source_List') | project SourceId;\nlet posVarGate = toscalar(\n    _GetWatchlist('UAV_Threshold_List')\n    | where ThresholdKey == 'MaxPosHorizVariance'\n    | project toreal(Value));\n// S14: TI 소스 오염\nlet S14 =\n    UAVThreatIntel_CL\n    | where TimeGenerated > ago(windowSize)\n    | where Source !in (TrustedSrc)\n    | summarize T1=min(TimeGenerated) by UAVId=tostring(UAVId);\n// S4: 펌웨어 HashMatch==0 (SByte false)\nlet S4 =\n    UAVPgse_CL\n    | where TimeGenerated > ago(windowSize)\n    | where HashMatch == 0 or SbomForbiddenCount > 0\n    | project T2=TimeGenerated, UAVId=tostring(UAVId);\n// S1: GNSS 스푸핑\nlet S1 =\n    UAVTelemetry_CL\n    | where TimeGenerated > ago(windowSize)\n    | where MsgType == 'EKF_STATUS_REPORT'\n    | where PosHorizVariance > posVarGate\n    | project T3=TimeGenerated, UAVId=tostring(UAVId);\nS14\n| join kind=inner (S4) on UAVId\n| where T2 >= T1 and T2 <= T1 + 2h\n| join kind=inner (S1) on UAVId\n| where T3 >= T2 and T3 <= T2 + 2h\n| extend CampaignType = \"C2_TI오염_펌웨어변조_GNSS스푸핑\"\n| extend StepSummary = strcat(\"S14@\", tostring(T1), \"→S4@\", tostring(T2), \"→S1@\", tostring(T3))\n| extend Severity = \"High\"\n| project T1, T2, T3, UAVId, CampaignType, StepSummary, Severity",
         "queryFrequency": "PT15M",
         "queryPeriod": "PT4H",
         "triggerOperator": "GreaterThan",
@@ -27,13 +27,10 @@
         "suppressionEnabled": false,
         "startTimeUtc": null,
         "tactics": [
-          "InitialAccess",
-          "Persistence",
+          "Collection",
           "Impact"
         ],
         "techniques": [
-          "T1195",
-          "T1542",
           "T1565"
         ],
         "subTechniques": [],

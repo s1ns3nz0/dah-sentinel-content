@@ -8,30 +8,28 @@
   },
   "resources": [
     {
-      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/5553e0ec-dff8-4cba-9c29-a53cf56f52a4')]",
-      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/5553e0ec-dff8-4cba-9c29-a53cf56f52a4')]",
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/b4309ed9-4558-471a-84f6-8336697151a3')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/b4309ed9-4558-471a-84f6-8336697151a3')]",
       "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
       "kind": "Scheduled",
       "apiVersion": "2023-12-01-preview",
       "properties": {
         "displayName": "UAV S15 - Off-hours Unauthorized C4I Command",
-        "description": "야간 시간대(23:00~05:00)에 Approved_Mission_Command_List 외부 CommandType으로 C4I 명령 발행 탐지. MITRE: T0821 Modify Controller Tasking",
+        "description": "야간(23:00~05:00) 비인가 C4I 명령 탐지. 실제 컬럼: EventType(CommandType 역할), IssuedBy, Roe, OrderId. Approved_Mission_Command_List.CommandType과 비교. MITRE: T0821 Modify Controller Tasking",
         "severity": "High",
         "enabled": true,
-        "query": "let alertWindow = 10m;\nlet ApprovedCmds = _GetWatchlist('Approved_Mission_Command_List') | project CommandType;\nlet ApprovedSchedule = _GetWatchlist('Approved_Operation_Schedule_List') | project MissionId;\nUAVC4I_CL\n| where TimeGenerated > ago(alertWindow)\n| where hourofday(TimeGenerated) >= 23 or hourofday(TimeGenerated) < 5\n| where CommandType !in (ApprovedCmds)\n| extend TriggerReason = strcat(\"C4I_야간_비인가_명령_\", CommandType, \"_\", tostring(hourofday(TimeGenerated)), \"시\")\n| extend Severity = \"High\"\n| project TimeGenerated, UAVId, MissionId, CommandType, OperatorId, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "query": "let alertWindow = 10m;\nlet offHoursStart = toscalar(\n    _GetWatchlist('UAV_Threshold_List')\n    | where ThresholdKey == 'OffHoursStart'\n    | project toint(Value));\nlet offHoursEnd = toscalar(\n    _GetWatchlist('UAV_Threshold_List')\n    | where ThresholdKey == 'OffHoursEnd'\n    | project toint(Value));\nlet ApprovedCmds = _GetWatchlist('Approved_Mission_Command_List') | project CommandType;\nUAVC4I_CL\n| where TimeGenerated > ago(alertWindow)\n| where hourofday(TimeGenerated) >= offHoursStart or hourofday(TimeGenerated) < offHoursEnd\n| where EventType !in (ApprovedCmds)\n| extend TriggerReason = strcat(\"C4I_야간_비인가_명령_EventType:\", EventType, \"_IssuedBy:\", IssuedBy, \"_\", tostring(hourofday(TimeGenerated)), \"시\")\n| extend Severity = \"High\"\n| project TimeGenerated, OrderId, EventType, IssuedBy, Roe, TriggerReason, Severity\n| order by TimeGenerated desc",
         "queryFrequency": "PT5M",
         "queryPeriod": "PT15M",
         "triggerOperator": "GreaterThan",
         "triggerThreshold": 0,
-        "suppressionDuration": "PT1H",
+        "suppressionDuration": "PT2H",
         "suppressionEnabled": false,
         "startTimeUtc": null,
         "tactics": [
           "Execution"
         ],
-        "techniques": [
-          "T0821"
-        ],
+        "techniques": [],
         "subTechniques": [],
         "alertRuleTemplateName": null,
         "incidentConfiguration": {
@@ -39,7 +37,7 @@
           "groupingConfiguration": {
             "enabled": true,
             "reopenClosedIncident": false,
-            "lookbackDuration": "PT1H",
+            "lookbackDuration": "PT2H",
             "matchingMethod": "AllEntities",
             "groupByEntities": [
               "Account"
@@ -52,14 +50,14 @@
           "aggregationKind": "SingleAlert"
         },
         "alertDetailsOverride": {
-          "alertDisplayNameFormat": "UAV S15 - Off-hours Unauthorized C4I Command - {{OperatorId}}",
+          "alertDisplayNameFormat": "UAV S15 - Off-hours Unauthorized C4I Command - {{IssuedBy}}",
           "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Severity={{Severity}}",
           "alertDynamicProperties": []
         },
         "customDetails": {
           "TriggerReason": "TriggerReason",
-          "CommandType": "CommandType",
-          "MissionId": "MissionId"
+          "OrderId": "OrderId",
+          "EventType": "EventType"
         },
         "entityMappings": [
           {
@@ -67,7 +65,7 @@
             "fieldMappings": [
               {
                 "identifier": "Name",
-                "columnName": "OperatorId"
+                "columnName": "IssuedBy"
               }
             ]
           }

@@ -8,32 +8,28 @@
   },
   "resources": [
     {
-      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/ae434cef-69d4-4922-989e-685765ac214b')]",
-      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/ae434cef-69d4-4922-989e-685765ac214b')]",
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/e4f73924-b8da-4034-8257-71bf8e9e1e55')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/e4f73924-b8da-4034-8257-71bf8e9e1e55')]",
       "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
       "kind": "Scheduled",
       "apiVersion": "2023-12-01-preview",
       "properties": {
         "displayName": "UAV S24 - Datalink C2 Channel Takeover (Rogue PeerIp + TxBytes Anomaly)",
-        "description": "C2_Whitelisted_GCS_List 외부 PeerIp가 MAVLink 포트에 연결하고 동시에 TxBytes z-score 이상 탐지. MITRE: T1090 Proxy, T1571 Non-Standard Port",
+        "description": "C2_Whitelisted_GCS_List 외부 PeerIp가 MAVLink 포트에 연결 + TxBytes z-score 이상 동시 탐지. 실제 컬럼: UAVId 없음(ContainerName/PeerIp 사용), LocalPort(Int32). MITRE: T1090 Proxy, T1571 Non-Standard Port",
         "severity": "High",
         "enabled": true,
-        "query": "let knownPorts = dynamic([5760, 5790, 14550, 14551]);\nlet alertWindow = 10m;\nlet KnownGCS = _GetWatchlist('C2_Whitelisted_GCS_List') | project GCS_IP;\nlet UnknownConn =\n    UAVDatalinkConn_CL\n    | where TimeGenerated > ago(alertWindow)\n    | join kind=leftanti (KnownGCS) on $left.PeerIp == $right.GCS_IP\n    | where LocalPort in (knownPorts)\n    | project T_conn=TimeGenerated, UAVId, PeerIp, LocalPort, State;\nlet TxAnomaly =\n    UAVDatalink_CL\n    | where TimeGenerated > ago(24h)\n    | make-series AvgTx=avg(TxBytes) on TimeGenerated step 5m by UAVId\n    | extend (Anom, Score, Base) = series_decompose_anomalies(AvgTx, 3.0)\n    | mv-expand TimeGenerated, AvgTx=todouble(AvgTx), Anom=toint(Anom)\n    | where TimeGenerated > ago(alertWindow) and Anom == 1\n    | project T_tx=TimeGenerated, UAVId, AvgTx;\nUnknownConn\n| join kind=inner (TxAnomaly) on UAVId\n| extend TriggerReason = case(\n    State == 'ESTABLISHED', strcat(\"비인가IP_C2포트_연결수립_TxBurst_\", PeerIp),\n    strcat(\"비인가IP_C2포트_연결시도_TxBurst_\", PeerIp))\n| extend Severity = \"High\"\n| project T_conn, UAVId, PeerIp, LocalPort, AvgTx, TriggerReason, Severity\n| order by T_conn desc",
+        "query": "let knownPorts = dynamic([5760, 5790, 14550, 14551]);\nlet alertWindow = 10m;\nlet KnownGCS = _GetWatchlist('C2_Whitelisted_GCS_List') | project GCS_IP;\nlet UnknownConn =\n    UAVDatalinkConn_CL\n    | where TimeGenerated > ago(alertWindow)\n    | where PeerIp !in (KnownGCS)\n    | where LocalPort in (knownPorts)\n    | summarize ConnCount=count(), FirstSeen=min(TimeGenerated) by PeerIp, LocalPort, State;\nlet TxAnomaly =\n    UAVDatalink_CL\n    | where TimeGenerated > ago(24h)\n    | make-series AvgTx=avg(TxBytes) on TimeGenerated step 5m by ContainerName\n    | extend (Anom, Score, Base) = series_decompose_anomalies(AvgTx, 3.0)\n    | mv-expand TimeGenerated, AvgTx=todouble(AvgTx), Anom=toint(Anom)\n    | where TimeGenerated > ago(alertWindow) and Anom == 1\n    | project T_tx=todatetime(TimeGenerated), ContainerName, AvgTx;\nUnknownConn\n| join kind=inner (TxAnomaly) on $left.FirstSeen <= $right.T_tx\n| extend TriggerReason = strcat(\"비인가IP_C2포트_TxBurst_PeerIp:\", PeerIp, \"_Port:\", tostring(LocalPort))\n| extend Severity = \"High\"\n| project FirstSeen, PeerIp, LocalPort, ConnCount, AvgTx, TriggerReason, Severity\n| order by FirstSeen desc",
         "queryFrequency": "PT10M",
         "queryPeriod": "P1D",
         "triggerOperator": "GreaterThan",
         "triggerThreshold": 0,
-        "suppressionDuration": "PT1H",
+        "suppressionDuration": "PT2H",
         "suppressionEnabled": false,
         "startTimeUtc": null,
         "tactics": [
-          "CommandAndControl",
-          "Exfiltration"
+          "Collection"
         ],
-        "techniques": [
-          "T1090",
-          "T1041"
-        ],
+        "techniques": [],
         "subTechniques": [],
         "alertRuleTemplateName": null,
         "incidentConfiguration": {
@@ -41,7 +37,7 @@
           "groupingConfiguration": {
             "enabled": true,
             "reopenClosedIncident": false,
-            "lookbackDuration": "PT1H",
+            "lookbackDuration": "PT2H",
             "matchingMethod": "AllEntities",
             "groupByEntities": [
               "IP"
@@ -68,7 +64,7 @@
             "entityType": "IP",
             "fieldMappings": [
               {
-                "identifier": "HostName",
+                "identifier": "Address",
                 "columnName": "PeerIp"
               }
             ]

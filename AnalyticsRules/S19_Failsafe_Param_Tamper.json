@@ -8,32 +8,28 @@
   },
   "resources": [
     {
-      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/f661637a-696d-41d8-9681-a72f3002a826')]",
-      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/f661637a-696d-41d8-9681-a72f3002a826')]",
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/8fa2fdca-6cea-4a15-91d5-22c8a3e3f3db')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/8fa2fdca-6cea-4a15-91d5-22c8a3e3f3db')]",
       "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
       "kind": "Scheduled",
       "apiVersion": "2023-12-01-preview",
       "properties": {
-        "displayName": "UAV S19 - Failsafe Parameter Unauthorized Modification (FS_* → 0)",
-        "description": "UAVConfigAudit_CL에서 FS_* 파라미터가 0 또는 이전 값 대비 50% 이하로 감소한 변경 탐지. 직후 UAVFailsafe_CL에서 failsafe_suppressed 이벤트 확인. MITRE: T0838 Modify Alarm Settings",
+        "displayName": "UAV S19 - Failsafe Parameter Unauthorized Modification (FS_* to 0)",
+        "description": "UAVConfigAudit_CL에서 FS_* 파라미터가 0으로 설정되거나 이전 값 대비 50% 이하로 감소 탐지. 실제 컬럼: ParamValueBefore/ParamValueAfter(Double). MITRE: T0838 Modify Alarm Settings (ICS — description 참조)",
         "severity": "High",
         "enabled": true,
-        "query": "let alertWindow = 15m;\nlet fsParams = dynamic([\"FS_THR_ENABLE\",\"FS_GCS_ENABLE\",\"FS_EKF_ACTION\",\"FS_CRASH_CHECK\",\"FS_LAND_AERR\"]);\nlet ConfigChange =\n    UAVConfigAudit_CL\n    | where TimeGenerated > ago(alertWindow)\n    | where ParamId in (fsParams)\n    | extend OldVal = toreal(ParamValueBefore)\n    | extend NewVal = toreal(ParamValueAfter)\n    | extend isDisabling = NewVal == 0 or (isnotnull(OldVal) and NewVal < OldVal * 0.5)\n    | where isDisabling\n    | project T1=TimeGenerated, UAVId, ParamId, OldVal, NewVal;\nlet FailsafeViolation =\n    UAVFailsafe_CL\n    | where TimeGenerated > ago(alertWindow)\n    | where EventType == 'failsafe_suppressed'\n    | project T2=TimeGenerated, UAVId, EventType;\nConfigChange\n| join kind=leftouter (FailsafeViolation) on UAVId\n| extend TriggerReason = case(\n    isnotnull(T2) and T2 >= T1, strcat(\"Failsafe_비활성화_억제이벤트_확인_\", ParamId, \"_\", tostring(OldVal), \"→\", tostring(NewVal)),\n    strcat(\"Failsafe_파라미터_비인가_비활성화_\", ParamId, \"_\", tostring(OldVal), \"→\", tostring(NewVal)))\n| extend Severity = \"High\"\n| project T1, UAVId, ParamId, OldVal, NewVal, TriggerReason, Severity\n| order by T1 desc",
+        "query": "let alertWindow = 15m;\nlet fsParams = dynamic([\"FS_THR_ENABLE\",\"FS_GCS_ENABLE\",\"FS_EKF_ACTION\",\"FS_CRASH_CHECK\",\"FS_LAND_AERR\"]);\nUAVConfigAudit_CL\n| where TimeGenerated > ago(alertWindow)\n| where ParamId in (fsParams)\n| extend isDisabling = ParamValueAfter == 0\n    or (isnotnull(ParamValueBefore) and ParamValueBefore > 0 and ParamValueAfter < ParamValueBefore * 0.5)\n| where isDisabling\n| extend TriggerReason = strcat(\"Failsafe_파라미터_비활성화_\", ParamId, \"_\", tostring(ParamValueBefore), \"→\", tostring(ParamValueAfter))\n| extend Severity = \"High\"\n| project TimeGenerated, UAVId, ParamId, ParamValueBefore, ParamValueAfter, Source, TriggerReason, Severity\n| order by TimeGenerated desc",
         "queryFrequency": "PT5M",
         "queryPeriod": "PT20M",
         "triggerOperator": "GreaterThan",
         "triggerThreshold": 0,
-        "suppressionDuration": "PT1H",
+        "suppressionDuration": "PT2H",
         "suppressionEnabled": false,
         "startTimeUtc": null,
         "tactics": [
-          "DefenseEvasion",
           "Impact"
         ],
-        "techniques": [
-          "T1562",
-          "T1499"
-        ],
+        "techniques": [],
         "subTechniques": [],
         "alertRuleTemplateName": null,
         "incidentConfiguration": {
@@ -41,7 +37,7 @@
           "groupingConfiguration": {
             "enabled": true,
             "reopenClosedIncident": false,
-            "lookbackDuration": "PT1H",
+            "lookbackDuration": "PT2H",
             "matchingMethod": "AllEntities",
             "groupByEntities": [
               "Host"
@@ -54,7 +50,7 @@
           "aggregationKind": "SingleAlert"
         },
         "alertDetailsOverride": {
-          "alertDisplayNameFormat": "UAV S19 - Failsafe Parameter Unauthorized Modification (FS_* → 0) - {{UAVId}}",
+          "alertDisplayNameFormat": "UAV S19 - Failsafe Parameter Unauthorized Modification (FS_* to 0) - {{UAVId}}",
           "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Severity={{Severity}}",
           "alertDynamicProperties": []
         },

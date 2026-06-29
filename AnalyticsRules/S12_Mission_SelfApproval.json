@@ -8,30 +8,28 @@
   },
   "resources": [
     {
-      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/bcc7ee61-6d04-46a8-b3e5-47739c14ead2')]",
-      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/bcc7ee61-6d04-46a8-b3e5-47739c14ead2')]",
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/73bbd169-8d7a-404f-9671-253eb59daae0')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/73bbd169-8d7a-404f-9671-253eb59daae0')]",
       "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
       "kind": "Scheduled",
       "apiVersion": "2023-12-01-preview",
       "properties": {
         "displayName": "UAV S12 - Mission Plan Self-Approval (2-person control bypass)",
-        "description": "임무계획에서 Planner == Approver(자기승인) 또는 비인가 Planner 탐지. MITRE: T1078 Valid Accounts",
+        "description": "임무계획에서 Planner == Approver(자기승인) 탐지. 실제 컬럼: PlanId(MissionId 없음), Planner, Approver. MITRE: T1078 Valid Accounts (Credential Access — description 참조)",
         "severity": "High",
         "enabled": true,
-        "query": "let alertWindow = 10m;\nlet ApprovedPlanners = _GetWatchlist('Approved_MPS_Planner_List') | project OperatorId;\nUAVMissionPlan_CL\n| where TimeGenerated > ago(alertWindow)\n| where Planner == Approver or Planner !in (ApprovedPlanners)\n| extend isSelfApproval = (Planner == Approver)\n| extend TriggerReason = case(\n    isSelfApproval, strcat(\"임무계획_자기승인_\", Planner),\n    strcat(\"임무계획_비인가_Planner_\", Planner))\n| extend Severity = \"High\"\n| project TimeGenerated, MissionId, Planner, Approver, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "query": "let alertWindow = 10m;\nlet ApprovedPlanners = _GetWatchlist('Approved_Arm_Operator_List') | project OperatorId;\nUAVMissionPlan_CL\n| where TimeGenerated > ago(alertWindow)\n| where Planner == Approver\n| extend TriggerReason = strcat(\"임무계획_자기승인_Planner:\", Planner, \"_PlanId:\", PlanId)\n| extend Severity = \"High\"\n| project TimeGenerated, PlanId, Planner, Approver, UAVId, TriggerReason, Severity\n| order by TimeGenerated desc",
         "queryFrequency": "PT5M",
         "queryPeriod": "PT15M",
         "triggerOperator": "GreaterThan",
         "triggerThreshold": 0,
-        "suppressionDuration": "PT1H",
+        "suppressionDuration": "PT2H",
         "suppressionEnabled": false,
         "startTimeUtc": null,
         "tactics": [
-          "CredentialAccess"
+          "Impact"
         ],
-        "techniques": [
-          "T1078"
-        ],
+        "techniques": [],
         "subTechniques": [],
         "alertRuleTemplateName": null,
         "incidentConfiguration": {
@@ -39,7 +37,7 @@
           "groupingConfiguration": {
             "enabled": true,
             "reopenClosedIncident": false,
-            "lookbackDuration": "PT1H",
+            "lookbackDuration": "PT2H",
             "matchingMethod": "AllEntities",
             "groupByEntities": [
               "Account"
@@ -58,7 +56,7 @@
         },
         "customDetails": {
           "TriggerReason": "TriggerReason",
-          "MissionId": "MissionId"
+          "PlanId": "PlanId"
         },
         "entityMappings": [
           {

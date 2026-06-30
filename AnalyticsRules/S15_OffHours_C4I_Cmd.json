@@ -33,7 +33,7 @@
         "subTechniques": [],
         "alertRuleTemplateName": null,
         "incidentConfiguration": {
-          "createIncident": true,
+          "createIncident": false,
           "groupingConfiguration": {
             "enabled": true,
             "reopenClosedIncident": false,

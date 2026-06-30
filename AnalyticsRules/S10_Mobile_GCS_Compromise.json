@@ -1,0 +1,79 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/d6fa8b60-c897-4442-a102-b9eded3bbfab')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/d6fa8b60-c897-4442-a102-b9eded3bbfab')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S10 - Mobile/Tactical GCS Compromise (Unauthorized Access + Unusual UserAgent)",
+        "description": "C2_Whitelisted_GCS_List 외부 ClientIp 접속 또는 비정상 UserAgent 패턴(모바일 기기 추정) 탐지. 실제 컬럼: ClientIp, Operator, UserAgent, Action, Result. MITRE: T0864 Transient Cyber Asset, T1550 (ICS — description 참조)",
+        "severity": "High",
+        "enabled": true,
+        "query": "let alertWindow = 10m;\nlet KnownGCS = _GetWatchlist('C2_Whitelisted_GCS_List') | project GCS_IP;\nlet ApprovedOps = _GetWatchlist('Approved_Arm_Operator_List') | project OperatorId;\nUAVGcsAccess_CL\n| where TimeGenerated > ago(alertWindow)\n| extend isUnknownIp = ClientIp !in (KnownGCS)\n| extend isUnknownOp = Operator !in (ApprovedOps)\n| extend isFailedAuth = Result != 'success'\n| extend isMobileUA = UserAgent has_any (\"Mobile\", \"Android\", \"iPhone\", \"iPad\") or UserAgent == 'x' or isempty(UserAgent)\n| where isUnknownIp or isFailedAuth or isMobileUA\n| extend TriggerReason = case(\n    isUnknownIp and isMobileUA, strcat(\"비인가IP_모바일UA_동시_\", ClientIp),\n    isUnknownIp, strcat(\"GCS_비인가_ClientIp_\", ClientIp),\n    isFailedAuth, strcat(\"GCS_인증실패_\", Operator),\n    strcat(\"GCS_비정상_UserAgent_\", UserAgent))\n| extend Severity = \"High\"\n| project TimeGenerated, SessionId, ClientIp, Operator, UserAgent, Transport, Action, Result, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "queryFrequency": "PT5M",
+        "queryPeriod": "PT15M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "Persistence",
+          "Collection"
+        ],
+        "techniques": [],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": true,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT2H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "IP"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S10 - Mobile/Tactical GCS Compromise (Unauthorized Access + Unusual UserAgent) - {{ClientIp}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Severity={{Severity}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "Operator": "Operator",
+          "UserAgent": "UserAgent"
+        },
+        "entityMappings": [
+          {
+            "entityType": "IP",
+            "fieldMappings": [
+              {
+                "identifier": "Address",
+                "columnName": "ClientIp"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

@@ -1,0 +1,78 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/8401cfb1-1d19-411a-ae8e-9925af044698')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/8401cfb1-1d19-411a-ae8e-9925af044698')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S28 - Imagery Stream Lost (Situational Awareness Denial)",
+        "description": "UAVImagery_CL의 GapMs(프레임 끊김)가 임계치 이상이거나 FrameRate가 비정상적으로 낮아지는 패턴 탐지. 실제 컬럼: GapMs(Int64), FrameRate(Double), FrameCount 없음. MITRE: T0815 Denial of View (ICS — description 참조)",
+        "severity": "Medium",
+        "enabled": true,
+        "query": "let alertWindow = 10m;\nlet gapThresholdMs = 5000;\nlet minFrameRate = 1.0;\nUAVImagery_CL\n| where TimeGenerated > ago(alertWindow)\n| extend isGapAlert = GapMs > gapThresholdMs\n| extend isLowFrameRate = FrameRate < minFrameRate and FrameRate > 0\n| extend isStreamDown = EventType has_any (\"stream_lost\", \"disconnect\", \"stopped\")\n| where isGapAlert or isLowFrameRate or isStreamDown\n| extend TriggerReason = case(\n    isStreamDown, strcat(\"영상스트림_중단_\", EventType),\n    isGapAlert, strcat(\"영상프레임_끊김_\", tostring(GapMs), \"ms\"),\n    strcat(\"영상프레임율_저하_\", tostring(round(FrameRate,2)), \"fps\"))\n| extend Severity = \"Medium\"\n| project TimeGenerated, UAVId, StreamId, GapMs, FrameRate, Resolution, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "queryFrequency": "PT5M",
+        "queryPeriod": "PT15M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "Impact"
+        ],
+        "techniques": [],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": true,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT2H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Host"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S28 - Imagery Stream Lost (Situational Awareness Denial) - {{UAVId}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Severity={{Severity}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "GapMs": "GapMs",
+          "StreamId": "StreamId"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "UAVId"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

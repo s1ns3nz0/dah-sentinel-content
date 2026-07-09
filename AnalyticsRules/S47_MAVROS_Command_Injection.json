@@ -8,8 +8,8 @@
   },
   "resources": [
     {
-      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/d4ae2c0c-200c-400c-8413-8189856aff88')]",
-      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/d4ae2c0c-200c-400c-8413-8189856aff88')]",
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/5ff064aa-8ba0-4ff6-8bf2-67f616f320a5')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/5ff064aa-8ba0-4ff6-8bf2-67f616f320a5')]",
       "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
       "kind": "Scheduled",
       "apiVersion": "2023-12-01-preview",

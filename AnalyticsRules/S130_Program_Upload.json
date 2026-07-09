@@ -27,7 +27,7 @@
         "suppressionEnabled": false,
         "startTimeUtc": null,
         "tactics": [
-          "Collection"
+          "CommandAndControl"
         ],
         "techniques": [
           "T1105"

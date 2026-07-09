@@ -1,8 +1,28 @@
+# description 은 ADS(Alerting & Detection Strategy) 형식으로 채운다 — 대괄호 섹션은
+# 그대로 두고 내용만 교체. Sentinel 포털/인시던트 화면에 그대로 노출되므로 분석가가
+# 이 텍스트만 보고 판단할 수 있게 쓴다.
 id: 00000000-0000-0000-0000-000000000000
 name: TemplateScheduledRule
 displayName: "[TEMPLATE] Scheduled rule template"
 description: |
-  설명을 채울 곳. 어떤 위협을 탐지하는지, 어떤 신호가 트리거인지, false positive 가능성.
+  [Goal] 이 룰이 잡는 위협을 한 문장으로. ("공격자가 X 를 통해 Y 를 시도하는 것을 탐지")
+
+  [Categorization] ATT&CK 매핑은 아래 tactics/techniques 필드 참조. D3FEND 대응처방이
+  있으면 한 줄로 (예: 공격→방어 매핑표 uav-sim-env/ARCHITECTURE.md §11).
+
+  [Strategy Abstract] 어떤 로그를 어떤 논리로 본다 (예: "UAVTelemetry_CL 에서 EKF 잔차가
+  베이스라인 P99 x 1.5 를 넘는 버스트를 series_decompose 로 탐지").
+
+  [Technical Context] 실제 테이블/컬럼/조인 대상 등 구현 세부사항.
+
+  [Blind Spots & Assumptions] 이 룰이 놓치는 조건 (예: "임계 아래로 강도를 낮추면 회피
+  가능 — 연속값 룰의 구조적 한계") 과 전제.
+
+  [False Positives] 알려진 오탐 시나리오 + 억제 조건 (예: "정비 중 재부팅 시 일시적 신호").
+
+  [Validation] 이 룰이 제대로 발화하는지 확인하는 방법 — 재현 절차 또는 회귀 픽스처 참조.
+
+  [Priority Rationale] 이 severity 를 준 근거 — 자산 영향/즉시성.
 severity: Medium
 status: Available
 requiredDataConnectors:

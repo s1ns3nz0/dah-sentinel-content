@@ -1,0 +1,31 @@
+name: Validate Analytics Rules (advisory)
+
+# 사전검증 게이트 — 실배포(sentinel-deploy 워크플로, ~40분) 전에 흔한 스키마 실수를
+# 초 단위로 잡아낸다. 기준선은 마이크로소프트 공식 스키마가 아니라 "이미 성공적으로
+# 배포된 나머지 룰들 자체"(self-referential) — scripts/validate_analytics_rules.py 참고.
+#
+# advisory(경고만, 머지 안 막음)로 시작 — 이 검증기 자체가 신규라 우리 데이터에 아직
+# 충분히 검증 안 됐으므로, 당분간 오탐 여부를 지켜본 뒤 required 전환 여부를 정한다.
+
+on:
+  pull_request:
+    paths:
+      - "AnalyticsRules/**"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: 자체기준 스키마 검사(advisory)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Python 설정
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: 검증 실행(advisory — 항상 성공, 결과만 출력)
+        run: python scripts/validate_analytics_rules.py --dir AnalyticsRules

@@ -1,0 +1,89 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/c16a3cc1-a56b-4b48-b01a-69b36cb1bf69')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/c16a3cc1-a56b-4b48-b01a-69b36cb1bf69')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S128 - Archive Collected Data (Compression Tool / Archive File)",
+        "description": "[Goal] 수집한 데이터를 유출 전 압축·아카이브하는 행위(아카이브 도구 실행 또는 압축 확장자 파일 생성)를 탐지한다.\n\n[Categorization] Collection / T1560(Archive Collected Data). ATT&CK Enterprise 매핑.\n\n[Strategy Abstract] UAVFileAudit_CL에서 exec/write 이벤트 중 알려진 아카이브 도구 프로세스명(tar/zip/gzip/7z/rar/zstd) 또는 압축 확장자(.tar/.zip/.gz) 파일 경로를 탐지.\n\n[Technical Context] UAVFileAudit_CL(ProcessName/FilePath/Operation) 기반. 실측 스키마 확인(2026-07) — 시드 데이터엔 매칭 이벤트 없음(문법·컬럼만 검증됨), 실운영 데이터로 임계·화이트리스트 보정 필요.\n\n[Blind Spots & Assumptions] 프로세스명 위장(예: 아카이브 바이너리를 다른 이름으로 실행)이나 커스텀 압축 로직(자체 구현 압축)은 회피 가능. 정상 백업/로그 로테이션 프로세스가 있다면 화이트리스트 필요.\n\n[False Positives] 정상 로그 로테이션(logrotate 등)이나 백업 스크립트가 같은 패턴을 만들 수 있음 — 운영 배포 전 정상 프로세스 화이트리스트 확인 필요.\n\n[Validation] UAVFileAudit_CL에 ProcessName='tar' 또는 FilePath='*.tar' write 이벤트 주입 후 발화 확인(2026-07 KQL 문법·컬럼 검증 완료, 실매칭 데이터는 시드셋에 없음).\n\n[Priority Rationale] 수집 후 유출 직전 단계라 Medium — 대량 파일 aggregation과 함께 나타나면 격상 검토.",
+        "severity": "Medium",
+        "enabled": true,
+        "query": "let alertWindow = 24h;\nlet archiveTools = dynamic([\"tar\",\"zip\",\"gzip\",\"7z\",\"rar\",\"zstd\"]);\nUAVFileAudit_CL\n| where TimeGenerated > ago(alertWindow)\n| where Operation in (\"exec\",\"write\")\n| where ProcessName has_any (archiveTools) or FilePath endswith \".tar\" or FilePath endswith \".zip\" or FilePath endswith \".gz\"\n| extend TriggerReason = strcat(\"아카이브도구_\", ProcessName, \"_\", FilePath)\n| project TimeGenerated, ContainerName, ProcessName, FilePath, User, Operation, TriggerReason\n| order by TimeGenerated desc",
+        "queryFrequency": "PT15M",
+        "queryPeriod": "P1D",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "Collection"
+        ],
+        "techniques": [
+          "T1560"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT5H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Host"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S128 - Archive Collected Data - {{ContainerName}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | ProcessName={{ProcessName}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "ProcessName": "ProcessName",
+          "FilePath": "FilePath"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "ContainerName"
+              }
+            ]
+          },
+          {
+            "entityType": "Account",
+            "fieldMappings": [
+              {
+                "identifier": "Name",
+                "columnName": "User"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

@@ -1,0 +1,89 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/b2f58a97-550e-4e69-8434-9d39d4e1f8dc')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/b2f58a97-550e-4e69-8434-9d39d4e1f8dc')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S127 - Automated Collection (Scripted Repeated File Access)",
+        "description": "[Goal] 사람이 아니라 스크립트/자동화 프로세스가 짧은 시간 안에 같은 파일을 반복 읽어가는 패턴(자동수집)을 탐지한다.\n\n[Categorization] Collection / T1119(Automated Collection). ATT&CK Enterprise 매핑(ICS 전용 근접기법 없음).\n\n[Strategy Abstract] UAVFileAudit_CL에서 동일 컨테이너·프로세스·파일·사용자 조합의 read 이벤트가 짧은 시간창 내 임계 이상 반복되면 자동화 수집 의심으로 탐지.\n\n[Technical Context] UAVFileAudit_CL(ContainerName/ProcessName/FilePath/User/Operation) 기반. 실측 스키마 확인(2026-07) — 반복횟수 게이트는 초기값(가상)이며 정상 베이스라인 실측 후 조정 필요.\n\n[Blind Spots & Assumptions] 사람이 짧은 시간에 반복 조회하는 정상 운영 패턴(예: 디버깅)과 구분 못함 — User 화이트리스트 없음. 파일당 1회씩만 읽고 흩어서 수집하면 회피 가능.\n\n[False Positives] 디버깅/모니터링 목적의 반복 폴링 프로세스(telemetryd 류)가 정상 오탐 소지 — ProcessName 화이트리스트 튜닝 필요.\n\n[Validation] UAVFileAudit_CL에 동일 조합 read 3회 이상 주입 후 발화 확인(2026-07 실측 확인).\n\n[Priority Rationale] 단독으로는 정찰/수집 신호라 Medium — 다른 침해 신호와 상관 시 격상.",
+        "severity": "Medium",
+        "enabled": true,
+        "query": "let alertWindow = 24h;\nlet repeatGate = 3;\nUAVFileAudit_CL\n| where TimeGenerated > ago(alertWindow)\n| where Operation == \"read\"\n| summarize ReadCount = count(), LastEvent = max(TimeGenerated) by ContainerName, ProcessName, FilePath, User\n| where ReadCount >= repeatGate\n| extend TriggerReason = strcat(\"자동수집의심_\", ProcessName, \"_\", FilePath, \"_\", tostring(ReadCount), \"회\")\n| project TimeGenerated = LastEvent, ContainerName, ProcessName, FilePath, User, ReadCount, TriggerReason\n| order by TimeGenerated desc",
+        "queryFrequency": "PT15M",
+        "queryPeriod": "P1D",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "Collection"
+        ],
+        "techniques": [
+          "T1119"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT5H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Host"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S127 - Automated Collection - {{ContainerName}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | ReadCount={{ReadCount}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "ReadCount": "ReadCount",
+          "FilePath": "FilePath"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "ContainerName"
+              }
+            ]
+          },
+          {
+            "entityType": "Account",
+            "fieldMappings": [
+              {
+                "identifier": "Name",
+                "columnName": "User"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

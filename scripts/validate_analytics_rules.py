@@ -1,11 +1,16 @@
 #!/usr/bin/env python3
 """Sentinel AnalyticsRules 스키마 사전검증 — advisory(비차단), 경량 자체기준.
 
-실측으로 확정된 9가지 Sentinel ARM 스키마 규칙(S1~S126 재정렬 중 실제로 걸렸던 것들)을
-새/변경 룰에 대해 사전 체크한다. GitHub Action 실배포(~40분) 전에 초 단위로 흔한 실수를
-잡아낸다. 근거(ground truth)는 마이크로소프트 공식 스키마 문서가 아니라 **이미 성공적으로
-배포된 나머지 룰들 자체**다 — 기존 룰들이 실제로 이 필드들을 어떻게 채웠는지 보고, 새 룰이
-그 패턴에서 벗어나면 경고한다(self-referential validation).
+실측으로 확정된 10가지 Sentinel ARM 스키마 규칙(S1~S126 재정렬 + S127~S129 저작 중
+실제로 걸렸던 것들)을 새/변경 룰에 대해 사전 체크한다. GitHub Action 실배포(~40분) 전에
+초 단위로 흔한 실수를 잡아낸다. 근거(ground truth)는 마이크로소프트 공식 스키마 문서가
+아니라 **이미 성공적으로 배포된 나머지 룰들 자체**다 — 기존 룰들이 실제로 이 필드들을
+어떻게 채웠는지 보고, 새 룰이 그 패턴에서 벗어나면 경고한다(self-referential validation).
+
+10번째 규칙(S129 배포 실패로 발견, 2026-07): techniques[]/subTechniques[]는 Enterprise
+ATT&CK ID(T1xxx)만 허용 — ICS 전용 ID(T0xxx)를 넣으면 "No valid tactic corresponding to
+the technique..." BadRequest로 배포 자체가 실패한다. ICS ID는 description 텍스트로만
+언급할 것(기존 158개 룰 전부 이 컨벤션을 따름).
 
 주의: 이건 advisory(경고만, 머지 안 막음)다 — 새로 만든 검증기 자체가 아직 우리 데이터에
 한 번도 안 돌려봤으니, 자기 오탐부터 확인하는 기간이 필요하다는 게 도입 결정 취지였다.
@@ -107,6 +112,8 @@ def check_rule(
             findings.append(Finding(path, "tactic-format", f"tactics 값이 PascalCase 아님: {t!r}"))
 
     # 2. techniques 는 상위 기법만 — 하위(.NNN)는 subTechniques 로.
+    # 2b. techniques/subTechniques 는 Enterprise ATT&CK(T1xxx)만 — ICS(T0xxx)는 Sentinel
+    #     API가 거부한다(2026-07 S129 배포 실패로 실측). ICS ID는 description 텍스트로만.
     for t in techniques:
         if _SUBTECHNIQUE_RE.match(t):
             findings.append(
@@ -114,9 +121,20 @@ def check_rule(
             )
         elif not _TECHNIQUE_RE.match(t):
             findings.append(Finding(path, "technique-format", f"techniques 형식 이상: {t!r}"))
+        elif t.startswith("T0"):
+            findings.append(
+                Finding(path, "ics-technique-rejected",
+                        f"{t!r}는 ICS 전용 ID — Sentinel techniques[] 필드는 Enterprise(T1xxx)만 허용"
+                        "(배포 실패함, description 텍스트로만 언급할 것)")
+            )
     for st in sub_techniques:
         if not _SUBTECHNIQUE_RE.match(st):
             findings.append(Finding(path, "subtechnique-format", f"subTechniques 형식 이상: {st!r}"))
+        elif st.startswith("T0"):
+            findings.append(
+                Finding(path, "ics-technique-rejected",
+                        f"{st!r}는 ICS 전용 ID — Sentinel subTechniques[] 필드는 Enterprise(T1xxx)만 허용")
+            )
 
     # 3/4. 기존에 검증된 기법인지 + tactics 와 최소 1개 매칭되는지(과거 이력 기준).
     for t in techniques:
@@ -200,7 +218,7 @@ def main() -> int:
         all_findings.extend(check_rule(path, known_techniques, technique_tactics))
 
     if not all_findings:
-        print(f"✅ {args.dir}: 전 규칙 통과(9종 자체기준 검사)")
+        print(f"✅ {args.dir}: 전 규칙 통과(10종 자체기준 검사)")
         return 0
 
     print(f"⚠️  {args.dir}: {len(all_findings)}건 발견(advisory — 머지는 안 막음)\n")

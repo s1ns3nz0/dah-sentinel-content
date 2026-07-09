@@ -15,10 +15,10 @@
       "apiVersion": "2023-12-01-preview",
       "properties": {
         "displayName": "UAV S43 - GCS Auto-Update MITM (Rogue Appcast)",
-        "description": "GCS 앱 자동업데이트 MITM(불법 appcast 응답) 탐지. update_check 이벤트에서 알려진 업데이트 서버 목록(updates.qgroundcontrol.com, update.dah-gcs.mil.kr)에 없는 호스트(SourceHost)로부터 응답을 받았거나, 응답 바이너리가 미서명(BinarySigned=false)인 경우 탐지. MITRE: T1195.002 (closest analogue — Compromise Software Supply Chain, subtechnique of T1195)",
+        "description": "GCS 앱 자동업데이트 MITM(불법 appcast 응답) 탐지. UAVCompanion_CL(ROS/컴패니언컴퓨터/설정/MQTT/NTP 등 EventType으로 구분되는 공용 테이블)에서 MitmSuspected=true인 이벤트를 탐지. 이 테이블은 여러 시나리오가 공유하므로 EventType 값 컨벤션으로 시나리오를 구분: 본 룰은 `EventType == \"gcs_update_mitm\"` 를 사용(다른 룰과 충돌 없음: qml_inject=S42, ros_master_access=S45, ros_topic_inject=S46, mavros_cmd_inject=S47, gcs_config_tamper=S44, ntp_spoof=S50, geofence_tamper=S77[타 담당]). 실제 컬럼: EventType, Target, ContentSnippet, MitmSuspected, StatusCode(UAVGcsApp_CL/SourceHost/BinarySigned/ResultCode/PayloadDetail/GcsHost 컬럼은 존재하지 않아 제거함). MITRE: T1195.002 (closest analogue — Compromise Software Supply Chain, subtechnique of T1195)",
         "severity": "High",
         "enabled": true,
-        "query": "let knownUpdateHosts = dynamic([\"updates.qgroundcontrol.com\", \"update.dah-gcs.mil.kr\"]);\nlet alertWindow = 15m;\nUAVGcsApp_CL\n| where TimeGenerated > ago(alertWindow)\n| where EventType == \"update_check\"\n| where SourceHost !in (knownUpdateHosts) or BinarySigned == false\n| extend TriggerReason = case(\n    SourceHost !in (knownUpdateHosts) and BinarySigned == false, \"GCS_업데이트_비인가호스트_미서명_동시\",\n    SourceHost !in (knownUpdateHosts), \"GCS_업데이트_비인가_AppcastHost\",\n    \"GCS_업데이트_미서명_바이너리\")\n| extend Severity = \"High\"\n| project TimeGenerated, GcsHost, Operator, SourceHost, ResultCode, BinarySigned, PayloadDetail, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "query": "let alertWindow = 15m;\nUAVCompanion_CL\n| where TimeGenerated > ago(alertWindow)\n| where EventType == \"gcs_update_mitm\"\n| where MitmSuspected == true\n| extend TriggerReason = \"GCS_자동업데이트_MITM_의심\"\n| extend Severity = \"High\"\n| project TimeGenerated, Target, EventType, ContentSnippet, MitmSuspected, StatusCode, TriggerReason, Severity\n| order by TimeGenerated desc",
         "queryFrequency": "PT10M",
         "queryPeriod": "PT30M",
         "triggerOperator": "GreaterThan",
@@ -54,14 +54,14 @@
           "aggregationKind": "SingleAlert"
         },
         "alertDetailsOverride": {
-          "alertDisplayNameFormat": "UAV S43 - GCS Auto-Update MITM (Rogue Appcast) - {{GcsHost}}",
-          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | SourceHost={{SourceHost}} | BinarySigned={{BinarySigned}}",
+          "alertDisplayNameFormat": "UAV S43 - GCS Auto-Update MITM (Rogue Appcast) - {{Target}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Target={{Target}} | MitmSuspected={{MitmSuspected}}",
           "alertDynamicProperties": []
         },
         "customDetails": {
           "TriggerReason": "TriggerReason",
-          "SourceHost": "SourceHost",
-          "Operator": "Operator"
+          "Target": "Target",
+          "MitmSuspected": "MitmSuspected"
         },
         "entityMappings": [
           {
@@ -69,7 +69,7 @@
             "fieldMappings": [
               {
                 "identifier": "HostName",
-                "columnName": "GcsHost"
+                "columnName": "Target"
               }
             ]
           }

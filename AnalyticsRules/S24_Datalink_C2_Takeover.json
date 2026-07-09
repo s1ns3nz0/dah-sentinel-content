@@ -15,10 +15,10 @@
       "apiVersion": "2023-12-01-preview",
       "properties": {
         "displayName": "UAV S24 - C2 Jamming/Datalink Channel Takeover",
-        "description": "UAVDatalinkConn_CL의 BlockedDuration(채널 차단 지속시간)이 임계(30초)를 초과하면 C2 재밍/통신 차단으로 인한 Datalink 채널 나포로 탐지. C2_Whitelisted_GCS_List 외부 PeerIp가 동시에 관측되면 채널 나포 후 비인가 재접속 시도로 판단해 High 상향. S23(GNSS 재밍)과 동일 테이블을 사용하되 신호는 BlockedDuration/ChannelId로 상이. MITRE: T1695 / MITRE ICS ATT&CK: T0814(Denial of Service)",
+        "description": "UAVDatalinkConn_CL에는 UAVId 컬럼이 없어 PeerIp/LocalPort 기준으로 엔티티를 재매핑. C2_Whitelisted_GCS_List에 없는 PeerIp(비인가 피어) 또는 State != 'ESTAB'(연결 비정상, 실 데이터 값 기준) 조건으로 데이터링크 C2 채널 나포를 탐지.",
         "severity": "High",
         "enabled": true,
-        "query": "let alertWindow = 10m;\nlet blockDurationGateSec = 30.0;\nlet KnownGCS = _GetWatchlist('C2_Whitelisted_GCS_List') | project GCS_IP;\nUAVDatalinkConn_CL\n| where TimeGenerated > ago(alertWindow)\n| where isnotempty(UAVId)\n| where BlockedDuration > blockDurationGateSec\n| extend isRoguePeer = isnotempty(PeerIp) and PeerIp !in (KnownGCS)\n| extend TriggerReason = strcat('C2_통신차단_채널나포_Channel:', ChannelId, '_BlockedSec:', tostring(BlockedDuration), iff(isRoguePeer, '_비인가Peer동시', ''))\n| extend Severity = iff(isRoguePeer, 'High', 'Medium')\n| project TimeGenerated, UAVId, ChannelId, BlockedDuration, PeerIp, isRoguePeer, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "query": "let alertWindow = 10m;\nlet KnownGCS = _GetWatchlist('C2_Whitelisted_GCS_List') | project GCS_IP;\nUAVDatalinkConn_CL\n| where TimeGenerated > ago(alertWindow)\n| where isnotempty(PeerIp)\n| extend isRoguePeer = PeerIp !in (KnownGCS)\n| where isRoguePeer or State != 'ESTAB'\n| extend TriggerReason = strcat('C2_통신채널_나포의심_State:', State, '_PeerIp:', PeerIp, '_LocalPort:', tostring(LocalPort))\n| extend Severity = iff(isRoguePeer, 'High', 'Medium')\n| project TimeGenerated, State, LocalIp, LocalPort, PeerIp, PeerPort, isRoguePeer, TriggerReason, Severity\n| order by TimeGenerated desc",
         "queryFrequency": "PT5M",
         "queryPeriod": "PT15M",
         "triggerOperator": "GreaterThan",
@@ -44,7 +44,7 @@
             "lookbackDuration": "PT2H",
             "matchingMethod": "AllEntities",
             "groupByEntities": [
-              "Host"
+              "IP"
             ],
             "groupByAlertDetails": [],
             "groupByCustomDetails": []
@@ -54,23 +54,23 @@
           "aggregationKind": "SingleAlert"
         },
         "alertDetailsOverride": {
-          "alertDisplayNameFormat": "UAV S24 - C2 Jamming/Datalink Channel Takeover - {{UAVId}}",
-          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | ChannelId={{ChannelId}} | BlockedDuration={{BlockedDuration}} | Severity={{Severity}}",
+          "alertDisplayNameFormat": "UAV S24 - C2 Jamming/Datalink Channel Takeover - {{PeerIp}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | State={{State}} | Severity={{Severity}}",
           "alertDynamicProperties": []
         },
         "customDetails": {
           "TriggerReason": "TriggerReason",
-          "ChannelId": "ChannelId",
-          "BlockedDuration": "BlockedDuration",
+          "State": "State",
+          "PeerPort": "PeerPort",
           "Severity": "Severity"
         },
         "entityMappings": [
           {
-            "entityType": "Host",
+            "entityType": "IP",
             "fieldMappings": [
               {
-                "identifier": "HostName",
-                "columnName": "UAVId"
+                "identifier": "Address",
+                "columnName": "PeerIp"
               }
             ]
           }

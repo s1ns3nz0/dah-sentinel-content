@@ -15,10 +15,10 @@
       "apiVersion": "2023-12-01-preview",
       "properties": {
         "displayName": "UAV S48 - Modem/SATCOM Terminal Firmware Tampering",
-        "description": "모뎀/SATCOM 터미널 펌웨어 변조 탐지 — UAVDatalinkInfra_CL의 firmware_report 이벤트에서 보고된 펌웨어 해시(ReportedValue)가 Approved_Firmware_Hash_List에 없거나, IntegrityStatus가 ok가 아닌(예: unsigned) 경우를 탐지. MITRE ICS ATT&CK: T0857 System Firmware",
+        "description": "모뎀/SATCOM 터미널 펌웨어 변조 탐지 — UAVPgse_CL(preflight/GSE 해시·SBOM 검사 테이블, S16/S33과 동일 테이블 재사용)에서 Serial 또는 Reason 값이 모뎀/SATCOM 구성요소임을 나타내는 컨벤션(예: 'MODEM-', 'SATCOM-', 'SAT-' 접두)을 가진 레코드 중 HashMatch=false, SbomForbiddenCount>0, 또는 Passed=false인 경우를 탐지. 실제 컬럼: EventType, UAVId, Operator, Serial, ImageHashSubmitted, ImageHashExpected, HashMatch, SbomForbiddenCount, Passed, FailReason, Reason, StatusCode(UAVDatalinkInfra_CL/ReportedValue/IntegrityStatus/RemoteHost/DeviceId 컬럼은 존재하지 않아 제거함). MITRE ICS ATT&CK: T0857 System Firmware",
         "severity": "High",
         "enabled": true,
-        "query": "let approvedHashes = _GetWatchlist('Approved_Firmware_Hash_List') | project Hash;\nlet alertWindow = 1d;\nUAVDatalinkInfra_CL\n| where TimeGenerated > ago(alertWindow)\n| where EventType == \"firmware_report\"\n| extend isUnapprovedHash = ReportedValue !in (approvedHashes)\n| where isUnapprovedHash or IntegrityStatus != \"ok\"\n| extend TriggerReason = case(\n    isUnapprovedHash and IntegrityStatus != \"ok\", \"모뎀SATCOM_펌웨어_미승인해시_무결성위반_동시\",\n    isUnapprovedHash, \"모뎀SATCOM_펌웨어_미승인_해시\",\n    \"모뎀SATCOM_펌웨어_무결성상태_이상\")\n| extend Severity = \"High\"\n| project TimeGenerated, UAVId, DeviceId, ReportedValue, IntegrityStatus, RemoteHost, SessionId, Operator, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "query": "let modemSatcomMarkers = dynamic([\"MODEM\", \"SATCOM\", \"SAT-\"]);\nlet alertWindow = 1d;\nUAVPgse_CL\n| where TimeGenerated > ago(alertWindow)\n| where Serial has_any (modemSatcomMarkers) or Reason has_any (modemSatcomMarkers)\n| where HashMatch == false or SbomForbiddenCount > 0 or Passed == false\n| extend TriggerReason = case(\n    HashMatch == false and SbomForbiddenCount > 0, \"모뎀SATCOM_펌웨어_해시불일치_금지SBOM_동시\",\n    HashMatch == false, \"모뎀SATCOM_펌웨어_해시_불일치\",\n    SbomForbiddenCount > 0, \"모뎀SATCOM_펌웨어_금지_SBOM컴포넌트\",\n    \"모뎀SATCOM_펌웨어_검증_실패\")\n| extend Severity = \"High\"\n| project TimeGenerated, UAVId, Operator, Serial, ImageHashSubmitted, ImageHashExpected, HashMatch, SbomForbiddenCount, Passed, FailReason, Reason, StatusCode, TriggerReason, Severity\n| order by TimeGenerated desc",
         "queryFrequency": "PT10M",
         "queryPeriod": "P1D",
         "triggerOperator": "GreaterThan",
@@ -53,14 +53,14 @@
           "aggregationKind": "SingleAlert"
         },
         "alertDetailsOverride": {
-          "alertDisplayNameFormat": "UAV S48 - Modem/SATCOM Terminal Firmware Tampering - {{DeviceId}}",
-          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | ReportedValue={{ReportedValue}} | IntegrityStatus={{IntegrityStatus}}",
+          "alertDisplayNameFormat": "UAV S48 - Modem/SATCOM Terminal Firmware Tampering - {{Serial}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | HashMatch={{HashMatch}} | SbomForbiddenCount={{SbomForbiddenCount}}",
           "alertDynamicProperties": []
         },
         "customDetails": {
           "TriggerReason": "TriggerReason",
-          "DeviceId": "DeviceId",
-          "IntegrityStatus": "IntegrityStatus"
+          "Serial": "Serial",
+          "HashMatch": "HashMatch"
         },
         "entityMappings": [
           {

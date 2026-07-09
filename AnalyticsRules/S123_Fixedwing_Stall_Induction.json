@@ -15,10 +15,10 @@
       "apiVersion": "2023-12-01-preview",
       "properties": {
         "displayName": "UAV S123 - Fixed-Wing Stall Induction (Airspeed/Control Surface Manipulation)",
-        "description": "UAVOpmode_CL에서 OpmodeField='airspeed_control_surface'인 레코드 중 ObservedValue(실측 대기속도)가 UAV_Threshold_List.MinAirspeed_ms(실속 최소속도 임계, FBW_MIN) 미만이고 Authorized=0(SByte)인 비인가 조작 탐지. 실제 컬럼: OpmodeField/ExpectedValue/ObservedValue/ChangedBy/Authorized(SByte). MITRE: T0806 Brute Force I/O (제어면/속도 명령을 비인가로 조작해 고정익 실속을 유도)",
+        "description": "UAVTelemetry_CL의 Airspeed_ms가 UAV_Threshold_List 워치리스트의 MinAirspeed_ms(실속 최소속도) 미만인 저속 구간을 탐지. UAVOpmode_CL은 존재하지 않아 실제 텔레메트리 Airspeed_ms 기반으로 재구성. MITRE: T0806 Brute Force I/O (제어면/속도 명령을 비인가로 조작해 고정익 실속을 유도)",
         "severity": "High",
         "enabled": true,
-        "query": "let alertWindow = 10m;\nlet minAirspeed = toscalar(\n    _GetWatchlist('UAV_Threshold_List')\n    | where ThresholdKey == 'MinAirspeed_ms'\n    | project toreal(Value));\nUAVOpmode_CL\n| where TimeGenerated > ago(alertWindow)\n| where OpmodeField == 'airspeed_control_surface'\n| extend ObservedAirspeed = toreal(ObservedValue)\n| where ObservedAirspeed < minAirspeed and Authorized == 0\n| extend TriggerReason = strcat(\"고정익_실속유도_비인가_\", UAVId, \"_속도:\", tostring(ObservedAirspeed), \"m/s<임계:\", tostring(minAirspeed))\n| project TimeGenerated, UAVId, OpmodeField, ExpectedValue, ObservedValue, ObservedAirspeed, ChangedBy, Authorized, Seq, TriggerReason\n| order by TimeGenerated desc",
+        "query": "let alertWindow = 10m;\nlet minAirspeed = toscalar(\n    _GetWatchlist('UAV_Threshold_List')\n    | where ThresholdKey == 'MinAirspeed_ms'\n    | project toreal(Value));\nUAVTelemetry_CL\n| where TimeGenerated > ago(alertWindow)\n| where isnotnull(Airspeed_ms)\n| where Airspeed_ms < minAirspeed\n| extend TriggerReason = strcat(\"고정익_실속유도_\", UAVId, \"_속도:\", tostring(Airspeed_ms), \"m/s<임계:\", tostring(minAirspeed))\n| project TimeGenerated, UAVId, Airspeed_ms, Groundspeed_ms, Pitch_rad, TriggerReason\n| order by TimeGenerated desc",
         "queryFrequency": "PT5M",
         "queryPeriod": "PT15M",
         "triggerOperator": "GreaterThan",
@@ -59,7 +59,7 @@
         },
         "customDetails": {
           "TriggerReason": "TriggerReason",
-          "ObservedAirspeed": "ObservedAirspeed"
+          "Airspeed_ms": "Airspeed_ms"
         },
         "entityMappings": [
           {
@@ -68,15 +68,6 @@
               {
                 "identifier": "HostName",
                 "columnName": "UAVId"
-              }
-            ]
-          },
-          {
-            "entityType": "Account",
-            "fieldMappings": [
-              {
-                "identifier": "Name",
-                "columnName": "ChangedBy"
               }
             ]
           }

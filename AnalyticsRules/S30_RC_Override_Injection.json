@@ -18,7 +18,7 @@
         "description": "UAVRcLink_CL의 ChannelValues(RC PWM 채널 배열, 정상범위 1000~2000)가 유효 범위를 벗어나면 RC override 명령 주입으로 탐지. 채널 값이 급격히 풀디플렉션(최대/최소치)으로 튀는 패턴은 원격 조종 신호 강제 주입의 전형적 지표. MITRE ICS ATT&CK: T0855(Unauthorized Command Message) / MITRE: T1565(근접기법)",
         "severity": "Medium",
         "enabled": true,
-        "query": "let alertWindow = 10m;\nlet minPwm = 1000;\nlet maxPwm = 2000;\nUAVRcLink_CL\n| where TimeGenerated > ago(alertWindow)\n| where isnotempty(ChannelValues)\n| mv-apply cv = ChannelValues to typeof(long) on (\n    summarize MinVal = min(cv), MaxVal = max(cv)\n)\n| where MinVal < minPwm or MaxVal > maxPwm\n| extend TriggerReason = strcat('RC_Override_명령주입_범위이탈_Min:', tostring(MinVal), '_Max:', tostring(MaxVal))\n| extend Severity = 'High'\n| project TimeGenerated, UAVId, Protocol, MinVal, MaxVal, ChannelValues, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "query": "let alertWindow = 10m;\nUAVRcLink_CL\n| where TimeGenerated > ago(alertWindow)\n| where OverrideAuthorized == false and isnotempty(ChannelValue)\n| extend TriggerReason = strcat('RC_Override_명령주입_비인가_Channel:', tostring(Channel), '_Value:', tostring(ChannelValue))\n| extend Severity = 'High'\n| project TimeGenerated, UavId, DeviceId, Channel, ChannelValue, OverrideAuthorized, TriggerReason, Severity\n| order by TimeGenerated desc",
         "queryFrequency": "PT5M",
         "queryPeriod": "PT15M",
         "triggerOperator": "GreaterThan",
@@ -52,14 +52,14 @@
           "aggregationKind": "SingleAlert"
         },
         "alertDetailsOverride": {
-          "alertDisplayNameFormat": "UAV S30 - RC Override Command Injection - {{UAVId}}",
-          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | MinVal={{MinVal}} | MaxVal={{MaxVal}} | Severity={{Severity}}",
+          "alertDisplayNameFormat": "UAV S30 - RC Override Command Injection - {{UavId}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Channel={{Channel}} | ChannelValue={{ChannelValue}} | Severity={{Severity}}",
           "alertDynamicProperties": []
         },
         "customDetails": {
           "TriggerReason": "TriggerReason",
-          "MinVal": "MinVal",
-          "MaxVal": "MaxVal",
+          "Channel": "Channel",
+          "ChannelValue": "ChannelValue",
           "Severity": "Severity"
         },
         "entityMappings": [
@@ -68,7 +68,7 @@
             "fieldMappings": [
               {
                 "identifier": "HostName",
-                "columnName": "UAVId"
+                "columnName": "UavId"
               }
             ]
           }

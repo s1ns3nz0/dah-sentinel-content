@@ -18,7 +18,7 @@
         "description": "IaC(Terraform/Helm) 매니페스트 적용(IaCApply) 시 Approved_Operators_List 상 approver/superadmin 권한의 승인자(DiffApprovedBy) 확인 없이 변경된 ManifestPath를 탐지. MITRE: T1195",
         "severity": "High",
         "enabled": true,
-        "query": "let alertWindow = 15m;\nlet ApprovedApprovers = _GetWatchlist('Approved_Operators_List') | where Role in ('approver','superadmin') | project OperatorId;\nUAVSupplyChain_CL\n| where TimeGenerated > ago(alertWindow)\n| where EventType == 'IaCApply'\n| extend isUnapproved = isempty(DiffApprovedBy) or DiffApprovedBy !in (ApprovedApprovers)\n| where isUnapproved\n| extend TriggerReason = strcat(\"IaC_비인가변경_\", ManifestPath, \"_승인자:\", iif(isempty(DiffApprovedBy), \"없음\", DiffApprovedBy))\n| extend Severity = \"High\"\n| project TimeGenerated, ManifestPath, DiffApprovedBy, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "query": "let alertWindow = 15m;\nUAVDevOps_CL\n| where TimeGenerated > ago(alertWindow)\n| where EventType == \"iac_tamper\"\n| where UnplannedApply == true\n| extend TriggerReason = strcat(\"IaC_계획외적용_\", Target, \"_\", Actor)\n| extend Severity = \"High\"\n| project TimeGenerated, Target, Actor, UnplannedApply, StatusCode, TriggerReason, Severity\n| order by TimeGenerated desc",
         "queryFrequency": "PT5M",
         "queryPeriod": "PT15M",
         "triggerOperator": "GreaterThan",
@@ -50,14 +50,14 @@
           "aggregationKind": "SingleAlert"
         },
         "alertDetailsOverride": {
-          "alertDisplayNameFormat": "UAV S72 - IaC Manifest Tampering - {{ManifestPath}}",
-          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | DiffApprovedBy={{DiffApprovedBy}}",
+          "alertDisplayNameFormat": "UAV S72 - IaC Manifest Tampering - {{Target}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | UnplannedApply={{UnplannedApply}}",
           "alertDynamicProperties": []
         },
         "customDetails": {
           "TriggerReason": "TriggerReason",
-          "ManifestPath": "ManifestPath",
-          "DiffApprovedBy": "DiffApprovedBy"
+          "Target": "Target",
+          "Actor": "Actor"
         },
         "entityMappings": [
           {
@@ -65,7 +65,7 @@
             "fieldMappings": [
               {
                 "identifier": "HostName",
-                "columnName": "ManifestPath"
+                "columnName": "Target"
               }
             ]
           }

@@ -18,7 +18,7 @@
         "description": "mTLS 인증서 발급 이벤트에서 기대 발급기관(CertIssuerExpected)과 실제 발급기관(CertIssuerActual)이 불일치하는 위조/비인가 CA 서명 인증서를 탐지. MITRE: T1649",
         "severity": "High",
         "enabled": true,
-        "query": "let alertWindow = 10m;\nUAVSupplyChain_CL\n| where TimeGenerated > ago(alertWindow)\n| where EventType == 'CertIssue'\n| extend isIssuerMismatch = (CertIssuerExpected != CertIssuerActual)\n| where isIssuerMismatch\n| extend TriggerReason = strcat(\"mTLS_발급자불일치_\", CertSerial, \"_기대:\", CertIssuerExpected, \"_실제:\", CertIssuerActual)\n| extend Severity = \"High\"\n| project TimeGenerated, CertSerial, CertIssuerExpected, CertIssuerActual, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "query": "let alertWindow = 10m;\nUAVSupplyChain_CL\n| where TimeGenerated > ago(alertWindow)\n| where CertForgedSuspected == true\n| extend TriggerReason = strcat(\"mTLS_인증서위조의심_\", CertSerial, \"_Subject:\", Subject, \"_Issuer:\", Issuer)\n| extend Severity = \"High\"\n| project TimeGenerated, EventType, Subject, Issuer, SignatureValid, CertSerial, CertForgedSuspected, StatusCode, TriggerReason, Severity\n| order by TimeGenerated desc",
         "queryFrequency": "PT5M",
         "queryPeriod": "PT15M",
         "triggerOperator": "GreaterThan",
@@ -56,8 +56,8 @@
         },
         "customDetails": {
           "TriggerReason": "TriggerReason",
-          "CertIssuerExpected": "CertIssuerExpected",
-          "CertIssuerActual": "CertIssuerActual"
+          "Subject": "Subject",
+          "Issuer": "Issuer"
         },
         "entityMappings": [
           {

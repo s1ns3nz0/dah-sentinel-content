@@ -15,10 +15,10 @@
       "apiVersion": "2023-12-01-preview",
       "properties": {
         "displayName": "UAV S39 - Living-off-the-Land Ground Infrastructure Compromise",
-        "description": "Volt Typhoon 스타일 LOTL(Living-off-the-Land) 지상 인프라 침해 탐지. UAVOpAudit_CL의 admin_cmd_exec 이벤트 중 관리도구(powershell/wmic/certutil/mshta/rundll32/psexec/bitsadmin/regsvr32 등)가 Approved_Operators_List에 없는 계정으로 실행되거나, 비정상 ParentProcess(services.exe/wmiprvse.exe/svchost.exe)에서 기동된 경우를 탐지. MITRE: T1059, T1570",
+        "description": "Volt Typhoon 스타일 LOTL(Living-off-the-Land) 지상 인프라 침해 탐지. UAVServiceAudit_CL(컨테이너/서비스 생애주기 감사)에서 파괴적 작업(IsDestructiveAction=true) 또는 로그베어링 타겟 의심(LogBearingTargetSuspected=true) 플래그가 설정된 이벤트가 Approved_Operators_List에 없는 ActorId로 수행된 경우를 탐지. 실제 컬럼: EventType, Action, ActorId, ContainerName, ImageName, ExitCode, Signal, ServiceLabel, ProjectLabel, Scope, IsDestructiveAction, LogBearingTargetSuspected(ProcessName/ParentProcess/CommandLine/TargetHost 컬럼은 존재하지 않아 제거함). MITRE: T1059, T1570",
         "severity": "High",
         "enabled": true,
-        "query": "let approvedOps = _GetWatchlist('Approved_Operators_List') | project OperatorId;\nlet lotlTools = dynamic([\"powershell.exe\", \"pwsh.exe\", \"wmic.exe\", \"certutil.exe\", \"mshta.exe\", \"rundll32.exe\", \"psexec.exe\", \"bitsadmin.exe\", \"regsvr32.exe\"]);\nlet suspiciousParents = dynamic([\"services.exe\", \"wmiprvse.exe\", \"svchost.exe\"]);\nlet alertWindow = 15m;\nUAVOpAudit_CL\n| where TimeGenerated > ago(alertWindow)\n| where EventType == \"admin_cmd_exec\"\n| where ProcessName has_any (lotlTools)\n| extend isUnexpectedAccount = Operator !in (approvedOps)\n| extend isSuspiciousParent = ParentProcess in (suspiciousParents)\n| where isUnexpectedAccount or isSuspiciousParent\n| extend TriggerReason = case(\n    isUnexpectedAccount and isSuspiciousParent, \"LOTL_비인가계정_비정상Parent_동시\",\n    isUnexpectedAccount, strcat(\"LOTL_비인가계정_관리도구실행_\", Operator),\n    strcat(\"LOTL_비정상_ParentProcess_\", ParentProcess))\n| extend Severity = \"High\"\n| project TimeGenerated, TargetHost, Operator, ClientIp, ProcessName, ParentProcess, CommandLine, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "query": "let approvedActors = _GetWatchlist('Approved_Operators_List') | project OperatorId;\nlet alertWindow = 15m;\nUAVServiceAudit_CL\n| where TimeGenerated > ago(alertWindow)\n| where IsDestructiveAction == true or LogBearingTargetSuspected == true\n| extend isUnexpectedActor = ActorId !in (approvedActors)\n| where isUnexpectedActor or LogBearingTargetSuspected == true\n| extend TriggerReason = case(\n    isUnexpectedActor and LogBearingTargetSuspected == true, \"LOTL_비인가Actor_로그베어링타겟_동시\",\n    LogBearingTargetSuspected == true, \"LOTL_로그베어링_타겟_의심\",\n    strcat(\"LOTL_비인가Actor_파괴적작업_\", ActorId))\n| extend Severity = \"High\"\n| project TimeGenerated, ContainerName, ActorId, Action, EventType, ImageName, ServiceLabel, ProjectLabel, Scope, IsDestructiveAction, LogBearingTargetSuspected, TriggerReason, Severity\n| order by TimeGenerated desc",
         "queryFrequency": "PT5M",
         "queryPeriod": "PT15M",
         "triggerOperator": "GreaterThan",
@@ -55,15 +55,14 @@
           "aggregationKind": "SingleAlert"
         },
         "alertDetailsOverride": {
-          "alertDisplayNameFormat": "UAV S39 - Living-off-the-Land Ground Infrastructure Compromise - {{TargetHost}}",
-          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | ProcessName={{ProcessName}} | ParentProcess={{ParentProcess}}",
+          "alertDisplayNameFormat": "UAV S39 - Living-off-the-Land Ground Infrastructure Compromise - {{ContainerName}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Action={{Action}} | ActorId={{ActorId}}",
           "alertDynamicProperties": []
         },
         "customDetails": {
           "TriggerReason": "TriggerReason",
-          "ProcessName": "ProcessName",
-          "ParentProcess": "ParentProcess",
-          "Operator": "Operator"
+          "Action": "Action",
+          "ActorId": "ActorId"
         },
         "entityMappings": [
           {
@@ -71,7 +70,7 @@
             "fieldMappings": [
               {
                 "identifier": "HostName",
-                "columnName": "TargetHost"
+                "columnName": "ContainerName"
               }
             ]
           },
@@ -80,7 +79,7 @@
             "fieldMappings": [
               {
                 "identifier": "Name",
-                "columnName": "Operator"
+                "columnName": "ActorId"
               }
             ]
           }

@@ -15,10 +15,10 @@
       "apiVersion": "2023-12-01-preview",
       "properties": {
         "displayName": "UAV S100 - Swarm-Induced Alert Saturation (SOC Response Neutralization)",
-        "description": "군집포화(SOC 대응 무력화) 탐지. UAVSocLoad_CL에서 동시발생 경보 수(SimultaneousAlertCount)가 구성된 처리용량 임계값(CapacityThreshold)을 초과하고 SOC 대응지연(ResponseDelaySec)이 급증한 구간을 탐지. 다수 UAV 군집을 동시에 이상행동시켜 SOC 경보 처리 용량을 포화시키고 실제 공격을 은폐/무력화하려는 시도. MITRE: T1499",
+        "description": "군집포화(SOC 대응 무력화) 탐지. 실배포 스키마에는 SOC 처리용량/대응지연을 직접 기록하는 전용 테이블이 없으므로, 본 룰은 UAVFleetState_CL의 ActiveUAVCount 급증(군집 동시 이상행동 신호)과 Sentinel 내장 SecurityAlert 테이블의 경보량 급증(SOC 부하 신호)을 각각 정규화한 뒤 UNION으로 결합해, 동일 5분 시간대역에 두 신호가 함께 관측되는 구간을 '군집 유발 경보 포화' 시그니처로 탐지한다. 다수 UAV 군집을 동시에 이상행동시켜 SOC 경보 처리 용량을 포화시키고 실제 공격을 은폐/무력화하려는 시도. MITRE: T1499",
         "severity": "High",
         "enabled": true,
-        "query": "let alertWindow = 10m;\nlet responseDelayGate = 120;\nUAVSocLoad_CL\n| where TimeGenerated > ago(alertWindow)\n| where SimultaneousAlertCount > CapacityThreshold\n| where ResponseDelaySec >= responseDelayGate\n| extend OverloadRatio = round(todouble(SimultaneousAlertCount) / todouble(CapacityThreshold), 2)\n| extend UAVId = 'SOC-CAPACITY'\n| extend TriggerReason = strcat('SOC_군집포화_대응지연_', tostring(SwarmSizeInvolved), '기_지연', tostring(ResponseDelaySec), 's')\n| extend Severity = 'High'\n| project TimeGenerated, UAVId, SwarmSizeInvolved, SimultaneousAlertCount, CapacityThreshold, OverloadRatio, ResponseDelaySec, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "query": "let alertWindow = 15m;\nlet binSize = 5m;\nlet fleetSizeGate = 8;\nlet alertVolumeGate = 5;\nlet fleetSignal =\n    UAVFleetState_CL\n    | where TimeGenerated > ago(alertWindow)\n    | summarize MaxActiveUAVCount = max(ActiveUAVCount) by FleetId, bin(TimeGenerated, binSize)\n    | where MaxActiveUAVCount >= fleetSizeGate\n    | project TimeGenerated, SignalType = 'FleetSpike', Detail = FleetId, MetricValue = toreal(MaxActiveUAVCount);\nlet socSignal =\n    SecurityAlert\n    | where TimeGenerated > ago(alertWindow)\n    | summarize AlertCount = count() by bin(TimeGenerated, binSize)\n    | where AlertCount >= alertVolumeGate\n    | project TimeGenerated, SignalType = 'SocOverload', Detail = 'SOC', MetricValue = toreal(AlertCount);\nunion fleetSignal, socSignal\n| summarize Signals = make_set(SignalType), SignalCount = dcount(SignalType), MaxMetric = max(MetricValue) by bin(TimeGenerated, binSize)\n| where SignalCount >= 2\n| extend TriggerReason = strcat('군집포화_SOC과부하_동시신호_', tostring(Signals))\n| extend Severity = 'High'\n| project TimeGenerated, Signals, SignalCount, MaxMetric, TriggerReason, Severity\n| order by TimeGenerated desc",
         "queryFrequency": "PT5M",
         "queryPeriod": "PT15M",
         "triggerOperator": "GreaterThan",
@@ -50,26 +50,16 @@
           "aggregationKind": "SingleAlert"
         },
         "alertDetailsOverride": {
-          "alertDisplayNameFormat": "UAV S100 - Swarm Alert Saturation - {{UAVId}}",
-          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | OverloadRatio={{OverloadRatio}} | Severity={{Severity}}",
+          "alertDisplayNameFormat": "UAV S100 - Swarm Alert Saturation - {{Signals}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | SignalCount={{SignalCount}} | Severity={{Severity}}",
           "alertDynamicProperties": []
         },
         "customDetails": {
           "TriggerReason": "TriggerReason",
-          "SwarmSizeInvolved": "SwarmSizeInvolved",
-          "OverloadRatio": "OverloadRatio"
+          "SignalCount": "SignalCount",
+          "MaxMetric": "MaxMetric"
         },
-        "entityMappings": [
-          {
-            "entityType": "Host",
-            "fieldMappings": [
-              {
-                "identifier": "HostName",
-                "columnName": "UAVId"
-              }
-            ]
-          }
-        ],
+        "entityMappings": [],
         "sentinelEntitiesMappings": null,
         "templateVersion": null
       }

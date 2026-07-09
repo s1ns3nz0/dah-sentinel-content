@@ -15,10 +15,10 @@
       "apiVersion": "2023-12-01-preview",
       "properties": {
         "displayName": "UAV S57 - Cron / World-Writable PATH Hijacking",
-        "description": "UAVHostAudit_CL에서 world-writable 디렉터리(/tmp,/var/tmp,/dev/shm) 내부에 새로운 cron 엔트리가 생성되는 PATH 하이재킹형 지속성 확보 탐지. MITRE: T1053.003,T1546",
+        "description": "UAVWebAudit_CL에서 새로운 cron 엔트리(CronEntry)가 기록되는 PATH 하이재킹형 지속성 확보 탐지. world-writable 경로(/tmp,/var/tmp,/dev/shm) 참조 여부를 부가 신호로 표시. MITRE: T1053.003,T1546",
         "severity": "High",
         "enabled": true,
-        "query": "let alertWindow = 15m;\nUAVHostAudit_CL\n| where TimeGenerated > ago(alertWindow)\n| where EventType == \"cron_add\"\n| where FilePath startswith \"/tmp\" or FilePath startswith \"/var/tmp\" or FilePath startswith \"/dev/shm\"\n    or ExecArgs has_any (\"/tmp\", \"/var/tmp\", \"/dev/shm\")\n| extend TriggerReason = strcat(\"cron_worldwritable_PATH하이재킹_\", FilePath)\n| extend Severity = \"High\"\n| project TimeGenerated, UAVId, ActorId, Binary, ExecArgs, FilePath, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "query": "let alertWindow = 15m;\nUAVWebAudit_CL\n| where TimeGenerated > ago(alertWindow)\n| where isnotempty(CronEntry)\n| extend IsWorldWritablePath = CronEntry has_any (\"/tmp\", \"/var/tmp\", \"/dev/shm\")\n| extend TriggerReason = strcat(\"cron_PATH하이재킹_지속성확보_\", CronEntry)\n| extend Severity = \"High\"\n| project TimeGenerated, RequesterId, InstalledBy, CronEntry, TargetPath, IsWorldWritablePath, StatusCode, TriggerReason, Severity\n| order by TimeGenerated desc",
         "queryFrequency": "PT5M",
         "queryPeriod": "PT15M",
         "triggerOperator": "GreaterThan",
@@ -56,32 +56,23 @@
           "aggregationKind": "SingleAlert"
         },
         "alertDetailsOverride": {
-          "alertDisplayNameFormat": "UAV S57 - Cron / World-Writable PATH Hijacking - {{UAVId}}",
-          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | FilePath={{FilePath}} | ExecArgs={{ExecArgs}}",
+          "alertDisplayNameFormat": "UAV S57 - Cron / World-Writable PATH Hijacking - {{RequesterId}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | CronEntry={{CronEntry}} | TargetPath={{TargetPath}}",
           "alertDynamicProperties": []
         },
         "customDetails": {
           "TriggerReason": "TriggerReason",
-          "FilePath": "FilePath",
-          "ExecArgs": "ExecArgs",
-          "Binary": "Binary"
+          "CronEntry": "CronEntry",
+          "TargetPath": "TargetPath",
+          "InstalledBy": "InstalledBy"
         },
         "entityMappings": [
-          {
-            "entityType": "Host",
-            "fieldMappings": [
-              {
-                "identifier": "HostName",
-                "columnName": "UAVId"
-              }
-            ]
-          },
           {
             "entityType": "Account",
             "fieldMappings": [
               {
                 "identifier": "Name",
-                "columnName": "ActorId"
+                "columnName": "RequesterId"
               }
             ]
           }

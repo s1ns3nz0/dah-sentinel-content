@@ -18,7 +18,7 @@
         "description": "UAVSwarmComms_CL의 link_status 메시지에서 PartitionDetected=true 또는 LinkSeveredCount>=2인 메시 파티션(군집 고립·분단) 탐지. MITRE: T0814 Denial of Service (ICS — description 참조)",
         "severity": "High",
         "enabled": true,
-        "query": "let alertWindow = 10m;\nUAVSwarmComms_CL\n| where TimeGenerated > ago(alertWindow)\n| where MessageType == \"link_status\"\n| where PartitionDetected == true or LinkSeveredCount >= 2\n| extend TriggerReason = strcat(\"메시파티션_군집고립_단절링크수_\", tostring(LinkSeveredCount), \"_파티션탐지_\", tostring(PartitionDetected))\n| extend Severity = \"High\"\n| project TimeGenerated, SwarmId, MemberId, UAVId, MessageType, LinkSeveredCount, PartitionDetected, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "query": "let alertWindow = 10m;\nlet severedThreshold = 2;\nUAVFleetInfra_CL\n| where TimeGenerated > ago(alertWindow)\n| where isnotempty(LinkA) and isnotempty(LinkB)\n| where LinkStatus in (\"down\", \"severed\")\n| summarize SeveredLinkCount = dcount(strcat(LinkA, \"-\", LinkB)), MaxTime = max(TimeGenerated)\n    by FleetId, bin(TimeGenerated, 5m)\n| where SeveredLinkCount >= severedThreshold\n| extend TriggerReason = strcat(\"메시파티션_군집고립의심_단절링크수_\", tostring(SeveredLinkCount), \"_FleetId_\", FleetId)\n| extend Severity = \"High\"\n| project TimeGenerated = MaxTime, FleetId, SeveredLinkCount, TriggerReason, Severity\n| order by TimeGenerated desc",
         "queryFrequency": "PT5M",
         "queryPeriod": "PT15M",
         "triggerOperator": "GreaterThan",
@@ -48,15 +48,14 @@
           "aggregationKind": "SingleAlert"
         },
         "alertDetailsOverride": {
-          "alertDisplayNameFormat": "UAV S108 - Swarm Mesh Partition (Isolation/Split) - {{UAVId}}",
+          "alertDisplayNameFormat": "UAV S108 - Swarm Mesh Partition (Isolation/Split) - {{FleetId}}",
           "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Severity={{Severity}}",
           "alertDynamicProperties": []
         },
         "customDetails": {
           "TriggerReason": "TriggerReason",
-          "LinkSeveredCount": "LinkSeveredCount",
-          "PartitionDetected": "PartitionDetected",
-          "SwarmId": "SwarmId"
+          "SeveredLinkCount": "SeveredLinkCount",
+          "FleetId": "FleetId"
         },
         "entityMappings": [
           {
@@ -64,7 +63,7 @@
             "fieldMappings": [
               {
                 "identifier": "HostName",
-                "columnName": "UAVId"
+                "columnName": "FleetId"
               }
             ]
           }

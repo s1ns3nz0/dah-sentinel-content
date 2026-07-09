@@ -15,10 +15,10 @@
       "apiVersion": "2023-12-01-preview",
       "properties": {
         "displayName": "UAV S22 - Rogue mavlink-router Endpoint (C2 Proxy)",
-        "description": "mavlink-router 비인가 엔드포인트/프록시 탐지를 3개 블록으로 병합 수행. [A] UAVRouterStats_CL에서 알려지지 않은 EndpointName 또는 C2_Whitelisted_GCS_List 외부 PeerIp로 등록된 엔드포인트 [B] 동일 테이블 MsgTx z-score 급증(비인가 프록시를 통한 트래픽 중계 의심) [C] UAVDatalinkConn_CL에서 비인가 PeerIp가 MAVLink 표준 포트(5760/5790/14550/14551)로 직접 접속. MITRE: T1090",
+        "description": "UAVRouterStats_CL(mavlink-router 통계)에서 UnexpectedEndpoint=true로 표시된 비인가/미등록 엔드포인트를 직접 탐지. CrcErrors 동반 시 신뢰도 High(회선 계층 이상 동시 시사).",
         "severity": "High",
         "enabled": true,
-        "query": "let alertWindow = 15m;\nlet baselineWindow = 24h;\nlet knownEndpoints = dynamic(['gcs-primary', 'telemetry-tap', 'sat-modem', 'qgc-local']);\nlet knownPorts = dynamic([5760, 5790, 14550, 14551]);\nlet KnownGCS = _GetWatchlist('C2_Whitelisted_GCS_List') | project GCS_IP;\n// [블록 A] 비인가 엔드포인트/피어\nlet RogueEndpoint =\n    UAVRouterStats_CL\n    | where TimeGenerated > ago(alertWindow)\n    | extend isUnknownEndpoint = EndpointName !in (knownEndpoints)\n    | extend isUnknownPeer = PeerIp !in (KnownGCS)\n    | where isUnknownEndpoint or isUnknownPeer\n    | summarize MsgTxTotal = todouble(sum(MsgTx)), MsgRxTotal = todouble(sum(MsgRx)), FirstSeen = min(TimeGenerated) by EndpointName, PeerIp, PeerPort\n    | extend TriggerReason = strcat('mavlink-router_비인가_엔드포인트_', EndpointName, '_PeerIp:', PeerIp)\n    | extend Severity = 'High';\n// [블록 B] MsgTx z-score 급증 (비인가 프록시 중계 트래픽 의심)\nlet TxAnomaly =\n    UAVRouterStats_CL\n    | where TimeGenerated > ago(baselineWindow)\n    | make-series AvgMsgTx = avg(MsgTx) on TimeGenerated step 5m by EndpointName\n    | extend (Anom, Score, Base) = series_decompose_anomalies(AvgMsgTx, 3.0)\n    | project EndpointName, TimeGenerated, AvgMsgTx, Anom\n    | mv-expand TimeGenerated to typeof(datetime), AvgMsgTx to typeof(double), Anom to typeof(double)\n    | where TimeGenerated > ago(alertWindow) and Anom == 1\n    | project TimeGenerated, EndpointName, MsgTxTotal = AvgMsgTx;\nlet EndpointPeer =\n    UAVRouterStats_CL\n    | where TimeGenerated > ago(alertWindow)\n    | summarize arg_max(TimeGenerated, PeerIp, PeerPort) by EndpointName\n    | project EndpointName, PeerIp, PeerPort;\nlet TxAnomalyWithPeer =\n    TxAnomaly\n    | join kind=inner (EndpointPeer) on EndpointName\n    | extend MsgRxTotal = real(null)\n    | extend TriggerReason = strcat('mavlink-router_MsgTx급증_비인가프록시의심_', EndpointName)\n    | extend Severity = 'Medium'\n    | project FirstSeen = TimeGenerated, EndpointName, PeerIp, PeerPort, MsgTxTotal, MsgRxTotal, TriggerReason, Severity;\n// [블록 C] 비인가 PeerIp가 MAVLink 표준 포트로 직접 접속 (라우터 우회)\nlet UnknownConn =\n    UAVDatalinkConn_CL\n    | where TimeGenerated > ago(alertWindow)\n    | where PeerIp !in (KnownGCS)\n    | where LocalPort in (knownPorts)\n    | summarize MsgTxTotal = todouble(count()), FirstSeen = min(TimeGenerated) by PeerIp, PeerPort = LocalPort\n    | extend EndpointName = strcat('datalink-direct:', PeerIp)\n    | extend MsgRxTotal = real(null)\n    | extend TriggerReason = strcat('비인가IP_MAVLink포트_직접연결_PeerIp:', PeerIp, '_Port:', tostring(PeerPort))\n    | extend Severity = 'Medium'\n    | project FirstSeen, EndpointName, PeerIp, PeerPort, MsgTxTotal, MsgRxTotal, TriggerReason, Severity;\nRogueEndpoint\n| union TxAnomalyWithPeer\n| union UnknownConn\n| order by FirstSeen desc",
+        "query": "let alertWindow = 15m;\nUAVRouterStats_CL\n| where TimeGenerated > ago(alertWindow)\n| where UnexpectedEndpoint == true\n| extend TriggerReason = strcat('mavlink-router_비인가_엔드포인트_탐지_', EndpointName, '_MsgTx:', tostring(MsgTx), '_MsgDropped:', tostring(MsgDropped), '_CrcErrors:', tostring(CrcErrors))\n| extend Severity = iff(CrcErrors > 0, 'High', 'Medium')\n| project TimeGenerated, EndpointName, MsgRx, MsgTx, MsgDropped, CrcErrors, UnexpectedEndpoint, TriggerReason, Severity\n| order by TimeGenerated desc",
         "queryFrequency": "PT15M",
         "queryPeriod": "P1D",
         "triggerOperator": "GreaterThan",
@@ -42,7 +42,7 @@
             "lookbackDuration": "PT2H",
             "matchingMethod": "AllEntities",
             "groupByEntities": [
-              "IP"
+              "Host"
             ],
             "groupByAlertDetails": [],
             "groupByCustomDetails": []
@@ -52,23 +52,23 @@
           "aggregationKind": "SingleAlert"
         },
         "alertDetailsOverride": {
-          "alertDisplayNameFormat": "UAV S22 - Rogue mavlink-router Endpoint (C2 Proxy) - {{PeerIp}}",
-          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Severity={{Severity}}",
+          "alertDisplayNameFormat": "UAV S22 - Rogue mavlink-router Endpoint (C2 Proxy) - {{EndpointName}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | MsgTx={{MsgTx}} | Severity={{Severity}}",
           "alertDynamicProperties": []
         },
         "customDetails": {
           "TriggerReason": "TriggerReason",
           "EndpointName": "EndpointName",
-          "MsgTxTotal": "MsgTxTotal",
+          "MsgTx": "MsgTx",
           "Severity": "Severity"
         },
         "entityMappings": [
           {
-            "entityType": "IP",
+            "entityType": "Host",
             "fieldMappings": [
               {
-                "identifier": "Address",
-                "columnName": "PeerIp"
+                "identifier": "HostName",
+                "columnName": "EndpointName"
               }
             ]
           }

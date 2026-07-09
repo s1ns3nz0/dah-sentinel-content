@@ -15,10 +15,10 @@
       "apiVersion": "2023-12-01-preview",
       "properties": {
         "displayName": "UAV S47 - MAVROS Command Injection (Mission Planner Bypass)",
-        "description": "MAVROS 명령 주입 탐지 — 정상 임무 플래너 경로(Approved_ROS_Node_List의 Role=mission_planner)를 우회해 setpoint 토픽(/mavros/setpoint_raw/local, /mavros/setpoint_velocity/cmd_vel, /mavros/setpoint_position/local)에 직접 명령을 publish하는 비인가 노드를 탐지. MITRE ICS ATT&CK: T0831 Manipulation of Control",
+        "description": "MAVROS 명령 주입 탐지 — UAVCompanion_CL(ROS/컴패니언컴퓨터/설정/MQTT/NTP 등 EventType으로 구분되는 공용 테이블)에서 Authorized=false인 MAVROS 명령 주입 이벤트를 탐지(Command 컬럼으로 세부 명령 확인). 이 테이블은 여러 시나리오가 공유하므로 EventType 값 컨벤션으로 시나리오를 구분: 본 룰은 `EventType == \"mavros_cmd_inject\"` 를 사용(다른 룰과 충돌 없음: qml_inject=S42, gcs_update_mitm=S43, gcs_config_tamper=S44, ros_master_access=S45, ros_topic_inject=S46, ntp_spoof=S50, geofence_tamper=S77[타 담당]). 실제 컬럼: EventType, Target, Command, Authorized, StatusCode(UAVRos_CL/NodeName/PeerIp/TopicName/CommandSummary 컬럼은 존재하지 않아 제거함). MITRE ICS ATT&CK: T0831 Manipulation of Control",
         "severity": "High",
         "enabled": true,
-        "query": "let plannerNodes = _GetWatchlist('Approved_ROS_Node_List') | where Role == \"mission_planner\" | project NodeName;\nlet setpointTopics = dynamic([\"/mavros/setpoint_raw/local\", \"/mavros/setpoint_velocity/cmd_vel\", \"/mavros/setpoint_position/local\"]);\nlet alertWindow = 10m;\nUAVRos_CL\n| where TimeGenerated > ago(alertWindow)\n| where EventType == \"topic_publish\"\n| where TopicName in (setpointTopics)\n| where NodeName !in (plannerNodes)\n| extend TriggerReason = strcat(\"MAVROS_설정점명령_임무플래너_우회_\", NodeName)\n| extend Severity = \"High\"\n| project TimeGenerated, UAVId, NodeName, PeerIp, TopicName, CommandSummary, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "query": "let alertWindow = 10m;\nUAVCompanion_CL\n| where TimeGenerated > ago(alertWindow)\n| where EventType == \"mavros_cmd_inject\"\n| where Authorized == false\n| extend TriggerReason = strcat(\"MAVROS_명령주입_비인가_\", Command)\n| extend Severity = \"High\"\n| project TimeGenerated, Target, Command, Authorized, StatusCode, TriggerReason, Severity\n| order by TimeGenerated desc",
         "queryFrequency": "PT5M",
         "queryPeriod": "PT15M",
         "triggerOperator": "GreaterThan",
@@ -52,14 +52,14 @@
           "aggregationKind": "SingleAlert"
         },
         "alertDetailsOverride": {
-          "alertDisplayNameFormat": "UAV S47 - MAVROS Command Injection (Mission Planner Bypass) - {{UAVId}}",
-          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | NodeName={{NodeName}} | TopicName={{TopicName}}",
+          "alertDisplayNameFormat": "UAV S47 - MAVROS Command Injection (Mission Planner Bypass) - {{Target}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Command={{Command}} | Authorized={{Authorized}}",
           "alertDynamicProperties": []
         },
         "customDetails": {
           "TriggerReason": "TriggerReason",
-          "NodeName": "NodeName",
-          "TopicName": "TopicName"
+          "Command": "Command",
+          "Authorized": "Authorized"
         },
         "entityMappings": [
           {
@@ -67,7 +67,7 @@
             "fieldMappings": [
               {
                 "identifier": "HostName",
-                "columnName": "UAVId"
+                "columnName": "Target"
               }
             ]
           }

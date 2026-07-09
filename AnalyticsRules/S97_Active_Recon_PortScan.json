@@ -14,11 +14,11 @@
       "kind": "Scheduled",
       "apiVersion": "2023-12-01-preview",
       "properties": {
-        "displayName": "UAV S97 - Active Reconnaissance (Port Scan)",
-        "description": "능동 정찰(포트스캔) 탐지. UAVOpAudit_CL의 EventType='port_scan' 레코드에서 최근 7일 정상 베이스라인의 P95 x 1.0(하한 15포트) 대비 PortsScanned가 초과하거나 ScanRatePerMin이 임계를 넘는 소스IP를 탐지. 고정 임계값 대신 baseline 적응형 게이트를 사용해 환경별 정상 스캔 활동(취약점 점검 등) 변화에 자동 추종. MITRE: T1595",
+        "displayName": "UAV S97 - Active Reconnaissance (Port/Endpoint Scan Proxy)",
+        "description": "능동 정찰(포트/엔드포인트 스캔) 탐지. UAVOpAudit_CL에는 포트 스캔을 직접 기록하는 PortsScanned 컬럼이 존재하지 않으므로(실제 컬럼: ClientIp, StatusCode, SessionId 등), 본 룰은 짧은 시간창 내 단일 ClientIp에서 비정상적으로 많은 세션(SessionId)을 생성하며 동시에 요청 실패율(StatusCode>=400)이 높은 패턴을 스캔 활동의 근사 신호로 탐지한다. 연결/요청 볼륨 기반 근사이며 실제 스캔된 포트 수를 측정하지 않는다. MITRE: T1595",
         "severity": "Medium",
         "enabled": true,
-        "query": "let alertWindow = 10m;\nlet baselineWindow = 7d;\nlet scanRateGate = 10.0;\nlet dynamicPortsGate = toscalar(\n    UAVOpAudit_CL\n    | where TimeGenerated > ago(baselineWindow)\n    | where EventType == 'port_scan'\n    | summarize percentile(PortsScanned, 95)\n);\nlet portsScannedGate = max_of(coalesce(dynamicPortsGate, 15.0), 15.0);\nUAVOpAudit_CL\n| where TimeGenerated > ago(alertWindow)\n| where EventType == 'port_scan'\n| where PortsScanned >= portsScannedGate or ScanRatePerMin >= scanRateGate\n| extend TriggerReason = strcat('능동정찰_포트스캔_', ScanSourceIp, '_Ports', tostring(PortsScanned), '_Rate', tostring(ScanRatePerMin))\n| extend Severity = 'Medium'\n| project TimeGenerated, ScanSourceIp, PortsScanned, ScanRatePerMin, PortsGate = portsScannedGate, Operator, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "query": "let alertWindow = 10m;\nlet sessionCountGate = 15;\nlet failureRateGate = 0.6;\nUAVOpAudit_CL\n| where TimeGenerated > ago(alertWindow)\n| summarize\n    TotalRequests = count(),\n    DistinctSessions = dcount(SessionId),\n    FailedRequests = countif(StatusCode >= 400)\n    by ClientIp, bin(TimeGenerated, alertWindow)\n| extend FailureRate = round(todouble(FailedRequests) / todouble(TotalRequests), 2)\n| where DistinctSessions >= sessionCountGate and FailureRate >= failureRateGate\n| extend TriggerReason = strcat('능동정찰_포트스캔근사_', ClientIp, '_세션', tostring(DistinctSessions), '_실패율', tostring(FailureRate))\n| extend Severity = 'Medium'\n| project TimeGenerated, ClientIp, TotalRequests, DistinctSessions, FailedRequests, FailureRate, TriggerReason, Severity\n| order by TimeGenerated desc",
         "queryFrequency": "PT10M",
         "queryPeriod": "P1D",
         "triggerOperator": "GreaterThan",
@@ -50,14 +50,14 @@
           "aggregationKind": "SingleAlert"
         },
         "alertDetailsOverride": {
-          "alertDisplayNameFormat": "UAV S97 - Active Recon Port Scan - {{ScanSourceIp}}",
+          "alertDisplayNameFormat": "UAV S97 - Active Recon Port Scan (Proxy) - {{ClientIp}}",
           "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Severity={{Severity}}",
           "alertDynamicProperties": []
         },
         "customDetails": {
           "TriggerReason": "TriggerReason",
-          "PortsScanned": "PortsScanned",
-          "ScanRatePerMin": "ScanRatePerMin"
+          "DistinctSessions": "DistinctSessions",
+          "FailureRate": "FailureRate"
         },
         "entityMappings": [
           {
@@ -65,7 +65,7 @@
             "fieldMappings": [
               {
                 "identifier": "Address",
-                "columnName": "ScanSourceIp"
+                "columnName": "ClientIp"
               }
             ]
           }

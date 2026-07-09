@@ -18,7 +18,7 @@
         "description": "CI/CD 파이프라인 실행(PipelineRun) 중 승인되지 않은 빌드 스텝(InjectedStep) 삽입 또는 Approved_Operators_List에 없는 비인가 트리거(TriggeredBy)를 탐지. 빌드 도구/의존성 변조를 통한 공급망 침해 징후. MITRE: T1195.001",
         "severity": "High",
         "enabled": true,
-        "query": "let alertWindow = 10m;\nlet ApprovedOps = _GetWatchlist('Approved_Operators_List') | project OperatorId;\nUAVSupplyChain_CL\n| where TimeGenerated > ago(alertWindow)\n| where EventType == 'PipelineRun'\n| extend isInjected = isnotempty(InjectedStep)\n| extend isUnknownTrigger = TriggeredBy !in (ApprovedOps)\n| where isInjected or isUnknownTrigger\n| extend TriggerReason = case(\n    isInjected and isUnknownTrigger, strcat(\"CICD_비인가스텝주입_비인가트리거_\", PipelineId),\n    isInjected, strcat(\"CICD_비인가스텝주입_\", InjectedStep),\n    strcat(\"CICD_비인가_트리거_\", TriggeredBy))\n| extend Severity = \"High\"\n| project TimeGenerated, PipelineId, InjectedStep, TriggeredBy, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "query": "let alertWindow = 10m;\nUAVDevOps_CL\n| where TimeGenerated > ago(alertWindow)\n| where EventType == \"cicd_compromise\"\n| where UnauthorizedTrigger == true\n| extend TriggerReason = strcat(\"CICD_비인가트리거_\", Target, \"_\", Actor)\n| extend Severity = \"High\"\n| project TimeGenerated, Target, Actor, UnauthorizedTrigger, StatusCode, TriggerReason, Severity\n| order by TimeGenerated desc",
         "queryFrequency": "PT5M",
         "queryPeriod": "PT15M",
         "triggerOperator": "GreaterThan",
@@ -50,14 +50,14 @@
           "aggregationKind": "SingleAlert"
         },
         "alertDetailsOverride": {
-          "alertDisplayNameFormat": "UAV S68 - CI/CD Pipeline Compromise - {{PipelineId}}",
-          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | InjectedStep={{InjectedStep}}",
+          "alertDisplayNameFormat": "UAV S68 - CI/CD Pipeline Compromise - {{Target}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | UnauthorizedTrigger={{UnauthorizedTrigger}}",
           "alertDynamicProperties": []
         },
         "customDetails": {
           "TriggerReason": "TriggerReason",
-          "PipelineId": "PipelineId",
-          "InjectedStep": "InjectedStep"
+          "Target": "Target",
+          "Actor": "Actor"
         },
         "entityMappings": [
           {
@@ -65,7 +65,7 @@
             "fieldMappings": [
               {
                 "identifier": "Name",
-                "columnName": "TriggeredBy"
+                "columnName": "Actor"
               }
             ]
           }

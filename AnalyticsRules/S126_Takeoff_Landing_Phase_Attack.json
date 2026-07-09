@@ -15,10 +15,10 @@
       "apiVersion": "2023-12-01-preview",
       "properties": {
         "displayName": "UAV S126 - Takeoff/Landing Phase Attack",
-        "description": "UAVOpmode_CL에서 OpmodeField='takeoff_landing_phase'인 레코드 중 ExpectedValue(정상 이착륙 위상 시퀀스)와 ObservedValue(실제 관측 위상)가 불일치하고 Authorized=0(SByte)인 비인가 조작 탐지. 실제 컬럼: OpmodeField/ExpectedValue/ObservedValue/ChangedBy/Authorized(SByte). MITRE: T0880 Loss of Safety (이착륙과 같은 저고도·저속 취약 위상에서 안전장치를 우회해 사고를 유발)",
+        "description": "UAVTelemetry_CL에서 저고도(AltRel_m < 임계값) 구간 중 ClimbRate_ms 이상 거동 또는 ARM/DISARM(Command=400) 명령이 함께 관측되는 이착륙 위상 이상 징후를 탐지. UAVOpmode_CL은 존재하지 않아 실제 텔레메트리 상대고도/승강률/명령 컬럼 기반으로 재구성. MITRE: T0880 Loss of Safety (이착륙과 같은 저고도·저속 취약 위상에서 안전장치를 우회해 사고를 유발)",
         "severity": "High",
         "enabled": true,
-        "query": "let alertWindow = 10m;\nUAVOpmode_CL\n| where TimeGenerated > ago(alertWindow)\n| where OpmodeField == 'takeoff_landing_phase'\n| where ExpectedValue != ObservedValue and Authorized == 0\n| extend TriggerReason = strcat(\"이착륙위상_비인가조작_\", UAVId, \"_\", ExpectedValue, \"->\", ObservedValue)\n| project TimeGenerated, UAVId, OpmodeField, ExpectedValue, ObservedValue, ChangedBy, Authorized, Seq, TriggerReason\n| order by TimeGenerated desc",
+        "query": "let alertWindow = 15m;\nlet LowAltThreshold_m = 20.0;\nlet ClimbRateAnomalyThreshold = 8.0; // m/s\nlet ArmDisarmCommand = 400; // MAV_CMD_COMPONENT_ARM_DISARM\nUAVTelemetry_CL\n| where TimeGenerated > ago(alertWindow)\n| where isnotnull(AltRel_m) and AltRel_m >= 0 and AltRel_m < LowAltThreshold_m\n| where isnotnull(ClimbRate_ms)\n| where abs(ClimbRate_ms) > ClimbRateAnomalyThreshold or Command == ArmDisarmCommand\n| extend TriggerReason = strcat(\"이착륙위상_이상거동_\", UAVId, \"_고도:\", tostring(AltRel_m), \"m_ClimbRate:\", tostring(ClimbRate_ms))\n| project TimeGenerated, UAVId, AltRel_m, ClimbRate_ms, Command, TriggerReason\n| order by TimeGenerated desc",
         "queryFrequency": "PT5M",
         "queryPeriod": "PT15M",
         "triggerOperator": "GreaterThan",
@@ -58,7 +58,7 @@
         },
         "customDetails": {
           "TriggerReason": "TriggerReason",
-          "Authorized": "Authorized"
+          "AltRel_m": "AltRel_m"
         },
         "entityMappings": [
           {
@@ -67,15 +67,6 @@
               {
                 "identifier": "HostName",
                 "columnName": "UAVId"
-              }
-            ]
-          },
-          {
-            "entityType": "Account",
-            "fieldMappings": [
-              {
-                "identifier": "Name",
-                "columnName": "ChangedBy"
               }
             ]
           }

@@ -18,7 +18,7 @@
         "description": "UAVExfilFlow_CL에서 StagingDirEvent=true 스테이징 이벤트 발생 후 30분 이내 동일 UAVId에서 ChunkCount>=10건, 청크당 2MB 미만(대역폭 제한 회피)으로 분할된 유출 흐름 탐지. MITRE: T1074 Data Staged, T1030 Data Transfer Size Limits",
         "severity": "High",
         "enabled": true,
-        "query": "let alertWindow = 30m;\nlet minChunkCount = 10;\nlet maxChunkSizeBytes = 2000000.0;\nlet maxReplayWindow = 30m;\nlet StagingEvents = UAVExfilFlow_CL\n    | where TimeGenerated > ago(alertWindow)\n    | where StagingDirEvent == true\n    | project StageTime = TimeGenerated, UAVId;\nlet ChunkedFlows = UAVExfilFlow_CL\n    | where TimeGenerated > ago(alertWindow)\n    | where ChunkCount >= minChunkCount and ChunkSizeBytes > 0 and ChunkSizeBytes < maxChunkSizeBytes;\nChunkedFlows\n| join kind=inner (StagingEvents) on UAVId\n| where TimeGenerated >= StageTime and TimeGenerated - StageTime <= maxReplayWindow\n| summarize arg_max(TimeGenerated, Operator, AssetType, DestIp, DestPort, BytesTransferred, ChunkCount, ChunkSizeBytes, StageTime) by UAVId\n| extend TriggerReason = strcat(\"스테이징후_분할유출_\", tostring(ChunkCount), \"청크x\", tostring(toint(ChunkSizeBytes/1000)), \"KB_스테이징후\", tostring(datetime_diff('minute', TimeGenerated, StageTime)), \"분\")\n| extend Severity = \"High\"\n| project TimeGenerated, UAVId, Operator, AssetType, DestIp, DestPort, BytesTransferred, ChunkCount, ChunkSizeBytes, StageTime, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "query": "let alertWindow = 30m;\nlet minChunkCount = 10;\nlet maxChunkSizeBytes = 2000000.0;\nUAVSatcomLink_CL\n| where TimeGenerated > ago(alertWindow)\n| where PayloadBytes > 0 and PayloadBytes < maxChunkSizeBytes\n| summarize ChunkCount = count(), TotalBytes = sum(PayloadBytes), MinTime = min(TimeGenerated), MaxTime = max(TimeGenerated)\n    by UAVId, SessionId\n| where ChunkCount >= minChunkCount\n| extend TriggerReason = strcat(\"스테이징분할유출_\", tostring(ChunkCount), \"청크_합계\", tostring(toint(TotalBytes/1000)), \"KB_구간\", tostring(datetime_diff('second', MaxTime, MinTime)), \"초\")\n| extend Severity = \"High\"\n| project TimeGenerated = MaxTime, UAVId, SessionId, ChunkCount, TotalBytes, MinTime, TriggerReason, Severity\n| order by TimeGenerated desc",
         "queryFrequency": "PT10M",
         "queryPeriod": "PT1H",
         "triggerOperator": "GreaterThan",
@@ -53,14 +53,14 @@
         },
         "alertDetailsOverride": {
           "alertDisplayNameFormat": "UAV S95 - Staged Bandwidth-Limited Split Exfiltration - {{UAVId}}",
-          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | ChunkCount={{ChunkCount}} | ChunkSizeBytes={{ChunkSizeBytes}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | ChunkCount={{ChunkCount}} | TotalBytes={{TotalBytes}}",
           "alertDynamicProperties": []
         },
         "customDetails": {
           "TriggerReason": "TriggerReason",
           "ChunkCount": "ChunkCount",
-          "ChunkSizeBytes": "ChunkSizeBytes",
-          "StageTime": "StageTime"
+          "TotalBytes": "TotalBytes",
+          "SessionId": "SessionId"
         },
         "entityMappings": [
           {
@@ -69,15 +69,6 @@
               {
                 "identifier": "HostName",
                 "columnName": "UAVId"
-              }
-            ]
-          },
-          {
-            "entityType": "Account",
-            "fieldMappings": [
-              {
-                "identifier": "Name",
-                "columnName": "Operator"
               }
             ]
           }

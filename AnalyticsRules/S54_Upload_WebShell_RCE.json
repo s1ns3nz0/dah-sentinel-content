@@ -15,10 +15,10 @@
       "apiVersion": "2023-12-01-preview",
       "properties": {
         "displayName": "UAV S54 - File Upload WebShell / Deserialization RCE",
-        "description": "UAVWebAccess_CL에서 영상(imagery) 업로드 엔드포인트로 Content-Type은 image/*로 선언했으나 실제 파일 확장자가 실행/스크립트(php,jsp,pkl 등)인 콘텐츠타입 불일치 업로드 탐지. 웹셸 적재 또는 역직렬화 RCE 시도 의심. MITRE: T1505.003,T1059",
+        "description": "UAVWebAudit_CL에서 업로드 콘텐츠가 웹셸 시그니처(WebshellSignatureDetected)로 탐지된 이벤트를 탐지. 파일 업로드를 통한 웹셸 적재 또는 역직렬화 RCE 시도 의심. MITRE: T1505.003,T1059",
         "severity": "High",
         "enabled": true,
-        "query": "let alertWindow = 15m;\nlet execExtensions = dynamic([\".php\",\".php5\",\".phtml\",\".jsp\",\".jspx\",\".asp\",\".aspx\",\".exe\",\".sh\",\".pkl\",\".pickle\",\".py\"]);\nUAVWebAccess_CL\n| where TimeGenerated > ago(alertWindow)\n| where Method == \"POST\"\n| where Path has \"/imagery/upload\"\n| where ContentType startswith \"image/\"\n| extend FileExt = tolower(extract(@\"(\\.[A-Za-z0-9]+)$\", 1, UploadFileName))\n| where FileExt in (execExtensions)\n| extend TriggerReason = strcat(\"웹셸_역직렬화RCE_ContentType불일치_\", UploadFileName, \"_선언타입_\", ContentType)\n| extend Severity = \"High\"\n| project TimeGenerated, Operator, ClientIp, Path, ResourceId, ContentType, UploadFileName, FileExt, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "query": "let alertWindow = 15m;\nUAVWebAudit_CL\n| where TimeGenerated > ago(alertWindow)\n| where WebshellSignatureDetected == true\n| extend TriggerReason = strcat(\"웹셸_시그니처탐지_\", Filename, \"_패턴_\", MatchedPattern)\n| extend Severity = \"High\"\n| project TimeGenerated, RequesterId, Filename, ContentSnippet, MatchedPattern, WebshellSignatureDetected, StatusCode, TriggerReason, Severity\n| order by TimeGenerated desc",
         "queryFrequency": "PT5M",
         "queryPeriod": "PT15M",
         "triggerOperator": "GreaterThan",
@@ -56,15 +56,15 @@
           "aggregationKind": "SingleAlert"
         },
         "alertDetailsOverride": {
-          "alertDisplayNameFormat": "UAV S54 - File Upload WebShell / Deserialization RCE - {{Operator}}",
-          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | UploadFileName={{UploadFileName}} | ContentType={{ContentType}}",
+          "alertDisplayNameFormat": "UAV S54 - File Upload WebShell / Deserialization RCE - {{RequesterId}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Filename={{Filename}} | MatchedPattern={{MatchedPattern}}",
           "alertDynamicProperties": []
         },
         "customDetails": {
           "TriggerReason": "TriggerReason",
-          "UploadFileName": "UploadFileName",
-          "ContentType": "ContentType",
-          "FileExt": "FileExt"
+          "Filename": "Filename",
+          "MatchedPattern": "MatchedPattern",
+          "StatusCode": "StatusCode"
         },
         "entityMappings": [
           {
@@ -72,16 +72,7 @@
             "fieldMappings": [
               {
                 "identifier": "Name",
-                "columnName": "Operator"
-              }
-            ]
-          },
-          {
-            "entityType": "IP",
-            "fieldMappings": [
-              {
-                "identifier": "Address",
-                "columnName": "ClientIp"
+                "columnName": "RequesterId"
               }
             ]
           }

@@ -15,10 +15,10 @@
       "apiVersion": "2023-12-01-preview",
       "properties": {
         "displayName": "UAV S27 - WiFi RF Jamming (Loss of Control)",
-        "description": "UAVWifi_CL에서 PacketLossPct(패킷 손실률)와 NoiseFloorDbm(RF 잡음 바닥)이 동시에 임계(손실률 20% 초과, 잡음 -75dBm 초과)를 넘으면 WiFi 재밍에 의한 통제 상실 징후로 탐지. MITRE: T1498",
+        "description": "UAVWifi_CL은 실 워크스페이스에 존재하지 않음. WiFi 대역 RF 재밍은 UAVCounterUas_CL(Band='wifi', JsRatio_dB/JamEirp_dBm)이 더 정확한 실제 컬럼을 제공하므로 이를 사용해 근사 탐지.",
         "severity": "Medium",
         "enabled": true,
-        "query": "let alertWindow = 10m;\nlet packetLossGate = 20.0;\nlet noiseFloorGate = -75.0;\nUAVWifi_CL\n| where TimeGenerated > ago(alertWindow)\n| where PacketLossPct > packetLossGate and NoiseFloorDbm > noiseFloorGate\n| summarize AvgLoss = avg(PacketLossPct), AvgNoise = avg(NoiseFloorDbm), LastSeen = max(TimeGenerated) by UAVId, BSSID\n| extend TriggerReason = strcat('WiFi_재밍_통제상실_PacketLoss:', tostring(round(AvgLoss,1)), '%_Noise:', tostring(round(AvgNoise,1)), 'dBm')\n| extend Severity = 'Medium'\n| project TimeGenerated = LastSeen, UAVId, BSSID, AvgLoss, AvgNoise, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "query": "let alertWindow = 10m;\nlet jsRatioGate = 6.0;\nUAVCounterUas_CL\n| where TimeGenerated > ago(alertWindow)\n| where Band has 'wifi'\n| where JsRatio_dB > jsRatioGate\n| summarize AvgJsRatio = avg(JsRatio_dB), AvgEirp = avg(JamEirp_dBm), LastSeen = max(TimeGenerated) by UAVId, JamMode\n| extend TriggerReason = strcat('WiFi_재밍_통제상실의심_JsRatio:', tostring(round(AvgJsRatio,1)), 'dB_Mode:', JamMode)\n| extend Severity = 'Medium'\n| project TimeGenerated = LastSeen, UAVId, JamMode, AvgJsRatio, AvgEirp, TriggerReason, Severity\n| order by TimeGenerated desc",
         "queryFrequency": "PT5M",
         "queryPeriod": "PT15M",
         "triggerOperator": "GreaterThan",
@@ -53,13 +53,13 @@
         },
         "alertDetailsOverride": {
           "alertDisplayNameFormat": "UAV S27 - WiFi RF Jamming (Loss of Control) - {{UAVId}}",
-          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | AvgLoss={{AvgLoss}} | AvgNoise={{AvgNoise}} | Severity={{Severity}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | AvgJsRatio={{AvgJsRatio}} | AvgEirp={{AvgEirp}} | Severity={{Severity}}",
           "alertDynamicProperties": []
         },
         "customDetails": {
           "TriggerReason": "TriggerReason",
-          "AvgLoss": "AvgLoss",
-          "AvgNoise": "AvgNoise",
+          "AvgJsRatio": "AvgJsRatio",
+          "AvgEirp": "AvgEirp",
           "Severity": "Severity"
         },
         "entityMappings": [

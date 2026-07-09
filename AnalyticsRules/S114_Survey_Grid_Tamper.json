@@ -15,10 +15,10 @@
       "apiVersion": "2023-12-01-preview",
       "properties": {
         "displayName": "UAV S114 - Survey Grid Parameter Tamper (Unauthorized Survey Grid Modification)",
-        "description": "UAVOpmode_CL에서 OpmodeField='survey_grid_params'인 레코드 중 ExpectedValue(승인된 측량 격자 파라미터)와 ObservedValue(실제 적용값)가 불일치하고 Authorized=0(SByte)인 비인가 변조 탐지. 실제 컬럼: OpmodeField/ExpectedValue/ObservedValue/ChangedBy/Authorized(SByte). MITRE: T0836 Modify Parameter (측량 임무의 격자 파라미터를 비인가로 변경해 커버리지·수집구역을 조작)",
+        "description": "UAVMissionPlan_CL에서 동일 PlanId의 연속 레코드 간 WaypointCount(측량 격자 경유점 수)가 변경되었고, 동시에 Approver가 비어있거나 Planner==Approver(자가승인)인 비인가 격자 변조를 탐지. UAVOpmode_CL은 존재하지 않아 실제 미션계획 감사 테이블 기반으로 재구성. MITRE: T0836 Modify Parameter (측량 임무의 격자 파라미터를 비인가로 변경해 커버리지·수집구역을 조작)",
         "severity": "Low",
         "enabled": true,
-        "query": "let alertWindow = 10m;\nUAVOpmode_CL\n| where TimeGenerated > ago(alertWindow)\n| where OpmodeField == 'survey_grid_params'\n| where ExpectedValue != ObservedValue and Authorized == 0\n| extend TriggerReason = strcat(\"측량격자_비인가변조_\", UAVId, \"_\", ExpectedValue, \"->\", ObservedValue)\n| project TimeGenerated, UAVId, OpmodeField, ExpectedValue, ObservedValue, ChangedBy, Authorized, Seq, TriggerReason\n| order by TimeGenerated desc",
+        "query": "let alertWindow = 30m;\nUAVMissionPlan_CL\n| where TimeGenerated > ago(alertWindow)\n| where isnotnull(WaypointCount)\n| order by PlanId asc, TimeGenerated asc\n| serialize\n| extend PrevWaypointCount = prev(WaypointCount, 1), PrevPlanId = prev(PlanId, 1)\n| where PlanId == PrevPlanId and WaypointCount != PrevWaypointCount\n| where isempty(Approver) or Planner == Approver\n| extend TriggerReason = strcat(\"측량격자_비인가변조_\", PlanId, \"_\", tostring(PrevWaypointCount), \"->\", tostring(WaypointCount))\n| project TimeGenerated, PlanId, UAVId, Planner, Approver, WaypointCount, PrevWaypointCount, Status, Comment, TriggerReason\n| order by TimeGenerated desc",
         "queryFrequency": "PT5M",
         "queryPeriod": "PT15M",
         "triggerOperator": "GreaterThan",
@@ -58,7 +58,7 @@
         },
         "customDetails": {
           "TriggerReason": "TriggerReason",
-          "Authorized": "Authorized"
+          "WaypointCount": "WaypointCount"
         },
         "entityMappings": [
           {
@@ -75,7 +75,7 @@
             "fieldMappings": [
               {
                 "identifier": "Name",
-                "columnName": "ChangedBy"
+                "columnName": "Planner"
               }
             ]
           }

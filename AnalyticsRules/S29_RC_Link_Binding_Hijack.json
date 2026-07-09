@@ -18,7 +18,7 @@
         "description": "UAVRcLink_CL에서 BindEvent(bind_start/bind_complete) 발생 시 ObservedTxId(관측된 송신기 ID)가 ExpectedTxId(등록된 송신기 ID)와 불일치하면 RC 링크 바인딩 탈취 시도로 탐지. MITRE: T1555",
         "severity": "Medium",
         "enabled": true,
-        "query": "let alertWindow = 10m;\nUAVRcLink_CL\n| where TimeGenerated > ago(alertWindow)\n| where BindEvent in ('bind_start', 'bind_complete')\n| where isnotempty(ExpectedTxId) and ObservedTxId != ExpectedTxId\n| extend TriggerReason = strcat('RC링크_바인딩탈취_', Protocol, '_Expected:', ExpectedTxId, '_Observed:', ObservedTxId)\n| extend Severity = 'Medium'\n| project TimeGenerated, UAVId, Protocol, BindEvent, ExpectedTxId, ObservedTxId, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "query": "let alertWindow = 10m;\nUAVRcLink_CL\n| where TimeGenerated > ago(alertWindow)\n| where BindCodeReused == true\n| extend TriggerReason = strcat('RC링크_바인딩코드_재사용_탈취의심_DeviceId:', DeviceId, '_Protocol:', ProtocolNegotiated)\n| extend Severity = 'Medium'\n| project TimeGenerated, UavId, DeviceId, ProtocolRequested, ProtocolNegotiated, BindCodeReused, TriggerReason, Severity\n| order by TimeGenerated desc",
         "queryFrequency": "PT5M",
         "queryPeriod": "PT15M",
         "triggerOperator": "GreaterThan",
@@ -52,15 +52,15 @@
           "aggregationKind": "SingleAlert"
         },
         "alertDetailsOverride": {
-          "alertDisplayNameFormat": "UAV S29 - RC Link Binding Hijack (DSMX/FrSky/ELRS) - {{UAVId}}",
-          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | ExpectedTxId={{ExpectedTxId}} | ObservedTxId={{ObservedTxId}} | Severity={{Severity}}",
+          "alertDisplayNameFormat": "UAV S29 - RC Link Binding Hijack (DSMX/FrSky/ELRS) - {{UavId}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | ProtocolNegotiated={{ProtocolNegotiated}} | Severity={{Severity}}",
           "alertDynamicProperties": []
         },
         "customDetails": {
           "TriggerReason": "TriggerReason",
-          "Protocol": "Protocol",
-          "ExpectedTxId": "ExpectedTxId",
-          "ObservedTxId": "ObservedTxId"
+          "ProtocolNegotiated": "ProtocolNegotiated",
+          "BindCodeReused": "BindCodeReused",
+          "Severity": "Severity"
         },
         "entityMappings": [
           {
@@ -68,7 +68,7 @@
             "fieldMappings": [
               {
                 "identifier": "HostName",
-                "columnName": "UAVId"
+                "columnName": "UavId"
               }
             ]
           }

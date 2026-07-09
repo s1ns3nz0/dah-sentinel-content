@@ -15,10 +15,10 @@
       "apiVersion": "2023-12-01-preview",
       "properties": {
         "displayName": "UAV S44 - GCS Config/Log Tampering (Unapproved Change)",
-        "description": "GCS 설정/로그 변조 탐지 — config_change 이벤트가 동일 ConfigKey에 대해 같은 30분 구간 내 config_change_approval(운영자 승인 기록)과 매칭되지 않는 경우를 탐지. bin(30m) 동치 조인으로 근사 시간대별 승인 여부를 판정(부등호는 조인 조건에 사용하지 않음). MITRE: T1565",
+        "description": "GCS 설정/로그 변조 탐지 — UAVCompanion_CL(ROS/컴패니언컴퓨터/설정/MQTT/NTP 등 EventType으로 구분되는 공용 테이블)에서 Authorized=false인 설정 변경(ConfigField/ValueBefore/ValueAfter/ChangedBy)을 탐지. 이 테이블은 여러 시나리오가 공유하므로 EventType 값 컨벤션으로 시나리오를 구분: 본 룰은 `EventType == \"gcs_config_tamper\"` 를 사용(다른 룰과 충돌 없음: qml_inject=S42, gcs_update_mitm=S43, ros_master_access=S45, ros_topic_inject=S46, mavros_cmd_inject=S47, ntp_spoof=S50, geofence_tamper=S77[타 담당]). 실제 컬럼: EventType, Target, ConfigField, ValueBefore, ValueAfter, ChangedBy, Authorized(UAVGcsApp_CL/ComponentName/PayloadDetail/SourceHost/GcsHost 컬럼은 존재하지 않아 제거함). MITRE: T1565",
         "severity": "Medium",
         "enabled": true,
-        "query": "let alertWindow = 2h;\nlet binSize = 30m;\nlet Changes =\n    UAVGcsApp_CL\n    | where TimeGenerated > ago(alertWindow)\n    | where EventType == \"config_change\"\n    | extend TimeBin = bin(TimeGenerated, binSize)\n    | project ChangeTime = TimeGenerated, GcsHost, Operator, ConfigKey = ComponentName, ConfigValue = PayloadDetail, TimeBin;\nlet Approvals =\n    UAVGcsApp_CL\n    | where TimeGenerated > ago(alertWindow)\n    | where EventType == \"config_change_approval\"\n    | extend TimeBin = bin(TimeGenerated, binSize)\n    | project ConfigKey = ComponentName, ApprovalRef = SourceHost, TimeBin;\nChanges\n| join kind=leftouter (Approvals) on ConfigKey, TimeBin\n| where isnull(ApprovalRef)\n| extend TriggerReason = strcat(\"GCS_설정변조_미승인_\", ConfigKey)\n| extend Severity = \"Medium\"\n| project TimeGenerated = ChangeTime, GcsHost, Operator, ConfigKey, ConfigValue, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "query": "let alertWindow = 2h;\nUAVCompanion_CL\n| where TimeGenerated > ago(alertWindow)\n| where EventType == \"gcs_config_tamper\"\n| where Authorized == false\n| extend TriggerReason = strcat(\"GCS_설정변조_미승인_\", ConfigField)\n| extend Severity = \"Medium\"\n| project TimeGenerated, Target, ConfigField, ValueBefore, ValueAfter, ChangedBy, Authorized, TriggerReason, Severity\n| order by TimeGenerated desc",
         "queryFrequency": "PT15M",
         "queryPeriod": "PT3H",
         "triggerOperator": "GreaterThan",
@@ -52,14 +52,14 @@
           "aggregationKind": "SingleAlert"
         },
         "alertDetailsOverride": {
-          "alertDisplayNameFormat": "UAV S44 - GCS Config/Log Tampering (Unapproved Change) - {{GcsHost}}",
-          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | ConfigKey={{ConfigKey}} | ConfigValue={{ConfigValue}}",
+          "alertDisplayNameFormat": "UAV S44 - GCS Config/Log Tampering (Unapproved Change) - {{Target}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | ConfigField={{ConfigField}} | ValueBefore={{ValueBefore}} | ValueAfter={{ValueAfter}}",
           "alertDynamicProperties": []
         },
         "customDetails": {
           "TriggerReason": "TriggerReason",
-          "ConfigKey": "ConfigKey",
-          "Operator": "Operator"
+          "ConfigField": "ConfigField",
+          "ChangedBy": "ChangedBy"
         },
         "entityMappings": [
           {
@@ -67,7 +67,16 @@
             "fieldMappings": [
               {
                 "identifier": "HostName",
-                "columnName": "GcsHost"
+                "columnName": "Target"
+              }
+            ]
+          },
+          {
+            "entityType": "Account",
+            "fieldMappings": [
+              {
+                "identifier": "Name",
+                "columnName": "ChangedBy"
               }
             ]
           }

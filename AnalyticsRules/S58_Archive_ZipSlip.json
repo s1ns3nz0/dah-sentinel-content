@@ -15,10 +15,10 @@
       "apiVersion": "2023-12-01-preview",
       "properties": {
         "displayName": "UAV S58 - Archive Zip Slip (Path Traversal)",
-        "description": "UAVArchiveExtract_CL에서 아카이브 엔트리(../ 등) 경로순회로 압축 해제 경로가 지정된 추출 루트(ExtractRoot) 밖으로 이탈하는 Zip Slip 탐지. MITRE: T1195",
+        "description": "UAVArchiveAudit_CL에서 아카이브 엔트리(../ 등) 경로순회로 압축 해제 경로가 벗어나는 Zip Slip이 PathTraversalDetected 플래그로 탐지된 이벤트. MITRE: T1195",
         "severity": "Medium",
         "enabled": true,
-        "query": "let alertWindow = 15m;\nUAVArchiveExtract_CL\n| where TimeGenerated > ago(alertWindow)\n| where TraversalDetected == true\n| where not(ExtractPathResolved startswith ExtractRoot)\n| extend TriggerReason = strcat(\"ZipSlip_경로순회_\", ArchiveEntry, \"_to_\", ExtractPathResolved)\n| extend Severity = \"Medium\"\n| project TimeGenerated, UAVId, ArchiveName, ArchiveEntry, ExtractPathResolved, ExtractRoot, UploadedBy, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "query": "let alertWindow = 15m;\nUAVArchiveAudit_CL\n| where TimeGenerated > ago(alertWindow)\n| where PathTraversalDetected == true\n| extend TriggerReason = strcat(\"ZipSlip_경로순회_\", ArchiveName, \"_\", EntryPath)\n| extend Severity = \"Medium\"\n| project TimeGenerated, ArchiveName, Mode, EntryPath, PathTraversalDetected, ExtractedCount, BlockedCount, StatusCode, TriggerReason, Severity\n| order by TimeGenerated desc",
         "queryFrequency": "PT5M",
         "queryPeriod": "PT15M",
         "triggerOperator": "GreaterThan",
@@ -52,15 +52,15 @@
           "aggregationKind": "SingleAlert"
         },
         "alertDetailsOverride": {
-          "alertDisplayNameFormat": "UAV S58 - Archive Zip Slip (Path Traversal) - {{UAVId}}",
-          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | ArchiveEntry={{ArchiveEntry}} | ExtractPathResolved={{ExtractPathResolved}}",
+          "alertDisplayNameFormat": "UAV S58 - Archive Zip Slip (Path Traversal) - {{ArchiveName}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | EntryPath={{EntryPath}} | BlockedCount={{BlockedCount}}",
           "alertDynamicProperties": []
         },
         "customDetails": {
           "TriggerReason": "TriggerReason",
-          "ArchiveEntry": "ArchiveEntry",
-          "ExtractPathResolved": "ExtractPathResolved",
-          "UploadedBy": "UploadedBy"
+          "ArchiveName": "ArchiveName",
+          "EntryPath": "EntryPath",
+          "BlockedCount": "BlockedCount"
         },
         "entityMappings": [
           {
@@ -68,16 +68,7 @@
             "fieldMappings": [
               {
                 "identifier": "HostName",
-                "columnName": "UAVId"
-              }
-            ]
-          },
-          {
-            "entityType": "Account",
-            "fieldMappings": [
-              {
-                "identifier": "Name",
-                "columnName": "UploadedBy"
+                "columnName": "ArchiveName"
               }
             ]
           }

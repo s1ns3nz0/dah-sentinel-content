@@ -15,10 +15,10 @@
       "apiVersion": "2023-12-01-preview",
       "properties": {
         "displayName": "UAV S13 - Satellite Link C2 Hijacking (Regular Beaconing over Whitelisted Endpoint)",
-        "description": "UAVDatalinkConn_CL의 SATCOM 링크에서 Watchlist(C2_Whitelisted_GCS_List)상 허가된 원격 엔드포인트로 향하는 정상적으로 보이는 세션임에도, 세션 내 연속 이벤트 간격(IntervalSec)의 변동계수(StdevInterval/AvgInterval)가 매우 낮아 기계적으로 규칙적인 비컨(beacon) 패턴을 보이는 정황 탐지 — Turla(G0010) 스타일의 정상 위성 ISP 세션에 편승한 C2 비컨/태스킹 트래픽 은닉 기법. MITRE Enterprise ATT&CK: T1090.002 Proxy: External Proxy",
+        "description": "UAVSatcomLink_CL(실제 컬럼: UAVId, LinkId, SessionId, Seq, IntegrityStatus, RttMs, JamIndicator, SrcAddr, DstAddr, Mode, Encoding, PayloadEntropy, BeaconJitterSec, PayloadBytes — LinkType 없음)에서 SrcAddr/DstAddr가 Watchlist(C2_Whitelisted_GCS_List)에 없는 비인가 엔드포인트, 또는 BeaconJitterSec가 매우 낮아 기계적으로 규칙적인 비컨(beacon) 패턴을 보이는 세션을 탐지 — Turla(G0010) 스타일의 정상 위성 세션에 편승한 C2 비컨/태스킹 트래픽 은닉 기법. MITRE Enterprise ATT&CK: T1090.002 Proxy: External Proxy",
         "severity": "High",
         "enabled": true,
-        "query": "let alertWindow = 2h;\nlet minSamples = 8;\nlet jitterThreshold = 0.05;\nlet WhitelistedGCS = _GetWatchlist('C2_Whitelisted_GCS_List') | project GCS_IP;\nUAVDatalinkConn_CL\n| where TimeGenerated > ago(alertWindow)\n| where LinkType == 'SATCOM'\n| where RemoteEndpoint in (WhitelistedGCS)\n| partition by SessionId (\n    sort by TimeGenerated asc\n    | extend PrevTime = prev(TimeGenerated)\n    | extend IntervalSec = datetime_diff('second', TimeGenerated, PrevTime)\n)\n| where isnotnull(IntervalSec) and IntervalSec > 0\n| summarize\n    SampleCount = count(),\n    AvgInterval = avg(IntervalSec),\n    StdevInterval = stdev(IntervalSec),\n    UAVId = any(UAVId),\n    RemoteEndpoint = any(RemoteEndpoint),\n    TotalBytesSent = sum(BytesSent),\n    TotalBytesReceived = sum(BytesReceived)\n    by SessionId\n| where SampleCount >= minSamples and AvgInterval > 0\n| extend CoeffVariation = StdevInterval / AvgInterval\n| where CoeffVariation < jitterThreshold\n| extend TriggerReason = strcat('SATCOM_C2_규칙비컨_탐지_', RemoteEndpoint, '_주기', tostring(round(AvgInterval,1)), 's_CV', tostring(round(CoeffVariation,3)))\n| extend Severity = 'High'\n| project SessionId, UAVId, RemoteEndpoint, SampleCount, AvgInterval, StdevInterval, CoeffVariation, TotalBytesSent, TotalBytesReceived, TriggerReason, Severity\n| order by CoeffVariation asc",
+        "query": "let alertWindow = 2h;\nlet minSamples = 8;\nlet jitterThreshold = 0.05;\nlet WhitelistedGCS = _GetWatchlist('C2_Whitelisted_GCS_List') | project GCS_IP;\nUAVSatcomLink_CL\n| where TimeGenerated > ago(alertWindow)\n| extend isUnwhitelisted = (SrcAddr !in (WhitelistedGCS)) and (DstAddr !in (WhitelistedGCS))\n| summarize\n    MaxTime = max(TimeGenerated),\n    SampleCount = count(),\n    AvgJitter = avg(BeaconJitterSec),\n    StdevJitter = stdev(BeaconJitterSec),\n    AvgEntropy = avg(PayloadEntropy),\n    AvgRtt = avg(RttMs),\n    UnwhitelistedCount = countif(isUnwhitelisted),\n    SrcSet = make_set(SrcAddr),\n    DstSet = make_set(DstAddr)\n    by UAVId, LinkId, SessionId\n| where SampleCount >= minSamples\n| where (AvgJitter < jitterThreshold) or (UnwhitelistedCount > 0)\n| extend TriggerReason = case(\n    UnwhitelistedCount > 0, strcat('SATCOM_비인가_엔드포인트_', tostring(UnwhitelistedCount), '건'),\n    strcat('SATCOM_C2_규칙비컨_탐지_지터', tostring(round(AvgJitter,4)), 's'))\n| extend Severity = 'High'\n| project TimeGenerated = MaxTime, UAVId, LinkId, SessionId, SampleCount, AvgJitter, StdevJitter, AvgEntropy, AvgRtt, UnwhitelistedCount, SrcSet, DstSet, TriggerReason, Severity\n| order by TimeGenerated desc",
         "queryFrequency": "PT15M",
         "queryPeriod": "PT2H",
         "triggerOperator": "GreaterThan",
@@ -60,7 +60,7 @@
         },
         "customDetails": {
           "TriggerReason": "TriggerReason",
-          "CoeffVariation": "CoeffVariation"
+          "AvgJitter": "AvgJitter"
         },
         "entityMappings": [
           {

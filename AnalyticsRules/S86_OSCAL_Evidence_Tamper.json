@@ -14,11 +14,11 @@
       "kind": "Scheduled",
       "apiVersion": "2023-12-01-preview",
       "properties": {
-        "displayName": "UAV S86 - OSCAL Compliance Evidence Tampering",
-        "description": "OSCAL 컴플라이언스 증거 변조 탐지. UAVComplianceEvidence_CL에서 무결성 서명(IntegritySigned)이 누락된 컴플라이언스 결과, 특히 'pass'로 기재된 결과 중 서명 파이프라인을 거치지 않은 레코드를 탐지. 정상 파이프라인은 컨트롤 평가 결과를 생성 시점에 항상 서명하므로 미서명 'pass' 증거는 감사 통과를 위한 사후 조작 의심. MITRE: T1565",
+        "displayName": "UAV S86 - OSCAL Compliance Evidence Tampering (Proxy - Instrumentation Gap)",
+        "description": "[계측 공백/최선근사] OSCAL 컴플라이언스 증거 변조 탐지. 실배포 워크스페이스에는 OSCAL 컨트롤 평가결과·증거 서명을 직접 기록하는 전용 테이블이 존재하지 않음(genuine instrumentation gap). 본 룰은 UAVServiceAudit_CL을 범용 감사 테이블로 활용해 EventType='oscal_evidence_tamper'(본 룰이 정의한 관례값)로 태깅된 레코드 중 IsDestructiveAction 또는 LogBearingTargetSuspected가 true인 경우를 증거 조작 의심 근사 신호로 탐지한다. 전용 OSCAL 증거 서명 파이프라인이 도입되기 전까지의 임시 대체(proxy) 룰이며, 실제 컨트롤 pass/fail 결과 조작을 직접 판정하지 않는다. MITRE: T1565",
         "severity": "High",
         "enabled": true,
-        "query": "let alertWindow = 15m;\nUAVComplianceEvidence_CL\n| where TimeGenerated > ago(alertWindow)\n| where IntegritySigned == false\n| extend TriggerReason = case(\n    ResultStated == 'pass', strcat('컴플라이언스_증거_무서명_임의PASS_', ControlId),\n    strcat('컴플라이언스_증거_무서명_', ControlId))\n| extend Severity = iff(ResultStated == 'pass', 'High', 'Medium')\n| project TimeGenerated, ControlId, ResultStated, IntegritySigned, AuthoredBy, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "query": "let alertWindow = 15m;\nUAVServiceAudit_CL\n| where TimeGenerated > ago(alertWindow)\n| where EventType == 'oscal_evidence_tamper'\n| where IsDestructiveAction == true or LogBearingTargetSuspected == true\n| extend TriggerReason = case(\n    LogBearingTargetSuspected == true, strcat('OSCAL증거_위조의심_로그대상_', ActorId),\n    IsDestructiveAction == true, strcat('OSCAL증거_위조의심_파괴적작업_', ActorId),\n    'Unknown')\n| extend Severity = 'High'\n| project TimeGenerated, EventType, Action, ActorId, ServiceLabel, ProjectLabel, IsDestructiveAction, LogBearingTargetSuspected, TriggerReason, Severity\n| order by TimeGenerated desc",
         "queryFrequency": "PT15M",
         "queryPeriod": "PT30M",
         "triggerOperator": "GreaterThan",
@@ -51,14 +51,14 @@
           "aggregationKind": "SingleAlert"
         },
         "alertDetailsOverride": {
-          "alertDisplayNameFormat": "UAV S86 - OSCAL Compliance Evidence Tampering - {{ControlId}}",
-          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | AuthoredBy={{AuthoredBy}} | Severity={{Severity}}",
+          "alertDisplayNameFormat": "UAV S86 - OSCAL Compliance Evidence Tampering (Proxy) - {{ActorId}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | ActorId={{ActorId}} | Severity={{Severity}}",
           "alertDynamicProperties": []
         },
         "customDetails": {
           "TriggerReason": "TriggerReason",
-          "ControlId": "ControlId",
-          "IntegritySigned": "IntegritySigned"
+          "ActorId": "ActorId",
+          "LogBearingTargetSuspected": "LogBearingTargetSuspected"
         },
         "entityMappings": [
           {
@@ -66,7 +66,7 @@
             "fieldMappings": [
               {
                 "identifier": "Name",
-                "columnName": "AuthoredBy"
+                "columnName": "ActorId"
               }
             ]
           }

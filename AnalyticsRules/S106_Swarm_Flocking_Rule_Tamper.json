@@ -18,7 +18,7 @@
         "description": "UAVSwarmComms_CL의 flock_rule_update 메시지에서 RuleParam(separation/alignment/cohesion)의 ValueBefore 대비 ValueAfter 변화율이 30% 초과하는 flocking 규칙 변조 탐지. MITRE: T0836 Modify Parameter (ICS — description 참조)",
         "severity": "Medium",
         "enabled": true,
-        "query": "let alertWindow = 10m;\nlet changeThresholdPct = 30.0;\nUAVSwarmComms_CL\n| where TimeGenerated > ago(alertWindow)\n| where MessageType == \"flock_rule_update\"\n| where isnotnull(ValueBefore) and isnotnull(ValueAfter) and ValueBefore != 0\n| extend PctChange = abs((ValueAfter - ValueBefore) / ValueBefore) * 100\n| where PctChange > changeThresholdPct\n| extend TriggerReason = strcat(\"flocking규칙변조_\", RuleParam, \"_변경률_\", tostring(toint(PctChange)), \"%_이전:\", tostring(ValueBefore), \"_이후:\", tostring(ValueAfter))\n| extend Severity = \"Medium\"\n| project TimeGenerated, SwarmId, MemberId, UAVId, MessageType, RuleParam, ValueBefore, ValueAfter, PctChange, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "query": "let alertWindow = 10m;\nlet anomalyThreshold = 0.7;\nUAVFleetState_CL\n| where TimeGenerated > ago(alertWindow)\n| where isnotnull(AnomalyScore) and AnomalyScore > anomalyThreshold\n| extend TriggerReason = strcat(\"편대대형flocking규칙변조의심_AnomalyScore_\", tostring(AnomalyScore), \"_FleetId_\", FleetId)\n| extend Severity = \"Medium\"\n| project TimeGenerated, FleetId, WindowStart, AnomalyScore, ActiveUAVCount, TriggerReason, Severity\n| order by TimeGenerated desc",
         "queryFrequency": "PT5M",
         "queryPeriod": "PT15M",
         "triggerOperator": "GreaterThan",
@@ -48,16 +48,15 @@
           "aggregationKind": "SingleAlert"
         },
         "alertDetailsOverride": {
-          "alertDisplayNameFormat": "UAV S106 - Flocking Rule Parameter Tampering - {{UAVId}}",
+          "alertDisplayNameFormat": "UAV S106 - Flocking Rule Parameter Tampering - {{FleetId}}",
           "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Severity={{Severity}}",
           "alertDynamicProperties": []
         },
         "customDetails": {
           "TriggerReason": "TriggerReason",
-          "RuleParam": "RuleParam",
-          "ValueBefore": "ValueBefore",
-          "ValueAfter": "ValueAfter",
-          "PctChange": "PctChange"
+          "AnomalyScore": "AnomalyScore",
+          "ActiveUAVCount": "ActiveUAVCount",
+          "FleetId": "FleetId"
         },
         "entityMappings": [
           {
@@ -65,7 +64,7 @@
             "fieldMappings": [
               {
                 "identifier": "HostName",
-                "columnName": "UAVId"
+                "columnName": "FleetId"
               }
             ]
           }

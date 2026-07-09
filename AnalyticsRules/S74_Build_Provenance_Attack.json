@@ -18,7 +18,7 @@
         "description": "빌드 증명(BuildAttest) 이벤트에서 프로버넌스 증명(ProvenanceAttested)이 실패한 BuildId를 탐지. 재현 불가능하거나 증명되지 않은 빌드 산출물의 공급망 유입 시도. MITRE: T1195",
         "severity": "High",
         "enabled": true,
-        "query": "let alertWindow = 15m;\nUAVSupplyChain_CL\n| where TimeGenerated > ago(alertWindow)\n| where EventType == 'BuildAttest'\n| where ProvenanceAttested == false\n| extend TriggerReason = strcat(\"빌드_프로버넌스_미인증_\", BuildId)\n| extend Severity = \"High\"\n| project TimeGenerated, BuildId, ProvenanceAttested, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "query": "let alertWindow = 15m;\nUAVDevOps_CL\n| where TimeGenerated > ago(alertWindow)\n| where EventType == \"provenance_attack\"\n| where ProvenanceMismatch == true\n| extend TriggerReason = strcat(\"빌드_프로버넌스_불일치_\", Target, \"_\", Actor)\n| extend Severity = \"High\"\n| project TimeGenerated, Target, Actor, ProvenanceMismatch, StatusCode, TriggerReason, Severity\n| order by TimeGenerated desc",
         "queryFrequency": "PT5M",
         "queryPeriod": "PT15M",
         "triggerOperator": "GreaterThan",
@@ -50,14 +50,14 @@
           "aggregationKind": "SingleAlert"
         },
         "alertDetailsOverride": {
-          "alertDisplayNameFormat": "UAV S74 - Build Provenance Integrity Attack - {{BuildId}}",
-          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | ProvenanceAttested={{ProvenanceAttested}}",
+          "alertDisplayNameFormat": "UAV S74 - Build Provenance Integrity Attack - {{Target}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | ProvenanceMismatch={{ProvenanceMismatch}}",
           "alertDynamicProperties": []
         },
         "customDetails": {
           "TriggerReason": "TriggerReason",
-          "BuildId": "BuildId",
-          "ProvenanceAttested": "ProvenanceAttested"
+          "Target": "Target",
+          "Actor": "Actor"
         },
         "entityMappings": [
           {
@@ -65,7 +65,7 @@
             "fieldMappings": [
               {
                 "identifier": "HostName",
-                "columnName": "BuildId"
+                "columnName": "Target"
               }
             ]
           }

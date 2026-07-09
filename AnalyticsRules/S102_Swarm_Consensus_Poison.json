@@ -18,7 +18,7 @@
         "description": "UAVSwarmComms_CL의 consensus_vote 메시지에서 ConflictingStateVotes>0 또는 ByzantineThresholdExceeded=true인 군집 합의(Consensus) 포이즈닝 탐지. MITRE: T0832 Manipulation of View (ICS — description 참조)",
         "severity": "High",
         "enabled": true,
-        "query": "let alertWindow = 10m;\nUAVSwarmComms_CL\n| where TimeGenerated > ago(alertWindow)\n| where MessageType == \"consensus_vote\"\n| where ByzantineThresholdExceeded == true or ConflictingStateVotes > 0\n| extend TriggerReason = strcat(\"합의포이즈닝_충돌투표_\", tostring(ConflictingStateVotes), \"건_비잔틴임계초과_\", tostring(ByzantineThresholdExceeded))\n| extend Severity = \"High\"\n| project TimeGenerated, SwarmId, MemberId, UAVId, MessageType, ConflictingStateVotes, ByzantineThresholdExceeded, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "query": "let alertWindow = 10m;\nlet byzantineFraction = 0.33;\nUAVFleetState_CL\n| where TimeGenerated > ago(alertWindow)\n| where ActiveUAVCount > 0\n| extend DivergingRatio = todouble(DivergingCount) / todouble(ActiveUAVCount)\n| where DivergingRatio > byzantineFraction\n| extend TriggerReason = strcat(\"합의포이즈닝의심_이탈비율_\", tostring(round(DivergingRatio*100,1)), \"%_FleetId_\", FleetId)\n| extend Severity = \"High\"\n| project TimeGenerated, FleetId, WindowStart, ActiveUAVCount, DivergingCount, DivergingRatio, TriggerReason, Severity\n| order by TimeGenerated desc",
         "queryFrequency": "PT5M",
         "queryPeriod": "PT15M",
         "triggerOperator": "GreaterThan",
@@ -48,15 +48,15 @@
           "aggregationKind": "SingleAlert"
         },
         "alertDetailsOverride": {
-          "alertDisplayNameFormat": "UAV S102 - Swarm Consensus Poisoning (Byzantine) - {{UAVId}}",
+          "alertDisplayNameFormat": "UAV S102 - Swarm Consensus Poisoning (Byzantine) - {{FleetId}}",
           "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Severity={{Severity}}",
           "alertDynamicProperties": []
         },
         "customDetails": {
           "TriggerReason": "TriggerReason",
-          "ConflictingStateVotes": "ConflictingStateVotes",
-          "ByzantineThresholdExceeded": "ByzantineThresholdExceeded",
-          "SwarmId": "SwarmId"
+          "DivergingCount": "DivergingCount",
+          "DivergingRatio": "DivergingRatio",
+          "FleetId": "FleetId"
         },
         "entityMappings": [
           {
@@ -64,7 +64,7 @@
             "fieldMappings": [
               {
                 "identifier": "HostName",
-                "columnName": "UAVId"
+                "columnName": "FleetId"
               }
             ]
           }

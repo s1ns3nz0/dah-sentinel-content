@@ -15,10 +15,10 @@
       "apiVersion": "2023-12-01-preview",
       "properties": {
         "displayName": "UAV S119 - Flight Mode Forced Change (Unauthorized GUIDED Injection)",
-        "description": "UAVOpmode_CL에서 OpmodeField='flight_mode'인 레코드 중 ObservedValue='GUIDED'로 강제 전환되었고 Authorized=0(SByte)인 비인가 비행모드 주입 탐지(외부에서 GUIDED 모드 주입 후 임의 경로점 명령 삽입 공격 패턴). 실제 컬럼: OpmodeField/ExpectedValue/ObservedValue/ChangedBy/Authorized(SByte). MITRE: T0855 Unauthorized Command Message (비인가 명령으로 비행모드를 GUIDED로 강제 전환해 외부 경로점 주입을 가능케 함)",
+        "description": "UAVMissionEvent_CL에서 CustomModeAfter=GUIDED(15)로 전환된 5분 구간에 UAVOperator_CL(운용자 발신 MAVLink 명령 감사로그)에 동일 UAVId의 대응 레코드가 전혀 없는 경우(운용자 명령 없이 GUIDED 진입)를 leftanti 조인으로 탐지. UAVOpmode_CL은 존재하지 않아 실제 미션 이벤트/운용자 명령 테이블 조인으로 재구성. MITRE: T0855 Unauthorized Command Message (비인가 명령으로 비행모드를 GUIDED로 강제 전환해 외부 경로점 주입을 가능케 함)",
         "severity": "High",
         "enabled": true,
-        "query": "let alertWindow = 10m;\nUAVOpmode_CL\n| where TimeGenerated > ago(alertWindow)\n| where OpmodeField == 'flight_mode'\n| where ObservedValue == 'GUIDED' and Authorized == 0\n| extend TriggerReason = strcat(\"GUIDED모드_비인가주입_\", UAVId, \"_\", ExpectedValue, \"->\", ObservedValue)\n| project TimeGenerated, UAVId, OpmodeField, ExpectedValue, ObservedValue, ChangedBy, Authorized, Seq, TriggerReason\n| order by TimeGenerated desc",
+        "query": "let alertWindow = 15m;\nlet GuidedMode = 15; // ArduPilot custom_mode convention: GUIDED=15 (미확정 시 재검증 필요)\nUAVMissionEvent_CL\n| where TimeGenerated > ago(alertWindow)\n| where CustomModeAfter == GuidedMode\n| extend TimeBucket = bin(TimeGenerated, 5m)\n| join kind=leftanti (\n    UAVOperator_CL\n    | where TimeGenerated > ago(alertWindow)\n    | extend TimeBucket = bin(TimeGenerated, 5m)\n) on UAVId, TimeBucket\n| extend TriggerReason = strcat(\"GUIDED모드_비인가주입_운용자명령없음_\", UAVId)\n| project TimeGenerated, UAVId, CustomModeBefore, CustomModeAfter, EventName, TriggerReason\n| order by TimeGenerated desc",
         "queryFrequency": "PT5M",
         "queryPeriod": "PT15M",
         "triggerOperator": "GreaterThan",
@@ -58,8 +58,7 @@
           "alertDynamicProperties": []
         },
         "customDetails": {
-          "TriggerReason": "TriggerReason",
-          "Authorized": "Authorized"
+          "TriggerReason": "TriggerReason"
         },
         "entityMappings": [
           {
@@ -68,15 +67,6 @@
               {
                 "identifier": "HostName",
                 "columnName": "UAVId"
-              }
-            ]
-          },
-          {
-            "entityType": "Account",
-            "fieldMappings": [
-              {
-                "identifier": "Name",
-                "columnName": "ChangedBy"
               }
             ]
           }

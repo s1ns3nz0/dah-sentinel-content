@@ -18,7 +18,7 @@
         "description": "UAVSwarmComms_CL의 command_replay 메시지에서 동일 CommandId가 원본 발생 60초 이내 3회 초과 재생(ReplayCount)되는 스웜 명령 리플레이/증폭(1:N) 탐지. MITRE: T0857 System Firmware (ICS 근사매핑 — description 참조, 실제 공격패턴은 명령 메시지 재생/증폭)",
         "severity": "Medium",
         "enabled": true,
-        "query": "let alertWindow = 10m;\nlet maxReplayCount = 3;\nlet maxReplayWindowSeconds = 60;\nUAVSwarmComms_CL\n| where TimeGenerated > ago(alertWindow)\n| where MessageType == \"command_replay\"\n| where ReplayCount > maxReplayCount and TimeSinceOriginal <= maxReplayWindowSeconds\n| extend TriggerReason = strcat(\"스웜명령리플레이증폭_CommandId:\", CommandId, \"_재생횟수:\", tostring(ReplayCount), \"_원본후경과:\", tostring(TimeSinceOriginal), \"초\")\n| extend Severity = \"Medium\"\n| project TimeGenerated, SwarmId, MemberId, UAVId, MessageType, CommandId, ReplayCount, TimeSinceOriginal, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "query": "let alertWindow = 10m;\nlet replayCountThreshold = 3;\nUAVFleetState_CL\n| where TimeGenerated > ago(alertWindow)\n| where isnotempty(CommonCommand)\n| summarize ReplayCount = count(), FleetIds = make_set(FleetId) by CommonCommand, TimeBin = bin(TimeGenerated, 1m)\n| where ReplayCount > replayCountThreshold\n| extend TriggerReason = strcat(\"스웜명령리플레이증폭의심_명령_\", CommonCommand, \"_반복횟수_\", tostring(ReplayCount))\n| extend Severity = \"Medium\"\n| project TimeGenerated = TimeBin, CommonCommand, ReplayCount, FleetIds, TriggerReason, Severity\n| order by TimeGenerated desc",
         "queryFrequency": "PT5M",
         "queryPeriod": "PT15M",
         "triggerOperator": "GreaterThan",
@@ -48,27 +48,17 @@
           "aggregationKind": "SingleAlert"
         },
         "alertDetailsOverride": {
-          "alertDisplayNameFormat": "UAV S107 - Swarm Command Replay/Amplification - {{UAVId}}",
+          "alertDisplayNameFormat": "UAV S107 - Swarm Command Replay/Amplification - {{CommonCommand}}",
           "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Severity={{Severity}}",
           "alertDynamicProperties": []
         },
         "customDetails": {
           "TriggerReason": "TriggerReason",
-          "CommandId": "CommandId",
+          "CommonCommand": "CommonCommand",
           "ReplayCount": "ReplayCount",
-          "TimeSinceOriginal": "TimeSinceOriginal"
+          "FleetIds": "FleetIds"
         },
-        "entityMappings": [
-          {
-            "entityType": "Host",
-            "fieldMappings": [
-              {
-                "identifier": "HostName",
-                "columnName": "UAVId"
-              }
-            ]
-          }
-        ],
+        "entityMappings": [],
         "sentinelEntitiesMappings": null,
         "templateVersion": null
       }

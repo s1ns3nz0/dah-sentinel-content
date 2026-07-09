@@ -15,10 +15,10 @@
       "apiVersion": "2023-12-01-preview",
       "properties": {
         "displayName": "UAV S51 - Container Service Forced Kill (Slowloris-induced)",
-        "description": "UAVContainerOps_CL에서 핵심 컨테이너(telemetry-tap/mavlink-router/pgse-stub/auth-stub) 연결 폭증(slowloris형 저속 연결 고갈) 직후 강제 stop/kill 탐지. 탐지맹점 생성 및 C2 두절 위험. MITRE: T0881,T1529",
+        "description": "UAVResourceMetrics_CL에서 핵심 컨테이너(telemetry-tap/mavlink-router/pgse-stub/auth-stub) CPU 고갈(slowloris형 리소스 고갈) 직후 UAVServiceAudit_CL에서 파괴적 강제 stop/kill이 발생하는 패턴 탐지. 탐지맹점 생성 및 C2 두절 위험. MITRE: T0881,T1529",
         "severity": "High",
         "enabled": true,
-        "query": "let alertWindow = 15m;\nlet criticalContainers = dynamic([\"telemetry-tap\",\"mavlink-router\",\"pgse-stub\",\"auth-stub\"]);\nlet connFloodGate = 150;\nlet KillEvents =\n    UAVContainerOps_CL\n    | where TimeGenerated > ago(alertWindow)\n    | where ContainerName in (criticalContainers)\n    | where Action in (\"stop\", \"kill\")\n    | project KillTime = TimeGenerated, UAVId, ContainerName, Namespace, ActorId, Action, TimeBin = bin(TimeGenerated, 5m);\nlet ConnBurst =\n    UAVContainerOps_CL\n    | where TimeGenerated > ago(alertWindow)\n    | where ContainerName in (criticalContainers)\n    | where ConnCount > connFloodGate\n    | summarize MaxConnCount = max(ConnCount) by ContainerName, TimeBin = bin(TimeGenerated, 5m);\nKillEvents\n| join kind=inner (ConnBurst) on ContainerName, TimeBin\n| extend TriggerReason = strcat(ContainerName, \"_slowloris_연결폭증후_강제중단_\", Action)\n| extend Severity = \"High\"\n| project KillTime, UAVId, ContainerName, Namespace, ActorId, Action, MaxConnCount, TriggerReason, Severity\n| order by KillTime desc",
+        "query": "let alertWindow = 20m;\nlet criticalContainers = dynamic([\"telemetry-tap\",\"mavlink-router\",\"pgse-stub\",\"auth-stub\"]);\nlet cpuGate = 90.0;\nlet CpuSpike =\n    UAVResourceMetrics_CL\n    | where TimeGenerated > ago(alertWindow)\n    | where ContainerName in (criticalContainers)\n    | where CpuUsagePct > cpuGate\n    | summarize MaxCpu = max(CpuUsagePct) by ContainerName, TimeBin = bin(TimeGenerated, 5m);\nUAVServiceAudit_CL\n| where TimeGenerated > ago(alertWindow)\n| where ContainerName in (criticalContainers)\n| where Action in (\"stop\", \"kill\")\n| where IsDestructiveAction == true\n| extend TimeBin = bin(TimeGenerated, 5m)\n| join kind=inner (CpuSpike) on ContainerName, TimeBin\n| extend TriggerReason = strcat(ContainerName, \"_slowloris_CPU고갈후_강제중단_\", Action)\n| extend Severity = \"High\"\n| project TimeGenerated, ContainerName, ActorId, ImageName, Action, ExitCode, Signal, MaxCpu, IsDestructiveAction, TriggerReason, Severity\n| order by TimeGenerated desc",
         "queryFrequency": "PT5M",
         "queryPeriod": "PT20M",
         "triggerOperator": "GreaterThan",
@@ -53,14 +53,14 @@
         },
         "alertDetailsOverride": {
           "alertDisplayNameFormat": "UAV S51 - Container Service Forced Kill (Slowloris-induced) - {{ContainerName}}",
-          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Action={{Action}} | MaxConnCount={{MaxConnCount}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Action={{Action}} | MaxCpu={{MaxCpu}}",
           "alertDynamicProperties": []
         },
         "customDetails": {
           "TriggerReason": "TriggerReason",
           "ContainerName": "ContainerName",
           "Action": "Action",
-          "MaxConnCount": "MaxConnCount"
+          "MaxCpu": "MaxCpu"
         },
         "entityMappings": [
           {
@@ -68,7 +68,7 @@
             "fieldMappings": [
               {
                 "identifier": "HostName",
-                "columnName": "UAVId"
+                "columnName": "ContainerName"
               }
             ]
           },

@@ -18,7 +18,7 @@
         "description": "함대관리 API 호출 시 호출자 소속 함대(CallerFleetId)와 요청 대상 함대(RequestedFleetId)가 불일치하는 IDOR(비인가 객체 직접 참조) 시도를 탐지. MITRE: T1190",
         "severity": "High",
         "enabled": true,
-        "query": "let alertWindow = 10m;\nUAVFleetApi_CL\n| where TimeGenerated > ago(alertWindow)\n| where isnotempty(RequestedFleetId) and isnotempty(CallerFleetId)\n| where RequestedFleetId != CallerFleetId\n| extend TriggerReason = strcat(\"함대API_IDOR_\", Endpoint, \"_caller:\", CallerFleetId, \"_requested:\", RequestedFleetId)\n| extend Severity = \"High\"\n| project TimeGenerated, Endpoint, Method, CallerFleetId, RequestedFleetId, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "query": "let alertWindow = 10m;\nUAVFleetInfra_CL\n| where TimeGenerated > ago(alertWindow)\n| where IdorSuspected == true\n| where isnotempty(RequesterId) and isnotempty(TargetId)\n| where RequesterId != TargetId\n| extend TriggerReason = strcat(\"함대API_IDOR_\", FleetId, \"_requester:\", RequesterId, \"_target:\", TargetId)\n| extend Severity = \"High\"\n| project TimeGenerated, FleetId, RequesterId, TargetId, IdorSuspected, StatusCode, TriggerReason, Severity\n| order by TimeGenerated desc",
         "queryFrequency": "PT5M",
         "queryPeriod": "PT15M",
         "triggerOperator": "GreaterThan",
@@ -50,14 +50,14 @@
           "aggregationKind": "SingleAlert"
         },
         "alertDetailsOverride": {
-          "alertDisplayNameFormat": "UAV S81 - Fleet API IDOR - {{Endpoint}}",
-          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Method={{Method}}",
+          "alertDisplayNameFormat": "UAV S81 - Fleet API IDOR - {{FleetId}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | RequesterId={{RequesterId}} | TargetId={{TargetId}}",
           "alertDynamicProperties": []
         },
         "customDetails": {
           "TriggerReason": "TriggerReason",
-          "CallerFleetId": "CallerFleetId",
-          "RequestedFleetId": "RequestedFleetId"
+          "RequesterId": "RequesterId",
+          "TargetId": "TargetId"
         },
         "entityMappings": [
           {
@@ -65,7 +65,7 @@
             "fieldMappings": [
               {
                 "identifier": "HostName",
-                "columnName": "Endpoint"
+                "columnName": "FleetId"
               }
             ]
           }

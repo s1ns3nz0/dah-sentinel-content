@@ -15,10 +15,10 @@
       "apiVersion": "2023-12-01-preview",
       "properties": {
         "displayName": "UAV S61 - Data Destruction (Logs / Mission / SAR Frames)",
-        "description": "UAVHostAudit_CL에서 로그/미션/SAR 프레임 디렉터리 대상 rm -rf류 대량 파일삭제 명령 패턴(5건 이상) 탐지. 증거인멸 또는 임무데이터 파괴 의심. MITRE: T0809,T1485",
+        "description": "UAVFileAudit_CL에서 짧은 시간창 내 동일 컨테이너/사용자가 대량 파일삭제(Operation=='delete')를 반복하거나 대용량 BytesAccessed 삭제가 발생하는 패턴 탐지. 증거인멸 또는 임무데이터 파괴 의심. MITRE: T0809,T1485",
         "severity": "High",
         "enabled": true,
-        "query": "let alertWindow = 15m;\nlet sensitiveDirs = dynamic([\"/var/log/uav\", \"/data/mission\", \"/data/sar_frames\"]);\nUAVHostAudit_CL\n| where TimeGenerated > ago(alertWindow)\n| where EventType == \"bulk_delete\"\n| where ExecArgs matches regex @\"rm\\s+-[a-zA-Z]*r[a-zA-Z]*f|rm\\s+-[a-zA-Z]*f[a-zA-Z]*r\"\n| where FilePath has_any (sensitiveDirs)\n| where AffectedCount >= 5\n| extend TriggerReason = strcat(\"데이터파괴_로그미션SAR프레임_대량삭제_\", FilePath, \"_\", tostring(AffectedCount), \"개\")\n| extend Severity = \"High\"\n| project TimeGenerated, UAVId, ActorId, Binary, ExecArgs, FilePath, AffectedCount, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "query": "let alertWindow = 15m;\nlet bulkCountGate = 5;\nlet bulkBytesGate = 50000000;\nUAVFileAudit_CL\n| where TimeGenerated > ago(alertWindow)\n| where Operation == \"delete\"\n| summarize DeleteCount = count(), TotalBytes = sum(BytesAccessed), LastEvent = max(TimeGenerated), SampleFiles = make_set(FilePath, 10) by ContainerName, User\n| where DeleteCount >= bulkCountGate or TotalBytes >= bulkBytesGate\n| extend TriggerReason = strcat(\"데이터파괴_대량삭제_\", ContainerName, \"_\", tostring(DeleteCount), \"건\")\n| extend Severity = \"High\"\n| project TimeGenerated = LastEvent, ContainerName, User, DeleteCount, TotalBytes, SampleFiles, TriggerReason, Severity\n| order by TimeGenerated desc",
         "queryFrequency": "PT5M",
         "queryPeriod": "PT15M",
         "triggerOperator": "GreaterThan",
@@ -52,15 +52,15 @@
           "aggregationKind": "SingleAlert"
         },
         "alertDetailsOverride": {
-          "alertDisplayNameFormat": "UAV S61 - Data Destruction (Logs / Mission / SAR Frames) - {{UAVId}}",
-          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | FilePath={{FilePath}} | AffectedCount={{AffectedCount}}",
+          "alertDisplayNameFormat": "UAV S61 - Data Destruction (Logs / Mission / SAR Frames) - {{ContainerName}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | DeleteCount={{DeleteCount}} | TotalBytes={{TotalBytes}}",
           "alertDynamicProperties": []
         },
         "customDetails": {
           "TriggerReason": "TriggerReason",
-          "FilePath": "FilePath",
-          "AffectedCount": "AffectedCount",
-          "ExecArgs": "ExecArgs"
+          "DeleteCount": "DeleteCount",
+          "TotalBytes": "TotalBytes",
+          "SampleFiles": "SampleFiles"
         },
         "entityMappings": [
           {
@@ -68,7 +68,7 @@
             "fieldMappings": [
               {
                 "identifier": "HostName",
-                "columnName": "UAVId"
+                "columnName": "ContainerName"
               }
             ]
           },
@@ -77,7 +77,7 @@
             "fieldMappings": [
               {
                 "identifier": "Name",
-                "columnName": "ActorId"
+                "columnName": "User"
               }
             ]
           }

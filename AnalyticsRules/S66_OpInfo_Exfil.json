@@ -15,10 +15,10 @@
       "apiVersion": "2023-12-01-preview",
       "properties": {
         "displayName": "UAV S66 - Operational Information Theft (EO/IR, SAR, Target Coordinates)",
-        "description": "UAVExfilFlow_CL에서 EO/IR·SAR·표적좌표 등 기밀 작전정보 자산이 짧은 시간창 내 3회 이상 copy 후 stage로 이어지는 대량 복사-스테이징 패턴 탐지. MITRE: T0882",
+        "description": "UAVSarPayload_CL에서 짧은 시간창(5분) 내 동일 UAV가 SAR 프레임(기밀 작전정보 자산: 표적좌표 포함)을 3건 이상, 대용량으로 연속 생성하는 대량 복사-스테이징형 정보탈취 패턴 탐지. MITRE: T0882",
         "severity": "High",
         "enabled": true,
-        "query": "let alertWindow = 15m;\nlet seqWindow = 5m;\nlet classifiedTypes = dynamic([\"EO_IR\", \"SAR\", \"TargetCoord\"]);\nlet minCopies = 3;\nlet CopyEvents =\n    UAVExfilFlow_CL\n    | where TimeGenerated > ago(alertWindow)\n    | where AssetType in (classifiedTypes) and ActionType == \"copy\"\n    | project CopyTime = TimeGenerated, SourceAsset, AssetType, Operator, BytesTransferred, TimeBin = bin(TimeGenerated, seqWindow);\nlet StageEvents =\n    UAVExfilFlow_CL\n    | where TimeGenerated > ago(alertWindow)\n    | where AssetType in (classifiedTypes) and ActionType == \"stage\"\n    | project StageTime = TimeGenerated, SourceAsset, AssetType, DestinationHost, Channel, TimeBin = bin(TimeGenerated, seqWindow);\nCopyEvents\n| join kind=inner (StageEvents) on SourceAsset, AssetType, TimeBin\n| where StageTime >= CopyTime\n| summarize CopyCount = count(), FirstCopy = min(CopyTime), LastStage = max(StageTime), TotalBytes = sum(BytesTransferred)\n    by SourceAsset, AssetType, Operator, DestinationHost, Channel\n| where CopyCount >= minCopies\n| extend TriggerReason = strcat(\"작전정보탈취_대량복사후스테이징_\", AssetType, \"_\", SourceAsset)\n| extend Severity = \"High\"\n| project FirstCopy, LastStage, SourceAsset, AssetType, Operator, DestinationHost, Channel, CopyCount, TotalBytes, TriggerReason, Severity\n| order by LastStage desc",
+        "query": "let alertWindow = 15m;\nlet seqWindow = 5m;\nlet minFrames = 3;\nlet sizeGate = 5000000;\nUAVSarPayload_CL\n| where TimeGenerated > ago(alertWindow)\n| summarize FrameCount = count(), TotalBytes = sum(SizeBytes), FirstFrame = min(TimeGenerated), LastFrame = max(TimeGenerated)\n    by UAVId, TimeBin = bin(TimeGenerated, seqWindow)\n| where FrameCount >= minFrames and TotalBytes > sizeGate\n| extend TriggerReason = strcat(\"작전정보탈취_SAR프레임대량생성스테이징의심_\", UAVId, \"_\", tostring(FrameCount), \"프레임\")\n| extend Severity = \"High\"\n| project TimeGenerated = LastFrame, UAVId, FirstFrame, FrameCount, TotalBytes, TriggerReason, Severity\n| order by TimeGenerated desc",
         "queryFrequency": "PT5M",
         "queryPeriod": "PT15M",
         "triggerOperator": "GreaterThan",
@@ -50,15 +50,14 @@
           "aggregationKind": "SingleAlert"
         },
         "alertDetailsOverride": {
-          "alertDisplayNameFormat": "UAV S66 - Operational Information Theft (EO/IR, SAR, Target Coordinates) - {{SourceAsset}}",
-          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | AssetType={{AssetType}} | CopyCount={{CopyCount}}",
+          "alertDisplayNameFormat": "UAV S66 - Operational Information Theft (EO/IR, SAR, Target Coordinates) - {{UAVId}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | FrameCount={{FrameCount}} | TotalBytes={{TotalBytes}}",
           "alertDynamicProperties": []
         },
         "customDetails": {
           "TriggerReason": "TriggerReason",
-          "AssetType": "AssetType",
-          "CopyCount": "CopyCount",
-          "DestinationHost": "DestinationHost"
+          "FrameCount": "FrameCount",
+          "TotalBytes": "TotalBytes"
         },
         "entityMappings": [
           {
@@ -66,16 +65,7 @@
             "fieldMappings": [
               {
                 "identifier": "HostName",
-                "columnName": "SourceAsset"
-              }
-            ]
-          },
-          {
-            "entityType": "Account",
-            "fieldMappings": [
-              {
-                "identifier": "Name",
-                "columnName": "Operator"
+                "columnName": "UAVId"
               }
             ]
           }

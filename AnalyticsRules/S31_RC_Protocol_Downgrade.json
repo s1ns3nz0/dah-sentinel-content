@@ -18,7 +18,7 @@
         "description": "UAVRcLink_CL의 ProtocolVersion이 승인된 보안 버전 목록(secureVersions)에 없거나 EncryptionEnabled == false이면 RC 프로토콜 다운그레이드(무암호 폴백)로 탐지. MITRE: T1600",
         "severity": "Medium",
         "enabled": true,
-        "query": "let alertWindow = 10m;\nlet secureVersions = dynamic(['ELRS-3.0', 'ELRS-3.1', 'FrSky-ACCESS', 'DSMX-2.4']);\nUAVRcLink_CL\n| where TimeGenerated > ago(alertWindow)\n| where ProtocolVersion !in (secureVersions) or EncryptionEnabled == false\n| extend TriggerReason = strcat('RC_프로토콜_다운그레이드_무암호폴백_', Protocol, '_', ProtocolVersion)\n| extend Severity = 'Medium'\n| project TimeGenerated, UAVId, Protocol, ProtocolVersion, EncryptionEnabled, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "query": "let alertWindow = 10m;\nUAVRcLink_CL\n| where TimeGenerated > ago(alertWindow)\n| where DowngradeDetected == true or ProtocolRequested != ProtocolNegotiated\n| extend TriggerReason = strcat('RC_프로토콜_다운그레이드_탐지_Requested:', ProtocolRequested, '_Negotiated:', ProtocolNegotiated)\n| extend Severity = 'Medium'\n| project TimeGenerated, UavId, DeviceId, ProtocolRequested, ProtocolNegotiated, DowngradeDetected, TriggerReason, Severity\n| order by TimeGenerated desc",
         "queryFrequency": "PT5M",
         "queryPeriod": "PT15M",
         "triggerOperator": "GreaterThan",
@@ -52,15 +52,15 @@
           "aggregationKind": "SingleAlert"
         },
         "alertDetailsOverride": {
-          "alertDisplayNameFormat": "UAV S31 - RC Protocol Downgrade (Unencrypted Fallback) - {{UAVId}}",
-          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | ProtocolVersion={{ProtocolVersion}} | EncryptionEnabled={{EncryptionEnabled}} | Severity={{Severity}}",
+          "alertDisplayNameFormat": "UAV S31 - RC Protocol Downgrade (Unencrypted Fallback) - {{UavId}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | ProtocolRequested={{ProtocolRequested}} | ProtocolNegotiated={{ProtocolNegotiated}} | Severity={{Severity}}",
           "alertDynamicProperties": []
         },
         "customDetails": {
           "TriggerReason": "TriggerReason",
-          "Protocol": "Protocol",
-          "ProtocolVersion": "ProtocolVersion",
-          "EncryptionEnabled": "EncryptionEnabled"
+          "ProtocolRequested": "ProtocolRequested",
+          "ProtocolNegotiated": "ProtocolNegotiated",
+          "DowngradeDetected": "DowngradeDetected"
         },
         "entityMappings": [
           {
@@ -68,7 +68,7 @@
             "fieldMappings": [
               {
                 "identifier": "HostName",
-                "columnName": "UAVId"
+                "columnName": "UavId"
               }
             ]
           }

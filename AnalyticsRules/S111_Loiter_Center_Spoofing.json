@@ -15,10 +15,10 @@
       "apiVersion": "2023-12-01-preview",
       "properties": {
         "displayName": "UAV S111 - Loiter Center Spoofing (Unauthorized Loiter Point Manipulation)",
-        "description": "UAVOpmode_CL에서 OpmodeField='loiter_center'인 레코드 중 ExpectedValue(승인된 선회 중심 좌표)와 ObservedValue(실제 적용된 좌표)가 불일치하고 Authorized=0(SByte)인 비인가 변경 탐지. 실제 컬럼: OpmodeField/ExpectedValue/ObservedValue/ChangedBy/Authorized(SByte). MITRE: T0836 Modify Parameter (선회 중심 좌표 파라미터의 비인가 변조로 UAV를 의도치 않은 위치에 체류시킴)",
+        "description": "UAVTelemetry_CL(MsgType=GLOBAL_POSITION_INT)에서 CustomMode=LOITER(12)인 구간의 5분 단위 평균 선회중심(Lat/Lon)을 연속 구간 간 비교하여 점진적 위치 이탈(drift)을 탐지. UAVOpmode_CL은 존재하지 않아 실제 텔레메트리 좌표 기반으로 재구성. MITRE ICS ATT&CK: T0836 Modify Parameter (선회 중심 좌표가 점진적으로 조작되어 UAV가 의도치 않은 위치에 체류)",
         "severity": "Medium",
         "enabled": true,
-        "query": "let alertWindow = 10m;\nUAVOpmode_CL\n| where TimeGenerated > ago(alertWindow)\n| where OpmodeField == 'loiter_center'\n| where ExpectedValue != ObservedValue and Authorized == 0\n| extend TriggerReason = strcat(\"선회중심_비인가변조_\", UAVId, \"_\", ExpectedValue, \"->\", ObservedValue)\n| project TimeGenerated, UAVId, OpmodeField, ExpectedValue, ObservedValue, ChangedBy, Authorized, Seq, TriggerReason\n| order by TimeGenerated desc",
+        "query": "let alertWindow = 40m;\nlet LoiterMode = 12; // ArduPilot custom_mode convention: LOITER=12 (미확정 시 재검증 필요)\nlet DriftThresholdDeg = 0.001; // 위경도 약 100m 상당, 추후 조정\nUAVTelemetry_CL\n| where TimeGenerated > ago(alertWindow)\n| where MsgType == 'GLOBAL_POSITION_INT'\n| where CustomMode == LoiterMode\n| where isnotnull(Lat) and isnotnull(Lon)\n| summarize CenterLat = avg(Lat), CenterLon = avg(Lon), SampleCount = count() by UAVId, bin(TimeGenerated, 5m)\n| order by UAVId asc, TimeGenerated asc\n| serialize\n| extend PrevLat = prev(CenterLat, 1), PrevLon = prev(CenterLon, 1), PrevUAVId = prev(UAVId, 1)\n| where UAVId == PrevUAVId\n| extend DriftDeg = sqrt(pow(CenterLat - PrevLat, 2) + pow(CenterLon - PrevLon, 2))\n| where DriftDeg > DriftThresholdDeg\n| extend TriggerReason = strcat(\"루프중심_점진적이탈_\", UAVId, \"_drift:\", tostring(DriftDeg))\n| project TimeGenerated, UAVId, CenterLat, CenterLon, PrevLat, PrevLon, DriftDeg, SampleCount, TriggerReason\n| order by TimeGenerated desc",
         "queryFrequency": "PT5M",
         "queryPeriod": "PT15M",
         "triggerOperator": "GreaterThan",
@@ -58,7 +58,7 @@
         },
         "customDetails": {
           "TriggerReason": "TriggerReason",
-          "Authorized": "Authorized"
+          "DriftDeg": "DriftDeg"
         },
         "entityMappings": [
           {
@@ -67,15 +67,6 @@
               {
                 "identifier": "HostName",
                 "columnName": "UAVId"
-              }
-            ]
-          },
-          {
-            "entityType": "Account",
-            "fieldMappings": [
-              {
-                "identifier": "Name",
-                "columnName": "ChangedBy"
               }
             ]
           }

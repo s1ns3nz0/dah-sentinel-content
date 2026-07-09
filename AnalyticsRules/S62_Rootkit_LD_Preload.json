@@ -15,10 +15,10 @@
       "apiVersion": "2023-12-01-preview",
       "properties": {
         "displayName": "UAV S62 - Rootkit (LD_PRELOAD / Kernel Module Insertion)",
-        "description": "UAVHostAudit_CL에서 /etc/ld.so.preload 변조 또는 미승인 커널모듈(LKM) 삽입을 통한 은폐형 루트킷 설치 탐지. MITRE: T1014,T0851",
+        "description": "UAVFileAudit_CL에서 지속성 확보 대상(LD_PRELOAD 파일/커널모듈 경로 등)이 PersistenceTargetSuspected 플래그로 탐지된 파일 조작 이벤트를 은폐형 루트킷 설치 시도로 탐지. MITRE: T1014,T0851",
         "severity": "High",
         "enabled": true,
-        "query": "let alertWindow = 15m;\nlet knownModules = dynamic([\"nf_conntrack\", \"overlay\", \"br_netfilter\", \"ip_tables\"]);\nUAVHostAudit_CL\n| where TimeGenerated > ago(alertWindow)\n| where EventType in (\"preload_modify\", \"kmod_insert\")\n| where (EventType == \"preload_modify\" and FilePath == \"/etc/ld.so.preload\")\n    or (EventType == \"kmod_insert\" and Binary !in (knownModules))\n| extend TriggerReason = case(\n    EventType == \"preload_modify\", \"rootkit_LD_PRELOAD_변조_은폐시도\",\n    strcat(\"rootkit_비인가_커널모듈삽입_\", Binary))\n| extend Severity = \"High\"\n| project TimeGenerated, UAVId, ActorId, EventType, Binary, ExecArgs, FilePath, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "query": "let alertWindow = 15m;\nUAVFileAudit_CL\n| where TimeGenerated > ago(alertWindow)\n| where PersistenceTargetSuspected == true\n| extend TriggerReason = strcat(\"rootkit_지속성타겟의심_\", ProcessName, \"_\", FilePath)\n| extend Severity = \"High\"\n| project TimeGenerated, ContainerName, Pid, ProcessName, Operation, FilePath, Syscall, User, PersistenceTargetSuspected, TriggerReason, Severity\n| order by TimeGenerated desc",
         "queryFrequency": "PT5M",
         "queryPeriod": "PT15M",
         "triggerOperator": "GreaterThan",
@@ -52,15 +52,15 @@
           "aggregationKind": "SingleAlert"
         },
         "alertDetailsOverride": {
-          "alertDisplayNameFormat": "UAV S62 - Rootkit (LD_PRELOAD / Kernel Module Insertion) - {{UAVId}}",
-          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | EventType={{EventType}} | Binary={{Binary}}",
+          "alertDisplayNameFormat": "UAV S62 - Rootkit (LD_PRELOAD / Kernel Module Insertion) - {{ContainerName}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | ProcessName={{ProcessName}} | FilePath={{FilePath}}",
           "alertDynamicProperties": []
         },
         "customDetails": {
           "TriggerReason": "TriggerReason",
-          "EventType": "EventType",
-          "Binary": "Binary",
-          "FilePath": "FilePath"
+          "ProcessName": "ProcessName",
+          "FilePath": "FilePath",
+          "Syscall": "Syscall"
         },
         "entityMappings": [
           {
@@ -68,7 +68,7 @@
             "fieldMappings": [
               {
                 "identifier": "HostName",
-                "columnName": "UAVId"
+                "columnName": "ContainerName"
               }
             ]
           },
@@ -77,7 +77,7 @@
             "fieldMappings": [
               {
                 "identifier": "Name",
-                "columnName": "ActorId"
+                "columnName": "User"
               }
             ]
           }

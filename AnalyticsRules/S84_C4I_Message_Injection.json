@@ -18,7 +18,7 @@
         "description": "C4I 메시지 발신 출처(MessageOrigin)가 존재하나 서명 검증이 실패(SignatureValid=false)한 주문 유형(OrderType)의 위조 명령 주입을 탐지. MITRE: T1565",
         "severity": "High",
         "enabled": true,
-        "query": "let alertWindow = 10m;\nUAVC4I_CL\n| where TimeGenerated > ago(alertWindow)\n| where isnotempty(MessageOrigin)\n| where SignatureValid == false\n| extend TriggerReason = strcat(\"C4I_메시지주입_서명무효_\", OrderType, \"_origin:\", MessageOrigin)\n| extend Severity = \"High\"\n| project TimeGenerated, OrderId, MessageOrigin, SignatureValid, OrderType, IssuedBy, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "query": "let alertWindow = 10m;\nlet ApprovedOps = _GetWatchlist('Approved_Operators_List') | project OperatorId;\nlet responseBytesGate = 100000;\nUAVC4I_CL\n| where TimeGenerated > ago(alertWindow)\n| where isnotempty(IssuedBy)\n| extend isUnapprovedIssuer = IssuedBy !in (ApprovedOps)\n| extend isAnomalousResponse = ResponseBytes > responseBytesGate\n| where isUnapprovedIssuer or isAnomalousResponse\n| extend TriggerReason = case(\n    isUnapprovedIssuer and isAnomalousResponse, strcat(\"C4I_메시지주입_비인가발신자_이상응답_\", IssuedBy),\n    isUnapprovedIssuer, strcat(\"C4I_메시지주입_비인가발신자_\", IssuedBy),\n    strcat(\"C4I_메시지주입_이상응답크기_\", ClientIp, \"_bytes:\", ResponseBytes))\n| extend Severity = \"High\"\n| project TimeGenerated, OrderId, IssuedBy, ClientIp, ResponseBytes, TriggerReason, Severity\n| order by TimeGenerated desc",
         "queryFrequency": "PT5M",
         "queryPeriod": "PT15M",
         "triggerOperator": "GreaterThan",
@@ -50,14 +50,14 @@
           "aggregationKind": "SingleAlert"
         },
         "alertDetailsOverride": {
-          "alertDisplayNameFormat": "UAV S84 - C4I Message Injection - {{OrderType}}",
-          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | MessageOrigin={{MessageOrigin}}",
+          "alertDisplayNameFormat": "UAV S84 - C4I Message Injection - {{OrderId}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | IssuedBy={{IssuedBy}} | ResponseBytes={{ResponseBytes}}",
           "alertDynamicProperties": []
         },
         "customDetails": {
           "TriggerReason": "TriggerReason",
-          "OrderType": "OrderType",
-          "MessageOrigin": "MessageOrigin"
+          "OrderId": "OrderId",
+          "IssuedBy": "IssuedBy"
         },
         "entityMappings": [
           {

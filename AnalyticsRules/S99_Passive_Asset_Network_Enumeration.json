@@ -14,11 +14,11 @@
       "kind": "Scheduled",
       "apiVersion": "2023-12-01-preview",
       "properties": {
-        "displayName": "UAV S99 - Passive Asset and Network Structure Enumeration",
-        "description": "수동 자산·네트워크 구조 열거 탐지. UAVPassiveCollect_CL의 EnumerationType(network|cve_db) 레코드를 SourceIp/30분 단위로 집계해, 동일 소스가 5회 이상 반복적으로 네트워크 구조를 스캔하거나 CVE DB를 조회한 경우를 탐지. 능동 스캔 없이 공개정보·구성정보만으로 공격표면을 매핑하는 수동 정찰. MITRE: T1590, T1596",
+        "displayName": "UAV S99 - Passive Asset and Network Structure Enumeration (Proxy - Design Blind Spot)",
+        "description": "[설계상 사각지대 — 능동 신호 없음] 수동 자산·네트워크 구조 열거 탐지. 수동 정찰(공개정보·구성정보만으로 공격표면 매핑, CVE DB 조회 등)은 정의상 대상 시스템에 요청을 보내지 않으므로 방어자 시야에 로그를 남기지 않는다. 실배포 워크스페이스에 이를 직접 관측하는 텔레메트리가 존재하지 않으며, 이는 계측 누락이 아니라 의도된(intentional) 탐지 불가 영역일 가능성이 높다. 본 룰은 UAVDatalinkConn_CL의 연결 메타데이터만으로 단일 LocalIp가 짧은 시간창 내 비정상적으로 다양한 PeerIp/PeerPort와 연결된 패턴(네트워크 구조 매핑과 인접한 연결 다양성)을 근사 신호로 관측하며, 실제 수동 열거 발생 여부를 판정하지 않는다. 이 룰은 항상 결과가 []일 수 있으며, 이는 정상이다. MITRE: T1590, T1596",
         "severity": "Low",
         "enabled": true,
-        "query": "let alertWindow = 30m;\nlet enumCountGate = 5;\nUAVPassiveCollect_CL\n| where TimeGenerated > ago(alertWindow)\n| where isnotempty(EnumerationType)\n| summarize EnumCount = count(), Types = make_set(EnumerationType) by SourceIp, bin(TimeGenerated, 30m)\n| where EnumCount >= enumCountGate\n| extend TriggerReason = strcat('수동정찰_자산네트워크열거_', SourceIp, '_', tostring(EnumCount), '건')\n| extend Severity = 'Low'\n| project TimeGenerated, EnumCount, Types, TriggerReason, Severity, SourceIp\n| order by TimeGenerated desc",
+        "query": "let alertWindow = 30m;\nlet peerDiversityGate = 20;\nUAVDatalinkConn_CL\n| where TimeGenerated > ago(alertWindow)\n| summarize DistinctPeers = dcount(PeerIp), DistinctPorts = dcount(PeerPort) by LocalIp, bin(TimeGenerated, alertWindow)\n| where DistinctPeers >= peerDiversityGate or DistinctPorts >= peerDiversityGate\n| extend TriggerReason = strcat('수동정찰_근사_연결다양성_', LocalIp, '_피어', tostring(DistinctPeers), '_포트', tostring(DistinctPorts))\n| extend Severity = 'Low'\n| project TimeGenerated, LocalIp, DistinctPeers, DistinctPorts, TriggerReason, Severity\n| order by TimeGenerated desc",
         "queryFrequency": "PT15M",
         "queryPeriod": "PT1H",
         "triggerOperator": "GreaterThan",
@@ -51,14 +51,14 @@
           "aggregationKind": "SingleAlert"
         },
         "alertDetailsOverride": {
-          "alertDisplayNameFormat": "UAV S99 - Passive Asset/Network Enumeration - {{SourceIp}}",
-          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Types={{Types}} | Severity={{Severity}}",
+          "alertDisplayNameFormat": "UAV S99 - Passive Asset/Network Enumeration (Proxy) - {{LocalIp}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | DistinctPeers={{DistinctPeers}} | Severity={{Severity}}",
           "alertDynamicProperties": []
         },
         "customDetails": {
           "TriggerReason": "TriggerReason",
-          "EnumCount": "EnumCount",
-          "Types": "Types"
+          "DistinctPeers": "DistinctPeers",
+          "DistinctPorts": "DistinctPorts"
         },
         "entityMappings": [
           {
@@ -66,7 +66,7 @@
             "fieldMappings": [
               {
                 "identifier": "Address",
-                "columnName": "SourceIp"
+                "columnName": "LocalIp"
               }
             ]
           }

@@ -15,10 +15,10 @@
       "apiVersion": "2023-12-01-preview",
       "properties": {
         "displayName": "UAV S65 - Exfiltration via SATCOM / Web Service (REST)",
-        "description": "UAVExfilFlow_CL에서 SATCOM 대체매체 또는 REST 웹서비스 채널을 통해 C2_Whitelisted_GCS_List에 없는 비인가 목적지로 500MB 초과 대량 전송되는 유출 탐지. MITRE: T1011,T1567",
+        "description": "UAVSatcomLink_CL에서 SATCOM 대체매체 채널의 PayloadBytes 누적 전송량이 임계치(500MB)를 초과하는 대량 유출 탐지. 실시간 텔레메트리 대비 비정상적으로 큰 페이로드 전송을 위성링크 경유 데이터 유출 시도로 간주(웹 채널 전용 계측 테이블은 없어 SATCOM 신호에 집중). MITRE: T1011,T1567",
         "severity": "Medium",
         "enabled": true,
-        "query": "let alertWindow = 15m;\nlet bytesGate = 500000000;\nlet WhitelistedGcs = _GetWatchlist('C2_Whitelisted_GCS_List') | project GCS_IP;\nUAVExfilFlow_CL\n| where TimeGenerated > ago(alertWindow)\n| where Channel in (\"satcom\", \"web\")\n| where DestinationHost !in (WhitelistedGcs)\n| summarize TotalBytes = sum(BytesTransferred), TransferCount = count(), LastEvent = max(TimeGenerated) by SourceAsset, Channel, DestinationHost, Operator\n| where TotalBytes > bytesGate\n| extend TriggerReason = strcat(\"유출_비인가목적지_\", Channel, \"_\", DestinationHost, \"_\", tostring(TotalBytes / 1000000), \"MB\")\n| extend Severity = \"Medium\"\n| project LastEvent, SourceAsset, Channel, DestinationHost, Operator, TotalBytes, TransferCount, TriggerReason, Severity\n| order by LastEvent desc",
+        "query": "let alertWindow = 15m;\nlet bytesGate = 500000000;\nUAVSatcomLink_CL\n| where TimeGenerated > ago(alertWindow)\n| summarize TotalBytes = sum(PayloadBytes), TransferCount = count(), LastEvent = max(TimeGenerated), AvgEntropy = avg(PayloadEntropy) by UAVId, LinkId, SrcAddr, DstAddr\n| where TotalBytes > bytesGate\n| extend TriggerReason = strcat(\"SATCOM_대용량유출_\", UAVId, \"_\", tostring(TotalBytes / 1000000), \"MB\")\n| extend Severity = \"Medium\"\n| project TimeGenerated = LastEvent, UAVId, LinkId, SrcAddr, DstAddr, TotalBytes, TransferCount, AvgEntropy, TriggerReason, Severity\n| order by TimeGenerated desc",
         "queryFrequency": "PT10M",
         "queryPeriod": "PT15M",
         "triggerOperator": "GreaterThan",
@@ -53,14 +53,14 @@
           "aggregationKind": "SingleAlert"
         },
         "alertDetailsOverride": {
-          "alertDisplayNameFormat": "UAV S65 - Exfiltration via SATCOM / Web Service (REST) - {{SourceAsset}}",
-          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | DestinationHost={{DestinationHost}} | TotalBytes={{TotalBytes}}",
+          "alertDisplayNameFormat": "UAV S65 - Exfiltration via SATCOM / Web Service (REST) - {{UAVId}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | DstAddr={{DstAddr}} | TotalBytes={{TotalBytes}}",
           "alertDynamicProperties": []
         },
         "customDetails": {
           "TriggerReason": "TriggerReason",
-          "Channel": "Channel",
-          "DestinationHost": "DestinationHost",
+          "LinkId": "LinkId",
+          "DstAddr": "DstAddr",
           "TotalBytes": "TotalBytes"
         },
         "entityMappings": [
@@ -69,7 +69,7 @@
             "fieldMappings": [
               {
                 "identifier": "HostName",
-                "columnName": "SourceAsset"
+                "columnName": "UAVId"
               }
             ]
           },
@@ -78,7 +78,7 @@
             "fieldMappings": [
               {
                 "identifier": "Address",
-                "columnName": "DestinationHost"
+                "columnName": "DstAddr"
               }
             ]
           }

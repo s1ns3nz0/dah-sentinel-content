@@ -18,7 +18,7 @@
         "description": "영상스트림 RTSP 세션(SessionId)의 DESCRIBE/PLAY 요청 클라이언트(ClientIp)가 기대 클라이언트(ExpectedClient)와 불일치하는 스트림 하이재킹을 탐지. MITRE: T1557",
         "severity": "High",
         "enabled": true,
-        "query": "let alertWindow = 10m;\nUAVImagery_CL\n| where TimeGenerated > ago(alertWindow)\n| where RTSPMethod in ('DESCRIBE', 'PLAY')\n| where isnotempty(ExpectedClient) and ClientIp != ExpectedClient\n| extend TriggerReason = strcat(\"RTSP_세션하이재킹_\", SessionId, \"_client:\", ClientIp, \"_expected:\", ExpectedClient)\n| extend Severity = \"High\"\n| project TimeGenerated, UAVId, SessionId, RTSPMethod, ClientIp, ExpectedClient, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "query": "let alertWindow = 10m;\nUAVFleetInfra_CL\n| where TimeGenerated > ago(alertWindow)\n| where HijackSuspected == true\n| extend TriggerReason = strcat(\"RTSP_스트림하이재킹의심_\", StreamId, \"_session:\", SessionId, \"_client:\", ClientIp)\n| extend Severity = \"High\"\n| project TimeGenerated, StreamId, SessionId, ClientIp, HijackSuspected, StatusCode, TriggerReason, Severity\n| order by TimeGenerated desc",
         "queryFrequency": "PT5M",
         "queryPeriod": "PT15M",
         "triggerOperator": "GreaterThan",
@@ -52,13 +52,13 @@
         },
         "alertDetailsOverride": {
           "alertDisplayNameFormat": "UAV S83 - RTSP Stream Hijacking - {{SessionId}}",
-          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | ClientIp={{ClientIp}} | ExpectedClient={{ExpectedClient}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | ClientIp={{ClientIp}} | StreamId={{StreamId}}",
           "alertDynamicProperties": []
         },
         "customDetails": {
           "TriggerReason": "TriggerReason",
           "SessionId": "SessionId",
-          "RTSPMethod": "RTSPMethod"
+          "StreamId": "StreamId"
         },
         "entityMappings": [
           {

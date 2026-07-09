@@ -15,10 +15,10 @@
       "apiVersion": "2023-12-01-preview",
       "properties": {
         "displayName": "UAV S42 - GCS QML/Plugin Injection",
-        "description": "GCS(QGroundControl류) 앱의 QML 컴포넌트/플러그인 인젝션 탐지. qml_load 이벤트가 공식 경로(qrc:/qml/, /opt/qgc/plugins/official/)가 아닌 곳에서 로드되거나, plugin_exec 이벤트의 바이너리가 미서명(BinarySigned=false)인 경우 탐지 — GCS 프로세스 내 임의 코드 실행 시도. MITRE: T1059",
+        "description": "GCS(QGroundControl류) 앱의 QML 컴포넌트/플러그인 인젝션 탐지. UAVCompanion_CL(ROS/컴패니언컴퓨터/설정/MQTT/NTP 등 EventType으로 구분되는 공용 테이블)에서 InjectionSignatureDetected=true인 이벤트를 탐지. 이 테이블은 여러 시나리오가 공유하므로 EventType 값 컨벤션으로 시나리오를 구분: 본 룰은 `EventType == \"qml_inject\"` 를 사용(다른 룰과 충돌 없음: ros_master_access=S45, ros_topic_inject=S46, mavros_cmd_inject=S47, gcs_update_mitm=S43, gcs_config_tamper=S44, ntp_spoof=S50, geofence_tamper=S77[타 담당]). 실제 컬럼: EventType, Target, ContentSnippet, InjectionSignatureDetected, StatusCode(UAVGcsApp_CL/SourceHost/BinarySigned/ComponentName/PayloadDetail/GcsHost 컬럼은 존재하지 않아 제거함). MITRE: T1059",
         "severity": "High",
         "enabled": true,
-        "query": "let alertWindow = 10m;\nlet knownComponentPaths = dynamic([\"qrc:/qml/\", \"/opt/qgc/plugins/official/\"]);\nUAVGcsApp_CL\n| where TimeGenerated > ago(alertWindow)\n| where EventType in (\"qml_load\", \"plugin_exec\")\n| where not(SourceHost has_any (knownComponentPaths)) or BinarySigned == false\n| extend TriggerReason = case(\n    EventType == \"plugin_exec\" and BinarySigned == false, \"GCS_미서명_플러그인_실행\",\n    EventType == \"qml_load\" and not(SourceHost has_any (knownComponentPaths)), \"GCS_비정상_QML컴포넌트_로드\",\n    \"GCS_플러그인_비정상_경로_실행\")\n| extend Severity = \"High\"\n| project TimeGenerated, GcsHost, Operator, ComponentName, EventType, SourceHost, BinarySigned, PayloadDetail, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "query": "let alertWindow = 10m;\nUAVCompanion_CL\n| where TimeGenerated > ago(alertWindow)\n| where EventType == \"qml_inject\"\n| where InjectionSignatureDetected == true\n| extend TriggerReason = \"GCS_QML플러그인_인젝션_시그니처_탐지\"\n| extend Severity = \"High\"\n| project TimeGenerated, Target, EventType, ContentSnippet, InjectionSignatureDetected, StatusCode, TriggerReason, Severity\n| order by TimeGenerated desc",
         "queryFrequency": "PT10M",
         "queryPeriod": "PT15M",
         "triggerOperator": "GreaterThan",
@@ -52,14 +52,14 @@
           "aggregationKind": "SingleAlert"
         },
         "alertDetailsOverride": {
-          "alertDisplayNameFormat": "UAV S42 - GCS QML/Plugin Injection - {{GcsHost}}",
-          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | ComponentName={{ComponentName}} | SourceHost={{SourceHost}}",
+          "alertDisplayNameFormat": "UAV S42 - GCS QML/Plugin Injection - {{Target}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Target={{Target}} | ContentSnippet={{ContentSnippet}}",
           "alertDynamicProperties": []
         },
         "customDetails": {
           "TriggerReason": "TriggerReason",
-          "ComponentName": "ComponentName",
-          "Operator": "Operator"
+          "Target": "Target",
+          "ContentSnippet": "ContentSnippet"
         },
         "entityMappings": [
           {
@@ -67,7 +67,7 @@
             "fieldMappings": [
               {
                 "identifier": "HostName",
-                "columnName": "GcsHost"
+                "columnName": "Target"
               }
             ]
           }

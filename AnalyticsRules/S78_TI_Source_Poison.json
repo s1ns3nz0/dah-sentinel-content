@@ -18,7 +18,7 @@
         "description": "Trusted_TI_Source_List에 등록되지 않은 외부 소스(Source)로부터의 IOC 주입 또는 단시간 IOC 버스트를 탐지. UAV EO/IR·SIGINT·HUMINT 등 인가된 소스 외 유입 시 표적정보 오염 위험. MITRE: T1080",
         "severity": "High",
         "enabled": true,
-        "query": "let alertWindow = 10m;\nlet TrustedSources = _GetWatchlist('Trusted_TI_Source_List') | project SourceId;\nUAVTiFeed_CL\n| where TimeGenerated > ago(alertWindow)\n| where Source !in (TrustedSources)\n| summarize Count=count(), FirstSeen=min(TimeGenerated) by Source\n| extend TriggerReason = strcat(\"TI_비신뢰_소스_\", Source)\n| extend Severity = \"High\"\n| project TimeGenerated=FirstSeen, Source, Count, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "query": "let alertWindow = 10m;\nlet TrustedSources = _GetWatchlist('Trusted_TI_Source_List') | project SourceId;\nUAVThreatIntel_CL\n| where TimeGenerated > ago(alertWindow)\n| where Source !in (TrustedSources)\n| summarize Count=count(), FirstSeen=min(TimeGenerated) by Source, FeedName\n| extend TriggerReason = strcat(\"TI_비신뢰_소스_\", Source, \"_\", FeedName)\n| extend Severity = \"High\"\n| project TimeGenerated=FirstSeen, Source, FeedName, Count, TriggerReason, Severity\n| order by TimeGenerated desc",
         "queryFrequency": "PT5M",
         "queryPeriod": "PT15M",
         "triggerOperator": "GreaterThan",
@@ -58,7 +58,7 @@
         },
         "customDetails": {
           "TriggerReason": "TriggerReason",
-          "Severity": "Severity"
+          "FeedName": "FeedName"
         },
         "entityMappings": [
           {

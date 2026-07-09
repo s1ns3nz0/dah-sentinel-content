@@ -15,10 +15,10 @@
       "apiVersion": "2023-12-01-preview",
       "properties": {
         "displayName": "UAV S110 - Gimbal/Payload Control Hijacking (Unauthorized Sensor Pointing)",
-        "description": "UAVPayloadCtrl_CL의 gimbal_point/payload_arm/sensor_slew 명령에서 Operator가 Watchlist(Approved_Operators_List)에 없거나 Operator-UAVId 조합이 Watchlist(Operator_UAV_Binding_List)의 유효 바인딩에 없는 경우 탐지. 비인가 주체가 짐벌/페이로드 지향 명령을 탈취해 센서 지향을 조작하는 행위. MITRE ICS ATT&CK: T0831 / EMB3D 통제신호조작",
+        "description": "제안 스키마 — 짐벌/페이로드 지향 제어 전용 텔레메트리 소스(UAVPayloadCtrl_CL 등) 미배포(문서화된 계측 공백). 최근접 대체 신호로 UAVOpAudit_CL(운용자 행위 감사 로그, 실제 컬럼: EventType, Operator, ClientIp, UserAgent, SessionId, FailReason, StatusCode, TargetOperator, Detail — UAVId 컬럼 없음)에서 EventType='gimbal_point'/'payload_arm'/'sensor_slew'로 태깅된 이벤트 중 Operator가 Watchlist(Approved_Operators_List)에 없는 경우를 근사 탐지. 비인가 주체의 짐벌/페이로드 지향 명령 탈취 프록시 신호(직접증거 아님, 향후 전용 텔레메트리 소스 추가 필요). MITRE ICS ATT&CK: T0831 / EMB3D 통제신호조작(프록시)",
         "severity": "Medium",
         "enabled": true,
-        "query": "let alertWindow = 10m;\nlet ApprovedOps = _GetWatchlist('Approved_Operators_List') | project OperatorId;\nlet ValidBindings = _GetWatchlist('Operator_UAV_Binding_List') | project OperatorId, AllowedUAVId;\nUAVPayloadCtrl_CL\n| where TimeGenerated > ago(alertWindow)\n| where EventType in ('gimbal_point', 'payload_arm', 'sensor_slew')\n| extend isUnknownOp = Operator !in (ApprovedOps)\n| join kind=leftouter (ValidBindings) on $left.Operator == $right.OperatorId, $left.UAVId == $right.AllowedUAVId\n| extend isUnboundUAV = isnull(OperatorId)\n| where isUnknownOp or isUnboundUAV\n| extend TriggerReason = case(\n    isUnknownOp, strcat('페이로드지향_비인가_Operator_', Operator),\n    strcat('페이로드지향_UAV바인딩_불일치_', Operator, '_', UAVId))\n| extend Severity = 'Medium'\n| project TimeGenerated, UAVId, Operator, EventType, PayloadCommand, TargetLat, TargetLon, CommandSource, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "query": "let alertWindow = 10m;\nlet ApprovedOps = _GetWatchlist('Approved_Operators_List') | project OperatorId;\nUAVOpAudit_CL\n| where TimeGenerated > ago(alertWindow)\n| where EventType in ('gimbal_point', 'payload_arm', 'sensor_slew')\n| extend isUnknownOp = Operator !in (ApprovedOps)\n| where isUnknownOp\n| extend TriggerReason = strcat('페이로드지향_비인가_Operator_', Operator)\n| extend Severity = 'Medium'\n| project TimeGenerated, Operator, EventType, ClientIp, SessionId, StatusCode, FailReason, Detail, TriggerReason, Severity\n| order by TimeGenerated desc",
         "queryFrequency": "PT5M",
         "queryPeriod": "PT15M",
         "triggerOperator": "GreaterThan",
@@ -60,7 +60,7 @@
         },
         "customDetails": {
           "TriggerReason": "TriggerReason",
-          "PayloadCommand": "PayloadCommand"
+          "EventType": "EventType"
         },
         "entityMappings": [
           {
@@ -69,15 +69,6 @@
               {
                 "identifier": "Name",
                 "columnName": "Operator"
-              }
-            ]
-          },
-          {
-            "entityType": "Host",
-            "fieldMappings": [
-              {
-                "identifier": "HostName",
-                "columnName": "UAVId"
               }
             ]
           }

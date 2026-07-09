@@ -18,7 +18,7 @@
         "description": "UAVExfilFlow_CL 유출 흐름 로그에서 SAR/영상 표적좌표(TargetLat/TargetLon)가 AOI_Boundary_List에 등록된 모든 허가구역(AOI) 밖으로 전송되는 것을 탐지. 기존 UAVSarPayload_CL+UAVC4I_CL 개별 조인 방식(S17)을 통합 유출 흐름 테이블 단일 소스로 재구성 — 등록된 AOI 다건(mpd_recon/mpd_attack/mpd_escort)을 전수 대조해 하나도 매칭되지 않을 때만 트리거. MITRE: T1041 Exfiltration Over C2 Channel",
         "severity": "High",
         "enabled": true,
-        "query": "let alertWindow = 15m;\nlet AOIZones = _GetWatchlist('AOI_Boundary_List')\n    | project MinLat=toreal(MinLat), MaxLat=toreal(MaxLat), MinLon=toreal(MinLon), MaxLon=toreal(MaxLon);\nUAVExfilFlow_CL\n| where TimeGenerated > ago(alertWindow)\n| where AssetType in (\"sar\", \"imagery\")\n| where isnotnull(TargetLat) and isnotnull(TargetLon)\n| extend JoinKey = 1\n| join kind=inner (AOIZones | extend JoinKey = 1) on JoinKey\n| summarize IsInAnyAOI = max(toint(TargetLat between (MinLat .. MaxLat) and TargetLon between (MinLon .. MaxLon)))\n    by TimeGenerated, UAVId, Operator, AssetType, DestIp, DestPort, BytesTransferred, TargetLat, TargetLon\n| where IsInAnyAOI == 0\n| extend TriggerReason = strcat(\"SAR표적좌표_허가AOI외_유출_lat:\", tostring(TargetLat), \"_lon:\", tostring(TargetLon))\n| extend Severity = \"High\"\n| project TimeGenerated, UAVId, Operator, AssetType, DestIp, DestPort, BytesTransferred, TargetLat, TargetLon, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "query": "let alertWindow = 15m;\nlet AOIZones = _GetWatchlist('AOI_Boundary_List')\n    | project MinLat=toreal(MinLat), MaxLat=toreal(MaxLat), MinLon=toreal(MinLon), MaxLon=toreal(MaxLon);\nUAVSarPayload_CL\n| where TimeGenerated > ago(alertWindow)\n| where isnotnull(TargetLat) and isnotnull(TargetLon)\n| extend JoinKey = 1\n| join kind=inner (AOIZones | extend JoinKey = 1) on JoinKey\n| summarize IsInAnyAOI = max(toint(TargetLat between (MinLat .. MaxLat) and TargetLon between (MinLon .. MaxLon)))\n    by TimeGenerated, UAVId, FrameId, Resolution, SensorMode, SizeBytes, TargetLat, TargetLon\n| where IsInAnyAOI == 0\n| extend TriggerReason = strcat(\"SAR표적좌표_허가AOI외_유출_lat:\", tostring(TargetLat), \"_lon:\", tostring(TargetLon))\n| extend Severity = \"High\"\n| project TimeGenerated, UAVId, FrameId, Resolution, SensorMode, SizeBytes, TargetLat, TargetLon, TriggerReason, Severity\n| order by TimeGenerated desc",
         "queryFrequency": "PT5M",
         "queryPeriod": "PT20M",
         "triggerOperator": "GreaterThan",
@@ -51,15 +51,15 @@
         },
         "alertDetailsOverride": {
           "alertDisplayNameFormat": "UAV S92 - SAR Target Coordinate Exfiltration - {{UAVId}}",
-          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | AssetType={{AssetType}} | Bytes={{BytesTransferred}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | SensorMode={{SensorMode}} | SizeBytes={{SizeBytes}}",
           "alertDynamicProperties": []
         },
         "customDetails": {
           "TriggerReason": "TriggerReason",
-          "AssetType": "AssetType",
+          "SensorMode": "SensorMode",
           "TargetLat": "TargetLat",
           "TargetLon": "TargetLon",
-          "BytesTransferred": "BytesTransferred"
+          "SizeBytes": "SizeBytes"
         },
         "entityMappings": [
           {
@@ -68,15 +68,6 @@
               {
                 "identifier": "HostName",
                 "columnName": "UAVId"
-              }
-            ]
-          },
-          {
-            "entityType": "Account",
-            "fieldMappings": [
-              {
-                "identifier": "Name",
-                "columnName": "Operator"
               }
             ]
           }

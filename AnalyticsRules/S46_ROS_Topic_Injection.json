@@ -15,10 +15,10 @@
       "apiVersion": "2023-12-01-preview",
       "properties": {
         "displayName": "UAV S46 - ROS Topic/Service Injection",
-        "description": "ROS 토픽/서비스 인젝션 탐지 — Approved_ROS_Node_List에 없는 NodeName이 민감 토픽(/mavros/setpoint_velocity/cmd_vel, /mavros/setpoint_position/local, /mavros/cmd/arming)에 직접 publish/서비스 호출한 경우 탐지. MITRE ICS ATT&CK: T0855 Unauthorized Command Message",
+        "description": "ROS 토픽/서비스 인젝션 탐지 — UAVCompanion_CL(ROS/컴패니언컴퓨터/설정/MQTT/NTP 등 EventType으로 구분되는 공용 테이블)에서 InjectionSignatureDetected=true인 토픽 인젝션 이벤트를 탐지(Topic/Command 컬럼으로 세부 내용 확인). 이 테이블은 여러 시나리오가 공유하므로 EventType 값 컨벤션으로 시나리오를 구분: 본 룰은 `EventType == \"ros_topic_inject\"` 를 사용(다른 룰과 충돌 없음: qml_inject=S42, gcs_update_mitm=S43, gcs_config_tamper=S44, ros_master_access=S45, mavros_cmd_inject=S47, ntp_spoof=S50, geofence_tamper=S77[타 담당]). 실제 컬럼: EventType, Target, Topic, Command, InjectionSignatureDetected, StatusCode(UAVRos_CL/NodeName/PeerIp/TopicName/CommandSummary 컬럼은 존재하지 않아 제거함). MITRE ICS ATT&CK: T0855 Unauthorized Command Message",
         "severity": "High",
         "enabled": true,
-        "query": "let approvedNodes = _GetWatchlist('Approved_ROS_Node_List') | project NodeName;\nlet sensitiveTopics = dynamic([\"/mavros/setpoint_velocity/cmd_vel\", \"/mavros/setpoint_position/local\", \"/mavros/cmd/arming\"]);\nlet alertWindow = 10m;\nUAVRos_CL\n| where TimeGenerated > ago(alertWindow)\n| where EventType in (\"topic_publish\", \"service_call\")\n| where TopicName in (sensitiveTopics)\n| where NodeName !in (approvedNodes)\n| extend TriggerReason = strcat(\"ROS_민감토픽_비인가노드_퍼블리시_\", TopicName)\n| extend Severity = \"High\"\n| project TimeGenerated, UAVId, NodeName, PeerIp, TopicName, CommandSummary, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "query": "let alertWindow = 10m;\nUAVCompanion_CL\n| where TimeGenerated > ago(alertWindow)\n| where EventType == \"ros_topic_inject\"\n| where InjectionSignatureDetected == true\n| extend TriggerReason = strcat(\"ROS_민감토픽_인젝션_시그니처_탐지_\", Topic)\n| extend Severity = \"High\"\n| project TimeGenerated, Target, Topic, Command, InjectionSignatureDetected, StatusCode, TriggerReason, Severity\n| order by TimeGenerated desc",
         "queryFrequency": "PT5M",
         "queryPeriod": "PT15M",
         "triggerOperator": "GreaterThan",
@@ -54,14 +54,14 @@
           "aggregationKind": "SingleAlert"
         },
         "alertDetailsOverride": {
-          "alertDisplayNameFormat": "UAV S46 - ROS Topic/Service Injection - {{UAVId}}",
-          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | NodeName={{NodeName}} | TopicName={{TopicName}}",
+          "alertDisplayNameFormat": "UAV S46 - ROS Topic/Service Injection - {{Target}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Topic={{Topic}} | Command={{Command}}",
           "alertDynamicProperties": []
         },
         "customDetails": {
           "TriggerReason": "TriggerReason",
-          "NodeName": "NodeName",
-          "TopicName": "TopicName"
+          "Topic": "Topic",
+          "Command": "Command"
         },
         "entityMappings": [
           {
@@ -69,7 +69,7 @@
             "fieldMappings": [
               {
                 "identifier": "HostName",
-                "columnName": "UAVId"
+                "columnName": "Target"
               }
             ]
           }

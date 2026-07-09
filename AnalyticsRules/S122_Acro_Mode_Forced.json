@@ -15,10 +15,10 @@
       "apiVersion": "2023-12-01-preview",
       "properties": {
         "displayName": "UAV S122 - ACRO/Manual Forced Destabilization",
-        "description": "UAVOpmode_CL에서 OpmodeField='acro_mode_forced'인 레코드 중 ObservedValue='ACRO'로 강제 전환되었고 Authorized=0(SByte)인 비인가 불안정화 탐지. 실제 컬럼: OpmodeField/ExpectedValue/ObservedValue/ChangedBy/Authorized(SByte). MITRE: T0836 Modify Parameter (자동 안정화가 없는 ACRO/수동 모드를 비인가로 강제 주입해 기체를 불안정화)",
+        "description": "UAVTelemetry_CL에서 CustomMode=ACRO(1) 구간 중 RollSpeed_rads/PitchSpeed_rads/YawSpeed_rads 중 하나라도 임계값을 초과하는 불안정화 징후를 탐지. UAVOpmode_CL은 존재하지 않아 실제 텔레메트리 모드/각속도 컬럼 기반으로 재구성. MITRE: T0836 Modify Parameter (자동 안정화가 없는 ACRO/수동 모드를 비인가로 강제 주입해 기체를 불안정화)",
         "severity": "High",
         "enabled": true,
-        "query": "let alertWindow = 10m;\nUAVOpmode_CL\n| where TimeGenerated > ago(alertWindow)\n| where OpmodeField == 'acro_mode_forced'\n| where ObservedValue == 'ACRO' and Authorized == 0\n| extend TriggerReason = strcat(\"ACRO강제전환_불안정화_\", UAVId, \"_\", ExpectedValue, \"->\", ObservedValue)\n| project TimeGenerated, UAVId, OpmodeField, ExpectedValue, ObservedValue, ChangedBy, Authorized, Seq, TriggerReason\n| order by TimeGenerated desc",
+        "query": "let alertWindow = 15m;\nlet AcroMode = 1; // ArduPilot custom_mode convention: ACRO=1 (미확정 시 재검증 필요)\nlet RateThreshold = 2.0; // rad/s\nUAVTelemetry_CL\n| where TimeGenerated > ago(alertWindow)\n| where CustomMode == AcroMode\n| where isnotnull(RollSpeed_rads) and isnotnull(PitchSpeed_rads) and isnotnull(YawSpeed_rads)\n| where abs(RollSpeed_rads) > RateThreshold or abs(PitchSpeed_rads) > RateThreshold or abs(YawSpeed_rads) > RateThreshold\n| extend TriggerReason = strcat(\"ACRO강제전환_불안정화_\", UAVId)\n| project TimeGenerated, UAVId, CustomMode, RollSpeed_rads, PitchSpeed_rads, YawSpeed_rads, TriggerReason\n| order by TimeGenerated desc",
         "queryFrequency": "PT5M",
         "queryPeriod": "PT15M",
         "triggerOperator": "GreaterThan",
@@ -57,8 +57,7 @@
           "alertDynamicProperties": []
         },
         "customDetails": {
-          "TriggerReason": "TriggerReason",
-          "Authorized": "Authorized"
+          "TriggerReason": "TriggerReason"
         },
         "entityMappings": [
           {
@@ -67,15 +66,6 @@
               {
                 "identifier": "HostName",
                 "columnName": "UAVId"
-              }
-            ]
-          },
-          {
-            "entityType": "Account",
-            "fieldMappings": [
-              {
-                "identifier": "Name",
-                "columnName": "ChangedBy"
               }
             ]
           }

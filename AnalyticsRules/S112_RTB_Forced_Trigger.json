@@ -15,10 +15,10 @@
       "apiVersion": "2023-12-01-preview",
       "properties": {
         "displayName": "UAV S112 - RTB Forced Trigger (Unauthorized Return-to-Base Injection)",
-        "description": "UAVOpmode_CL에서 OpmodeField='rtb_trigger'가 Authorized=0(SByte) 상태로 5분 내 2회 이상 발생하는 비인가 RTB 강제 트리거 버스트 탐지. 실제 컬럼: OpmodeField/ChangedBy/Authorized(SByte)/Seq. MITRE: T0855 Unauthorized Command Message (비인가 명령으로 임무를 강제 종료시키는 가용성 공격)",
+        "description": "UAVMissionEvent_CL에서 CustomModeAfter=RTL(11)로의 전환이 5분 내 2회 이상 발생하는 비인가 RTB 강제 트리거 버스트 탐지. UAVOpmode_CL은 존재하지 않아 실제 미션 이벤트 테이블(CustomModeBefore/CustomModeAfter) 기반으로 재구성. MITRE: T0855 Unauthorized Command Message (비인가 명령으로 임무를 강제 종료시키는 가용성 공격)",
         "severity": "Medium",
         "enabled": true,
-        "query": "let alertWindow = 15m;\nUAVOpmode_CL\n| where TimeGenerated > ago(alertWindow)\n| where OpmodeField == 'rtb_trigger'\n| where Authorized == 0\n| summarize TriggerCount = count(), FirstSeen = min(TimeGenerated), MinSeq = min(Seq), MaxSeq = max(Seq)\n    by UAVId, ChangedBy, bin(TimeGenerated, 5m)\n| where TriggerCount >= 2\n| extend TriggerReason = strcat(\"RTB_강제트리거_비인가_\", tostring(TriggerCount), \"회_\", UAVId)\n| project FirstSeen, UAVId, ChangedBy, TriggerCount, MinSeq, MaxSeq, TriggerReason\n| order by FirstSeen desc",
+        "query": "let alertWindow = 15m;\nlet RtlMode = 11; // ArduPilot custom_mode convention: RTL=11 (미확정 시 재검증 필요)\nUAVMissionEvent_CL\n| where TimeGenerated > ago(alertWindow)\n| where CustomModeAfter == RtlMode\n| summarize TriggerCount = count(), FirstSeen = min(TimeGenerated), MinSeq = min(Seq), MaxSeq = max(Seq)\n    by UAVId, bin(TimeGenerated, 5m)\n| where TriggerCount >= 2\n| extend TriggerReason = strcat(\"RTB_강제트리거_버스트_\", tostring(TriggerCount), \"회_\", UAVId)\n| project FirstSeen, UAVId, TriggerCount, MinSeq, MaxSeq, TriggerReason\n| order by FirstSeen desc",
         "queryFrequency": "PT5M",
         "queryPeriod": "PT15M",
         "triggerOperator": "GreaterThan",
@@ -68,15 +68,6 @@
               {
                 "identifier": "HostName",
                 "columnName": "UAVId"
-              }
-            ]
-          },
-          {
-            "entityType": "Account",
-            "fieldMappings": [
-              {
-                "identifier": "Name",
-                "columnName": "ChangedBy"
               }
             ]
           }

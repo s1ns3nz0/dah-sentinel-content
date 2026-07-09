@@ -14,11 +14,11 @@
       "kind": "Scheduled",
       "apiVersion": "2023-12-01-preview",
       "properties": {
-        "displayName": "UAV S88 - Adversarial Patch Attack Against Onboard Vision Model",
-        "description": "적대적 패치 공격(Adversarial Patch) 탐지. UAVAiInference_CL의 InferenceType='vision_classify' 레코드 중 오분류(MisclassificationDetected=true)가 발생하고 동시에 입력 이미지에서 패치성 이상 패턴(PatchIndicator)이 검출된 경우를 탐지. 표적 인식/장애물 회피 등 UAV 온보드 비전 모델의 입력을 물리적/디지털 패치로 조작해 오분류를 유도하는 AML 공격. MITRE: AML.T0043",
+        "displayName": "UAV S88 - Adversarial Patch Attack Against Onboard Vision Model (Proxy - Instrumentation Gap)",
+        "description": "[계측 공백/최선근사] 적대적 패치 공격(Adversarial Patch) 탐지. 실배포 워크스페이스에는 AI/ML 추론 계층(비전 분류 결과, 오분류 여부, 패치 지표 등)을 기록하는 전용 텔레메트리가 존재하지 않음(genuine instrumentation gap — AI 추론 로깅 미도입). 본 룰은 UAVOpAudit_CL을 범용 운영감사 테이블로 활용해 EventType='adversarial_patch'(본 룰이 정의한 관례값)로 태깅된 레코드 중 Detail 필드에 이상 콘텐츠 패턴이 기록된 경우를 근사 신호로 탐지한다. 실제 모델 오분류·패치 검출 로직을 포함하지 않으며, 전용 AI 추론 계측이 도입되기 전까지의 임시 대체(proxy) 룰이다. MITRE: AML.T0043",
         "severity": "High",
         "enabled": true,
-        "query": "let alertWindow = 15m;\nUAVAiInference_CL\n| where TimeGenerated > ago(alertWindow)\n| where InferenceType == 'vision_classify'\n| where MisclassificationDetected == true and isnotempty(PatchIndicator)\n| extend TriggerReason = strcat('적대적패치_오분류_', ModelEndpoint, '_', PatchIndicator)\n| extend Severity = 'High'\n| project TimeGenerated, ModelEndpoint, RequesterId, InputHash, MisclassificationDetected, PatchIndicator, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "query": "let alertWindow = 15m;\nUAVOpAudit_CL\n| where TimeGenerated > ago(alertWindow)\n| where EventType == 'adversarial_patch'\n| where isnotempty(Detail)\n| extend TriggerReason = strcat('적대적패치_근사탐지_', Operator, '_', Detail)\n| extend Severity = 'High'\n| project TimeGenerated, EventType, Operator, ClientIp, SessionId, StatusCode, Detail, TriggerReason, Severity\n| order by TimeGenerated desc",
         "queryFrequency": "PT5M",
         "queryPeriod": "PT15M",
         "triggerOperator": "GreaterThan",
@@ -51,22 +51,22 @@
           "aggregationKind": "SingleAlert"
         },
         "alertDetailsOverride": {
-          "alertDisplayNameFormat": "UAV S88 - Adversarial Patch Attack - {{ModelEndpoint}}",
-          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | PatchIndicator={{PatchIndicator}} | Severity={{Severity}}",
+          "alertDisplayNameFormat": "UAV S88 - Adversarial Patch Attack (Proxy) - {{Operator}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Detail={{Detail}} | Severity={{Severity}}",
           "alertDynamicProperties": []
         },
         "customDetails": {
           "TriggerReason": "TriggerReason",
-          "ModelEndpoint": "ModelEndpoint",
-          "PatchIndicator": "PatchIndicator"
+          "Operator": "Operator",
+          "Detail": "Detail"
         },
         "entityMappings": [
           {
-            "entityType": "Host",
+            "entityType": "Account",
             "fieldMappings": [
               {
-                "identifier": "HostName",
-                "columnName": "ModelEndpoint"
+                "identifier": "Name",
+                "columnName": "Operator"
               }
             ]
           }

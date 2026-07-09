@@ -18,7 +18,7 @@
         "description": "UAVSwarmComms_CL의 scatter_cmd 메시지에서 Authorized=false이거나 ScatterCommandIssuedBy가 Approved_Operators_List에 비등록인 대형 분산/이탈 명령주입(scatter) 탐지. MITRE: T0855 Unauthorized Command Message (ICS 근사매핑 — description 참조)",
         "severity": "High",
         "enabled": true,
-        "query": "let alertWindow = 10m;\nlet ApprovedOps = _GetWatchlist('Approved_Operators_List') | project OperatorId;\nUAVSwarmComms_CL\n| where TimeGenerated > ago(alertWindow)\n| where MessageType == \"scatter_cmd\"\n| extend isUnknownIssuer = ScatterCommandIssuedBy !in (ApprovedOps)\n| where Authorized == false or isUnknownIssuer\n| extend TriggerReason = case(\n    Authorized == false, strcat(\"대형분산이탈명령_비인가주입_발신:\", ScatterCommandIssuedBy),\n    strcat(\"대형분산이탈명령_미등록발신자_\", ScatterCommandIssuedBy))\n| extend Severity = \"High\"\n| project TimeGenerated, SwarmId, MemberId, UAVId, MessageType, ScatterCommandIssuedBy, Authorized, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "query": "let alertWindow = 10m;\nlet scatterDivergingRatio = 0.7;\nUAVFleetState_CL\n| where TimeGenerated > ago(alertWindow)\n| where ActiveUAVCount > 0\n| extend DivergingRatio = todouble(DivergingCount) / todouble(ActiveUAVCount)\n| where DivergingRatio >= scatterDivergingRatio and CommonCommand == \"scatter\"\n| extend TriggerReason = strcat(\"대형분산이탈명령주입의심_이탈비율_\", tostring(round(DivergingRatio*100,1)), \"%_명령_\", CommonCommand)\n| extend Severity = \"High\"\n| project TimeGenerated, FleetId, WindowStart, ActiveUAVCount, DivergingCount, DivergingRatio, CommonCommand, TriggerReason, Severity\n| order by TimeGenerated desc",
         "queryFrequency": "PT5M",
         "queryPeriod": "PT15M",
         "triggerOperator": "GreaterThan",
@@ -48,15 +48,15 @@
           "aggregationKind": "SingleAlert"
         },
         "alertDetailsOverride": {
-          "alertDisplayNameFormat": "UAV S104 - Unauthorized Scatter/Break-Formation Command Injection - {{UAVId}}",
+          "alertDisplayNameFormat": "UAV S104 - Unauthorized Scatter/Break-Formation Command Injection - {{FleetId}}",
           "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Severity={{Severity}}",
           "alertDynamicProperties": []
         },
         "customDetails": {
           "TriggerReason": "TriggerReason",
-          "ScatterCommandIssuedBy": "ScatterCommandIssuedBy",
-          "Authorized": "Authorized",
-          "SwarmId": "SwarmId"
+          "CommonCommand": "CommonCommand",
+          "DivergingRatio": "DivergingRatio",
+          "FleetId": "FleetId"
         },
         "entityMappings": [
           {
@@ -64,16 +64,7 @@
             "fieldMappings": [
               {
                 "identifier": "HostName",
-                "columnName": "UAVId"
-              }
-            ]
-          },
-          {
-            "entityType": "Account",
-            "fieldMappings": [
-              {
-                "identifier": "Name",
-                "columnName": "ScatterCommandIssuedBy"
+                "columnName": "FleetId"
               }
             ]
           }

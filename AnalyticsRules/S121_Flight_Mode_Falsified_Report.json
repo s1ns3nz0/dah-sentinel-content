@@ -15,10 +15,10 @@
       "apiVersion": "2023-12-01-preview",
       "properties": {
         "displayName": "UAV S121 - Flight Mode Falsified Reporting (Reported vs Actual Mismatch)",
-        "description": "UAVOpmode_CL에서 OpmodeField='flight_mode_reported_vs_actual'인 레코드 중 ExpectedValue(실제 비행모드)와 ObservedValue(운용자에게 보고된 비행모드)가 불일치하는 위조 보고 탐지(Authorized 여부 무관 — 보고값 자체 조작). 실제 컬럼: OpmodeField/ExpectedValue/ObservedValue/ChangedBy/Authorized(SByte). MITRE: T0832 Manipulation of View (실제 비행모드와 다른 값을 운용자 화면에 보고해 상황인식을 조작)",
+        "description": "UAVGroundTruth_CL.GroundTruthCustomMode(지상 실측 실제 비행모드)와 UAVTelemetry_CL.CustomMode(보고된 비행모드)를 동일 UAVId/5분 구간 기준으로 조인하여 값이 불일치하는 위조 보고를 탐지. 실제 텔레메트리/지상실측 조인 — UAVGroundTruth_CL의 정확한 사용 목적에 부합. MITRE: T0832 Manipulation of View (실제 비행모드와 다른 값을 운용자 화면에 보고해 상황인식을 조작)",
         "severity": "Medium",
         "enabled": true,
-        "query": "let alertWindow = 10m;\nUAVOpmode_CL\n| where TimeGenerated > ago(alertWindow)\n| where OpmodeField == 'flight_mode_reported_vs_actual'\n| where ExpectedValue != ObservedValue\n| extend TriggerReason = strcat(\"비행모드_위조보고_실제:\", ExpectedValue, \"_보고:\", ObservedValue)\n| project TimeGenerated, UAVId, OpmodeField, ExpectedValue, ObservedValue, ChangedBy, Authorized, Seq, TriggerReason\n| order by TimeGenerated desc",
+        "query": "let alertWindow = 15m;\nUAVGroundTruth_CL\n| where TimeGenerated > ago(alertWindow)\n| extend TimeBucket = bin(TimeGenerated, 5m)\n| join kind=inner (\n    UAVTelemetry_CL\n    | where TimeGenerated > ago(alertWindow)\n    | where isnotnull(CustomMode)\n    | extend TimeBucket = bin(TimeGenerated, 5m)\n    | project ReportedTime = TimeGenerated, UAVId, ReportedCustomMode = CustomMode, TimeBucket\n) on UAVId, TimeBucket\n| where GroundTruthCustomMode != ReportedCustomMode\n| extend TriggerReason = strcat(\"비행모드_위조보고_실제:\", tostring(GroundTruthCustomMode), \"_보고:\", tostring(ReportedCustomMode))\n| project TimeGenerated, ReportedTime, UAVId, GroundTruthCustomMode, ReportedCustomMode, Source, TriggerReason\n| order by TimeGenerated desc",
         "queryFrequency": "PT5M",
         "queryPeriod": "PT15M",
         "triggerOperator": "GreaterThan",
@@ -58,8 +58,7 @@
           "alertDynamicProperties": []
         },
         "customDetails": {
-          "TriggerReason": "TriggerReason",
-          "Authorized": "Authorized"
+          "TriggerReason": "TriggerReason"
         },
         "entityMappings": [
           {
@@ -68,15 +67,6 @@
               {
                 "identifier": "HostName",
                 "columnName": "UAVId"
-              }
-            ]
-          },
-          {
-            "entityType": "Account",
-            "fieldMappings": [
-              {
-                "identifier": "Name",
-                "columnName": "ChangedBy"
               }
             ]
           }

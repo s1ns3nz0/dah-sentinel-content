@@ -18,7 +18,7 @@
         "description": "배포 아티팩트 서명 검증 이벤트(ArtifactSign)에서 서명 무효(SignatureValid=false) 또는 서명 우회 지표(BypassIndicator) 발생을 탐지. 신뢰 제어 우회를 통한 미서명/변조 아티팩트 배포 시도. MITRE: T1553",
         "severity": "High",
         "enabled": true,
-        "query": "let alertWindow = 10m;\nUAVSupplyChain_CL\n| where TimeGenerated > ago(alertWindow)\n| where EventType == 'ArtifactSign'\n| extend isInvalidSig = (SignatureValid == false)\n| extend isBypass = isnotempty(BypassIndicator)\n| where isInvalidSig or isBypass\n| extend TriggerReason = case(\n    isInvalidSig and isBypass, strcat(\"아티팩트_서명무효_우회지표_\", ArtifactId, \"_\", BypassIndicator),\n    isInvalidSig, strcat(\"아티팩트_서명무효_\", ArtifactId),\n    strcat(\"아티팩트_서명우회지표_\", ArtifactId, \"_\", BypassIndicator))\n| extend Severity = \"High\"\n| project TimeGenerated, ArtifactId, SignatureValid, BypassIndicator, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "query": "let alertWindow = 10m;\nUAVSupplyChain_CL\n| where TimeGenerated > ago(alertWindow)\n| where BypassSuspected == true and SignatureValid == false\n| extend TriggerReason = strcat(\"아티팩트_서명우회의심_\", Subject, \"_Issuer:\", Issuer)\n| extend Severity = \"High\"\n| project TimeGenerated, EventType, Subject, Issuer, SignatureValid, BypassSuspected, CertSerial, StatusCode, TriggerReason, Severity\n| order by TimeGenerated desc",
         "queryFrequency": "PT5M",
         "queryPeriod": "PT15M",
         "triggerOperator": "GreaterThan",
@@ -50,14 +50,14 @@
           "aggregationKind": "SingleAlert"
         },
         "alertDetailsOverride": {
-          "alertDisplayNameFormat": "UAV S73 - Artifact Signature Bypass - {{ArtifactId}}",
+          "alertDisplayNameFormat": "UAV S73 - Artifact Signature Bypass - {{Subject}}",
           "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | SignatureValid={{SignatureValid}}",
           "alertDynamicProperties": []
         },
         "customDetails": {
           "TriggerReason": "TriggerReason",
-          "ArtifactId": "ArtifactId",
-          "BypassIndicator": "BypassIndicator"
+          "Subject": "Subject",
+          "BypassSuspected": "BypassSuspected"
         },
         "entityMappings": [
           {
@@ -65,7 +65,7 @@
             "fieldMappings": [
               {
                 "identifier": "HostName",
-                "columnName": "ArtifactId"
+                "columnName": "Subject"
               }
             ]
           }

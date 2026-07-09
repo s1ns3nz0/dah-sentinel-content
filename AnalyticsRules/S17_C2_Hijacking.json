@@ -18,7 +18,7 @@
         "description": "UAVMavsec_CL에서 SET_MODE/COMMAND_LONG 명령의 SourceSystemId가 Approved_SystemId_List(UAVId별 인가 SystemId)에 없는 경우 MAVLink C2 하이재킹 관측으로 탐지. 같은 시점 서명검증 실패(FailedCount>0)가 동반되면 신뢰도를 High로 상향(MITM/평문주입 병행 가능성). MITRE: T1071",
         "severity": "High",
         "enabled": true,
-        "query": "let alertWindow = 10m;\nlet ApprovedSystems = _GetWatchlist('Approved_SystemId_List') | project SystemId = toint(SystemId), UAVId;\nUAVMavsec_CL\n| where TimeGenerated > ago(alertWindow)\n| where Command in ('SET_MODE', 'COMMAND_LONG')\n| join kind=leftanti (ApprovedSystems) on $left.SourceSystemId == $right.SystemId, UAVId\n| extend isSignatureFail = FailedCount > 0\n| extend TriggerReason = iff(isSignatureFail,\n    strcat('MAVLink_C2_하이재킹_비인가SystemId_서명실패동시_', tostring(SourceSystemId)),\n    strcat('MAVLink_C2_하이재킹_비인가SystemId_모드변경_', tostring(SourceSystemId)))\n| extend Severity = iff(isSignatureFail, 'High', 'Medium')\n| project TimeGenerated, UAVId, SourceSystemId, Command, ModeValue, FailedCount, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "query": "let alertWindow = 10m;\nlet bucket = 1m;\nlet ModeChangeEvents =\n    UAVTelemetry_CL\n    | where TimeGenerated > ago(alertWindow)\n    | where isnotnull(CustomMode)\n    | order by UAVId asc, TimeGenerated asc\n    | extend PrevCustomMode = prev(CustomMode), PrevUAVId = prev(UAVId)\n    | where UAVId == PrevUAVId and CustomMode != PrevCustomMode\n    | extend TimeBin = bin(TimeGenerated, bucket)\n    | project TimeGenerated, UAVId, TimeBin, BaseMode, CustomMode, PrevCustomMode;\nlet UnsignedActivity =\n    UAVMavsec_CL\n    | where TimeGenerated > ago(alertWindow)\n    | where UnsignedCount > 0 or FailedCount > 0\n    | extend TimeBin = bin(TimeGenerated, bucket)\n    | project UAVId, TimeBin, SignedCount, UnsignedCount, FailedCount, WindowSec;\nModeChangeEvents\n| join kind=inner (UnsignedActivity) on UAVId, TimeBin\n| extend TriggerReason = strcat('MAVLink_C2_하이재킹_모드변경(', tostring(PrevCustomMode), '->', tostring(CustomMode), ')_무서명활동동시발생_Unsigned:', tostring(UnsignedCount), '_Failed:', tostring(FailedCount))\n| extend Severity = iff(FailedCount > 0, 'High', 'Medium')\n| project TimeGenerated, UAVId, PrevCustomMode, CustomMode, BaseMode, SignedCount, UnsignedCount, FailedCount, TriggerReason, Severity\n| order by TimeGenerated desc",
         "queryFrequency": "PT5M",
         "queryPeriod": "PT15M",
         "triggerOperator": "GreaterThan",
@@ -54,14 +54,16 @@
         },
         "alertDetailsOverride": {
           "alertDisplayNameFormat": "UAV S17 - MAVLink C2/Mode-Change Hijack Observation - {{UAVId}}",
-          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Severity={{Severity}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | PrevCustomMode={{PrevCustomMode}} | CustomMode={{CustomMode}} | UnsignedCount={{UnsignedCount}} | Severity={{Severity}}",
           "alertDynamicProperties": []
         },
         "customDetails": {
           "TriggerReason": "TriggerReason",
           "Severity": "Severity",
-          "SourceSystemId": "SourceSystemId",
-          "Command": "Command"
+          "PrevCustomMode": "PrevCustomMode",
+          "CustomMode": "CustomMode",
+          "UnsignedCount": "UnsignedCount",
+          "FailedCount": "FailedCount"
         },
         "entityMappings": [
           {

@@ -15,10 +15,10 @@
       "apiVersion": "2023-12-01-preview",
       "properties": {
         "displayName": "UAV S120 - RTL/LAND Failsafe Recovery Block",
-        "description": "UAVOpmode_CL에서 OpmodeField='failsafe_recovery_block'인 레코드 중 ObservedValue가 RTL/LAND 페일세이프 복귀를 차단(blocked/disabled)하는 값이고 Authorized=0(SByte)인 비인가 차단 탐지. 실제 컬럼: OpmodeField/ExpectedValue/ObservedValue/ChangedBy/Authorized(SByte). MITRE: T0838 Modify Alarm Settings (페일세이프 복귀 로직을 비인가로 차단해 비상 회수 수단을 무력화)",
+        "description": "UAVTelemetry_CL에서 저배터리(BatteryRemaining_pct < 임계값) 조건이 발생한 5분 구간에 UAVFailsafe_CL에서 해당 UAVId의 ModeAfter=RTL(11) 전환 레코드가 없는 경우(예상되는 페일세이프 응답 부재)를 leftanti 조인으로 탐지. UAVOpmode_CL은 존재하지 않아 실제 텔레메트리 배터리 상태와 페일세이프 테이블 조인으로 재구성. MITRE: T0838 Modify Alarm Settings (페일세이프 복귀 로직을 비인가로 차단해 비상 회수 수단을 무력화)",
         "severity": "High",
         "enabled": true,
-        "query": "let alertWindow = 10m;\nUAVOpmode_CL\n| where TimeGenerated > ago(alertWindow)\n| where OpmodeField == 'failsafe_recovery_block'\n| where ObservedValue in ('blocked', 'disabled') and Authorized == 0\n| extend TriggerReason = strcat(\"페일세이프복귀_차단_\", UAVId, \"_\", ObservedValue)\n| project TimeGenerated, UAVId, OpmodeField, ExpectedValue, ObservedValue, ChangedBy, Authorized, Seq, TriggerReason\n| order by TimeGenerated desc",
+        "query": "let alertWindow = 20m;\nlet LowBatteryPct = 15;\nlet RtlMode = 11; // ArduPilot custom_mode convention: RTL=11 (미확정 시 재검증 필요)\nUAVTelemetry_CL\n| where TimeGenerated > ago(alertWindow)\n| where isnotnull(BatteryRemaining_pct) and BatteryRemaining_pct < LowBatteryPct\n| extend TimeBucket = bin(TimeGenerated, 5m)\n| join kind=leftanti (\n    UAVFailsafe_CL\n    | where TimeGenerated > ago(alertWindow)\n    | where ModeAfter == RtlMode\n    | extend TimeBucket = bin(TimeGenerated, 5m)\n) on UAVId, TimeBucket\n| extend TriggerReason = strcat(\"페일세이프복귀_차단의심_저배터리무응답_\", UAVId, \"_배터리:\", tostring(BatteryRemaining_pct), \"%\")\n| project TimeGenerated, UAVId, BatteryRemaining_pct, TriggerReason\n| order by TimeGenerated desc",
         "queryFrequency": "PT5M",
         "queryPeriod": "PT15M",
         "triggerOperator": "GreaterThan",
@@ -58,7 +58,7 @@
         },
         "customDetails": {
           "TriggerReason": "TriggerReason",
-          "Authorized": "Authorized"
+          "BatteryRemaining_pct": "BatteryRemaining_pct"
         },
         "entityMappings": [
           {
@@ -67,15 +67,6 @@
               {
                 "identifier": "HostName",
                 "columnName": "UAVId"
-              }
-            ]
-          },
-          {
-            "entityType": "Account",
-            "fieldMappings": [
-              {
-                "identifier": "Name",
-                "columnName": "ChangedBy"
               }
             ]
           }

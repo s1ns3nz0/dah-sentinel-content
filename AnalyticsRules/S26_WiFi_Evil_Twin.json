@@ -15,10 +15,10 @@
       "apiVersion": "2023-12-01-preview",
       "properties": {
         "displayName": "UAV S26 - WiFi Evil Twin (Rogue AP C2 Hijack)",
-        "description": "UAVWifi_CL에서 동일 SSID가 서로 다른 BSSID(2개 이상)로 동시에 비콘 프레임을 송출하면 Evil Twin(Rogue AP)에 의한 C2 하이재킹 시도로 탐지. MITRE: T1557",
+        "description": "UAVRcLink_CL의 BssidMismatch(bool) 플래그를 직접 사용하여 동일 SSID에 대해 기대 BSSID와 불일치하는 접속(로그 AP/이블 트윈 의심)을 탐지.",
         "severity": "Medium",
         "enabled": true,
-        "query": "let alertWindow = 15m;\nUAVWifi_CL\n| where TimeGenerated > ago(alertWindow)\n| where FrameType == 'beacon'\n| summarize BSSIDCount = dcount(BSSID), BSSIDs = make_set(BSSID), LastSeen = max(TimeGenerated) by SSID, UAVId\n| where BSSIDCount > 1\n| extend TriggerReason = strcat('WiFi_EvilTwin_동일SSID_상이BSSID_', SSID, '_', tostring(BSSIDCount), '개')\n| extend Severity = 'Medium'\n| project TimeGenerated = LastSeen, UAVId, SSID, BSSIDCount, BSSIDs, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "query": "let alertWindow = 15m;\nUAVRcLink_CL\n| where TimeGenerated > ago(alertWindow)\n| where BssidMismatch == true\n| summarize MismatchCount = count(), LastSeen = max(TimeGenerated) by UavId, DeviceId, Ssid\n| extend TriggerReason = strcat('WiFi_EvilTwin_BSSID불일치_탐지_', Ssid, '_', tostring(MismatchCount), '건')\n| extend Severity = 'Medium'\n| project TimeGenerated = LastSeen, UavId, DeviceId, Ssid, MismatchCount, TriggerReason, Severity\n| order by TimeGenerated desc",
         "queryFrequency": "PT10M",
         "queryPeriod": "PT15M",
         "triggerOperator": "GreaterThan",
@@ -53,14 +53,14 @@
           "aggregationKind": "SingleAlert"
         },
         "alertDetailsOverride": {
-          "alertDisplayNameFormat": "UAV S26 - WiFi Evil Twin (Rogue AP C2 Hijack) - {{UAVId}}",
-          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | SSID={{SSID}} | BSSIDCount={{BSSIDCount}} | Severity={{Severity}}",
+          "alertDisplayNameFormat": "UAV S26 - WiFi Evil Twin (Rogue AP C2 Hijack) - {{UavId}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Ssid={{Ssid}} | MismatchCount={{MismatchCount}} | Severity={{Severity}}",
           "alertDynamicProperties": []
         },
         "customDetails": {
           "TriggerReason": "TriggerReason",
-          "SSID": "SSID",
-          "BSSIDCount": "BSSIDCount",
+          "Ssid": "Ssid",
+          "MismatchCount": "MismatchCount",
           "Severity": "Severity"
         },
         "entityMappings": [
@@ -69,7 +69,7 @@
             "fieldMappings": [
               {
                 "identifier": "HostName",
-                "columnName": "UAVId"
+                "columnName": "UavId"
               }
             ]
           }

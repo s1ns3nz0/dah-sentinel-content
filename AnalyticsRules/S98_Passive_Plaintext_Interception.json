@@ -14,11 +14,11 @@
       "kind": "Scheduled",
       "apiVersion": "2023-12-01-preview",
       "properties": {
-        "displayName": "UAV S98 - Passive Interception of Telemetry, Screen, Input, or File (Plaintext)",
-        "description": "수동 텔레메트리·화면·입력·파일 감청(평문) 탐지. UAVPassiveCollect_CL의 CollectionType(telemetry|screen|input|file) 레코드 중 평문 링크로 노출된 경우(PlaintextLinkDetected=true)를 탐지. RF/유선 도청, 화면 캡처, 입력장치 후킹, 로컬 파일 무단 열람 등 암호화되지 않은 채널을 통한 수동 정보 수집. MITRE: T0887, T1125, T1119, T0845, T1113, T1005, T1056",
-        "severity": "High",
+        "displayName": "UAV S98 - Passive Interception of Telemetry, Screen, Input, or File (Plaintext) (Proxy - Design Blind Spot)",
+        "description": "[설계상 사각지대 — 능동 신호 없음] 수동 텔레메트리·화면·입력·파일 감청(평문) 탐지. 평문/수동 감청은 정의상 방어자 시야에 로그를 남기지 않는 공격이므로(RF 도청, 케이블 탭, 화면/입력장치 후킹 등) 실배포 워크스페이스에 이를 직접 관측하는 텔레메트리가 존재하지 않는다. 이는 계측 누락이 아니라 의도된(intentional) 탐지 불가 영역일 가능성이 높다. 본 룰은 UAVDatalinkConn_CL의 연결 메타데이터(State/LocalIp/PeerIp/PeerPort)를 이용해 텔넷(23)·FTP(21)·TFTP(69)·HTTP(80)·RTSP(554)·PPTP(1723) 등 알려진 평문 프로토콜 포트로의 연결 패턴만 인접 신호로 근사 관측하며, 실제 평문 감청 발생 여부를 판정하지 않는다. 이 룰은 항상 결과가 []일 수 있으며, 이는 정상이다. MITRE: T1125, T1119, T1113, T1005, T1056, T1040",
+        "severity": "Low",
         "enabled": true,
-        "query": "let alertWindow = 15m;\nUAVPassiveCollect_CL\n| where TimeGenerated > ago(alertWindow)\n| where isnotempty(CollectionType)\n| where PlaintextLinkDetected == true\n| extend TriggerReason = strcat('수동감청_평문노출_', CollectionType, '_', UAVId)\n| extend Severity = iff(CollectionType in ('telemetry', 'input'), 'High', 'Medium')\n| project TimeGenerated, UAVId, CollectionType, PlaintextLinkDetected, ProtocolObserved, CaptureMethod, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "query": "let alertWindow = 15m;\nlet plaintextPorts = dynamic([21, 23, 69, 80, 554, 1723]);\nUAVDatalinkConn_CL\n| where TimeGenerated > ago(alertWindow)\n| where PeerPort in (plaintextPorts)\n| extend TriggerReason = strcat('평문가능성_연결패턴근사_', LocalIp, '_to_', PeerIp, ':', tostring(PeerPort))\n| extend Severity = 'Low'\n| project TimeGenerated, LocalIp, PeerIp, PeerPort, State, TriggerReason, Severity\n| order by TimeGenerated desc",
         "queryFrequency": "PT10M",
         "queryPeriod": "PT20M",
         "triggerOperator": "GreaterThan",
@@ -31,10 +31,8 @@
         ],
         "techniques": [
           "T1125",
-          "T1119",
           "T1113",
           "T1005",
-          "T1056",
           "T1040"
         ],
         "subTechniques": [],
@@ -55,22 +53,22 @@
           "aggregationKind": "SingleAlert"
         },
         "alertDetailsOverride": {
-          "alertDisplayNameFormat": "UAV S98 - Passive Plaintext Interception - {{UAVId}}",
-          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | CollectionType={{CollectionType}} | Severity={{Severity}}",
+          "alertDisplayNameFormat": "UAV S98 - Passive Plaintext Interception (Proxy) - {{LocalIp}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | PeerPort={{PeerPort}} | Severity={{Severity}}",
           "alertDynamicProperties": []
         },
         "customDetails": {
           "TriggerReason": "TriggerReason",
-          "CollectionType": "CollectionType",
-          "PlaintextLinkDetected": "PlaintextLinkDetected"
+          "PeerIp": "PeerIp",
+          "PeerPort": "PeerPort"
         },
         "entityMappings": [
           {
-            "entityType": "Host",
+            "entityType": "IP",
             "fieldMappings": [
               {
-                "identifier": "HostName",
-                "columnName": "UAVId"
+                "identifier": "Address",
+                "columnName": "LocalIp"
               }
             ]
           }

@@ -15,10 +15,10 @@
       "apiVersion": "2023-12-01-preview",
       "properties": {
         "displayName": "UAV S9 - IMU Spoofing/Fault (Gyro/Accel Stealthy Drift)",
-        "description": "UAVSensorFault_CL의 gyro/accel 센서에서 매 표본의 DeltaRate가 EkfInnovationGate 미만으로 유지되어 EKF에 매번 Accepted=true로 수용되면서도, 관측 구간 시작~끝 사이 ActualValue 누적 변화량(CumulativeDrift)이 게이트의 5배를 초과하는 완만한 램프(ramp) 주입 패턴 탐지. 매 스텝은 이상탐지 게이트를 통과하지만 누적으로는 명백한 센서 폴트/스푸핑. MITRE ICS ATT&CK: T0806 / EMB3D 센서변조(스텔스 램프 인젝션)",
-        "severity": "High",
+        "description": "UAVTelemetry_CL의 VelocityVariance/PosHorizVariance(EKF_STATUS_REPORT)를 사용해 IMU(자이로/가속도계) 완만한 저강도 드리프트 램프를 탐지. S1(GNSS 스푸핑, PosHorizVariance+VelocityVariance z-score 급증 스파이크)과 달리, S9는 짧은 스파이크가 아닌 2시간 윈도우에 걸친 점진적 상승 추세(누적 램프량)를 낮은 절대 임계값 아래에서 탐지해 스텔스 IMU 조작을 식별(다른 탐지 각도로 S1과 중복 회피). MITRE ICS ATT&CK: T0806 / EMB3D 센서변조(스텔스 램프 인젝션)",
+        "severity": "Medium",
         "enabled": true,
-        "query": "let alertWindow = 1h;\nlet minSamples = 5;\nlet stealthMargin = 5.0;\nUAVSensorFault_CL\n| where TimeGenerated > ago(alertWindow)\n| where SensorType in ('gyro', 'accel')\n| where Accepted == true\n| where abs(DeltaRate) < EkfInnovationGate\n| summarize\n    (FirstTime, FirstActual) = arg_min(TimeGenerated, ActualValue),\n    (LastTime, LastActual) = arg_max(TimeGenerated, ActualValue),\n    SampleCount = count(),\n    AcceptedCount = countif(Accepted),\n    MaxAbsDeltaRate = max(abs(DeltaRate)),\n    MinGate = min(EkfInnovationGate)\n    by UAVId, SensorType\n| where SampleCount >= minSamples and AcceptedCount == SampleCount\n| extend CumulativeDrift = abs(LastActual - FirstActual)\n| where MaxAbsDeltaRate < MinGate\n| where CumulativeDrift > (MinGate * stealthMargin)\n| extend TriggerReason = strcat('IMU_스텔스_점진드리프트_', SensorType, '_누적', tostring(round(CumulativeDrift,4)), '_게이트', tostring(round(MinGate,4)))\n| extend Severity = 'High'\n| project FirstTime, LastTime, UAVId, SensorType, SampleCount, CumulativeDrift, MaxAbsDeltaRate, MinGate, TriggerReason, Severity\n| order by LastTime desc",
+        "query": "let alertWindow = 2h;\nlet binSize = 5m;\nlet minSamples = 6;\nlet rampThreshold = 0.02;\nlet capLevel = 0.15;\nUAVTelemetry_CL\n| where TimeGenerated > ago(alertWindow)\n| where MsgType == \"EKF_STATUS_REPORT\"\n| summarize AvgPosVar = avg(PosHorizVariance), AvgVelVar = avg(VelocityVariance) by UAVId, TimeBin = bin(TimeGenerated, binSize)\n| summarize\n    (FirstBin, FirstPos, FirstVel) = arg_min(TimeBin, AvgPosVar, AvgVelVar),\n    (LastBin, LastPos, LastVel) = arg_max(TimeBin, AvgPosVar, AvgVelVar),\n    SampleCount = count(),\n    MaxPos = max(AvgPosVar),\n    MaxVel = max(AvgVelVar)\n    by UAVId\n| where SampleCount >= minSamples\n| extend PosRamp = LastPos - FirstPos, VelRamp = LastVel - FirstVel\n| where PosRamp > rampThreshold and VelRamp > rampThreshold\n| where MaxPos < capLevel and MaxVel < capLevel\n| extend TriggerReason = strcat('IMU_스텔스_점진드리프트_램프_Pos', tostring(round(PosRamp,4)), '_Vel', tostring(round(VelRamp,4)))\n| extend Severity = 'Medium'\n| project TimeGenerated = LastBin, UAVId, FirstBin, LastBin, SampleCount, PosRamp, VelRamp, MaxPos, MaxVel, TriggerReason, Severity\n| order by TimeGenerated desc",
         "queryFrequency": "PT10M",
         "queryPeriod": "PT1H",
         "triggerOperator": "GreaterThan",
@@ -60,7 +60,8 @@
         },
         "customDetails": {
           "TriggerReason": "TriggerReason",
-          "CumulativeDrift": "CumulativeDrift"
+          "PosRamp": "PosRamp",
+          "VelRamp": "VelRamp"
         },
         "entityMappings": [
           {

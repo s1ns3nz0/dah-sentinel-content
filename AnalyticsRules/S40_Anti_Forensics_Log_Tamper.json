@@ -15,10 +15,10 @@
       "apiVersion": "2023-12-01-preview",
       "properties": {
         "displayName": "UAV S40 - Anti-Forensics (Log Deletion / Black Box Tamper)",
-        "description": "드론 anti-forensics 탐지 — UAVAuditLog_CL에서 명시적 삭제/절단/블랙박스 와이프/타임스탬프 역행 이벤트(log_delete, log_truncate, blackbox_wipe, timestamp_rewind), 또는 로그 보존 비율(RecordCountAfter/RecordCountBefore)이 UAV_Threshold_List의 MinAuditLogRetentionRatio 미만으로 급감한 경우를 탐지. MITRE: T1070",
+        "description": "드론 anti-forensics 탐지 — UAVFileAudit_CL(컨테이너 파일시스템 감사)에서 LogBearingTargetSuspected=true(로그/블랙박스/감사기록을 대상으로 하는 것으로 의심되는 파일 작업)로 플래그된 이벤트를 탐지. Operation이 삭제/절단류(delete/truncate/unlink)인 경우와 PersistenceTargetSuspected가 동시에 참인 경우를 구분해 사유를 산출. 실제 컬럼: ContainerName, Pid, ProcessName, Operation, FilePath, BytesAccessed, User, Syscall, LogBearingTargetSuspected, PersistenceTargetSuspected(UAVAuditLog_CL/RecordCountBefore/RecordCountAfter/TimestampDeltaSec 컬럼은 존재하지 않아 제거함). MITRE: T1070",
         "severity": "High",
         "enabled": true,
-        "query": "let minRetentionRatio = toscalar(\n    _GetWatchlist('UAV_Threshold_List')\n    | where ThresholdKey == 'MinAuditLogRetentionRatio'\n    | project toreal(Value));\nlet alertWindow = 15m;\nUAVAuditLog_CL\n| where TimeGenerated > ago(alertWindow)\n| extend RetentionRatio = iff(RecordCountBefore > 0, todouble(RecordCountAfter) / todouble(RecordCountBefore), 1.0)\n| where EventType in (\"log_delete\", \"log_truncate\", \"blackbox_wipe\", \"timestamp_rewind\")\n    or RetentionRatio < minRetentionRatio\n    or TimestampDeltaSec < 0\n| extend TriggerReason = case(\n    EventType == \"blackbox_wipe\", \"안티포렌식_블랙박스_와이프\",\n    EventType == \"timestamp_rewind\" or TimestampDeltaSec < 0, \"안티포렌식_타임스탬프_역행조작\",\n    EventType in (\"log_delete\", \"log_truncate\"), \"안티포렌식_로그삭제_절단\",\n    \"안티포렌식_로그건수_급감\")\n| extend Severity = \"High\"\n| project TimeGenerated, UAVId, LogSource, EventType, RecordCountBefore, RecordCountAfter, RetentionRatio, TimestampDeltaSec, Operator, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "query": "let alertWindow = 15m;\nUAVFileAudit_CL\n| where TimeGenerated > ago(alertWindow)\n| where LogBearingTargetSuspected == true\n| extend TriggerReason = case(\n    Operation in (\"delete\", \"truncate\", \"unlink\") and PersistenceTargetSuspected == true, \"안티포렌식_로그삭제절단_퍼시스턴스_동시\",\n    Operation in (\"delete\", \"truncate\", \"unlink\"), \"안티포렌식_로그파일_삭제절단\",\n    PersistenceTargetSuspected == true, \"안티포렌식_로그변조_퍼시스턴스_의심\",\n    \"안티포렌식_로그베어링_타겟_접근\")\n| extend Severity = \"High\"\n| project TimeGenerated, ContainerName, Pid, ProcessName, Operation, FilePath, BytesAccessed, User, Syscall, LogBearingTargetSuspected, PersistenceTargetSuspected, TriggerReason, Severity\n| order by TimeGenerated desc",
         "queryFrequency": "PT5M",
         "queryPeriod": "PT15M",
         "triggerOperator": "GreaterThan",
@@ -52,15 +52,15 @@
           "aggregationKind": "SingleAlert"
         },
         "alertDetailsOverride": {
-          "alertDisplayNameFormat": "UAV S40 - Anti-Forensics (Log Deletion / Black Box Tamper) - {{UAVId}}",
-          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | RetentionRatio={{RetentionRatio}} | TimestampDeltaSec={{TimestampDeltaSec}}",
+          "alertDisplayNameFormat": "UAV S40 - Anti-Forensics (Log Deletion / Black Box Tamper) - {{ContainerName}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Operation={{Operation}} | FilePath={{FilePath}}",
           "alertDynamicProperties": []
         },
         "customDetails": {
           "TriggerReason": "TriggerReason",
-          "LogSource": "LogSource",
-          "RetentionRatio": "RetentionRatio",
-          "Operator": "Operator"
+          "Operation": "Operation",
+          "FilePath": "FilePath",
+          "User": "User"
         },
         "entityMappings": [
           {
@@ -68,7 +68,16 @@
             "fieldMappings": [
               {
                 "identifier": "HostName",
-                "columnName": "UAVId"
+                "columnName": "ContainerName"
+              }
+            ]
+          },
+          {
+            "entityType": "Account",
+            "fieldMappings": [
+              {
+                "identifier": "Name",
+                "columnName": "User"
               }
             ]
           }

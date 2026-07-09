@@ -15,10 +15,10 @@
       "apiVersion": "2023-12-01-preview",
       "properties": {
         "displayName": "UAV S59 - Archive Symlink Path Traversal",
-        "description": "UAVArchiveExtract_CL에서 아카이브 내 심볼릭 링크 엔트리의 타깃이 지정된 추출 루트(ExtractRoot) 밖을 가리키는 경로순회 탐지. MITRE: T1195",
+        "description": "UAVArchiveAudit_CL에서 아카이브 내 심볼릭 링크 엔트리가 추출 루트 밖을 가리키는 경로순회가 SymlinkEscapeDetected 플래그로 탐지된 이벤트. MITRE: T1195",
         "severity": "Medium",
         "enabled": true,
-        "query": "let alertWindow = 15m;\nUAVArchiveExtract_CL\n| where TimeGenerated > ago(alertWindow)\n| where isnotempty(SymlinkTarget)\n| where not(SymlinkTarget startswith ExtractRoot)\n| extend TriggerReason = strcat(\"심볼릭링크_경로순회_\", ArchiveEntry, \"_to_\", SymlinkTarget)\n| extend Severity = \"Medium\"\n| project TimeGenerated, UAVId, ArchiveName, ArchiveEntry, SymlinkTarget, ExtractRoot, UploadedBy, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "query": "let alertWindow = 15m;\nUAVArchiveAudit_CL\n| where TimeGenerated > ago(alertWindow)\n| where SymlinkEscapeDetected == true\n| extend TriggerReason = strcat(\"심볼릭링크_경로순회_\", ArchiveName, \"_\", EntryPath)\n| extend Severity = \"Medium\"\n| project TimeGenerated, ArchiveName, Mode, EntryPath, SymlinkEscapeDetected, ExtractedCount, BlockedCount, StatusCode, TriggerReason, Severity\n| order by TimeGenerated desc",
         "queryFrequency": "PT5M",
         "queryPeriod": "PT15M",
         "triggerOperator": "GreaterThan",
@@ -50,15 +50,15 @@
           "aggregationKind": "SingleAlert"
         },
         "alertDetailsOverride": {
-          "alertDisplayNameFormat": "UAV S59 - Archive Symlink Path Traversal - {{UAVId}}",
-          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | ArchiveEntry={{ArchiveEntry}} | SymlinkTarget={{SymlinkTarget}}",
+          "alertDisplayNameFormat": "UAV S59 - Archive Symlink Path Traversal - {{ArchiveName}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | EntryPath={{EntryPath}} | BlockedCount={{BlockedCount}}",
           "alertDynamicProperties": []
         },
         "customDetails": {
           "TriggerReason": "TriggerReason",
-          "ArchiveEntry": "ArchiveEntry",
-          "SymlinkTarget": "SymlinkTarget",
-          "UploadedBy": "UploadedBy"
+          "ArchiveName": "ArchiveName",
+          "EntryPath": "EntryPath",
+          "BlockedCount": "BlockedCount"
         },
         "entityMappings": [
           {
@@ -66,16 +66,7 @@
             "fieldMappings": [
               {
                 "identifier": "HostName",
-                "columnName": "UAVId"
-              }
-            ]
-          },
-          {
-            "entityType": "Account",
-            "fieldMappings": [
-              {
-                "identifier": "Name",
-                "columnName": "UploadedBy"
+                "columnName": "ArchiveName"
               }
             ]
           }

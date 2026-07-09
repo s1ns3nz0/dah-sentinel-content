@@ -15,10 +15,10 @@
       "apiVersion": "2023-12-01-preview",
       "properties": {
         "displayName": "UAV S8 - DShot/ESC Motor Manipulation (Autopilot Mixer Bypass)",
-        "description": "UAVActuator_CL에서 CommandSource가 autopilot_mixer가 아니거나 BypassAutopilot=true인 DShot/ESC 모터 명령 탐지. 공격자가 비행제어기의 믹서 로직을 우회해 개별 모터에 직접 out-of-band 명령을 주입, 특정 모터 지속 장악/추력 조작을 시도하는 정황. MITRE ICS ATT&CK: T0855 / EMB3D 비인가명령주입",
-        "severity": "High",
+        "description": "제안 스키마 — 실제 텔레메트리 소스(DShot/ESC 직접 액추에이터 명령 로그) 미배포. UAVTelemetry_CL의 진동(VibrationX/Y/Z)/클리핑(Clipping0/1/2) 필드로 간접 프록시하여 모터 이상거동 신호를 근사 탐지(비행제어기 믹서 우회 직접증거 아님, 진동/클리핑 급증만으로 판정하는 약한 대체 신호). MITRE ICS ATT&CK: T0855 / EMB3D 비인가명령주입(프록시)",
+        "severity": "Medium",
         "enabled": true,
-        "query": "let alertWindow = 10m;\nUAVActuator_CL\n| where TimeGenerated > ago(alertWindow)\n| extend isBypass = BypassAutopilot == true or CommandSource != 'autopilot_mixer'\n| where isBypass\n| summarize\n    EventCount = count(),\n    DistinctMotors = dcount(MotorId),\n    MaxCommandValue = max(CommandValue),\n    MinCommandValue = min(CommandValue),\n    SourceSet = make_set(CommandSource)\n    by UAVId, bin(TimeGenerated, 1m)\n| where EventCount > 0\n| extend TriggerReason = strcat('DShot_ESC_비인가_직접명령_', tostring(DistinctMotors), '개모터_', tostring(EventCount), '건')\n| extend Severity = 'High'\n| project TimeGenerated, UAVId, EventCount, DistinctMotors, MaxCommandValue, MinCommandValue, SourceSet, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "query": "let alertWindow = 10m;\nlet vibThreshold = 30.0;\nUAVTelemetry_CL\n| where TimeGenerated > ago(alertWindow)\n| where isnotnull(VibrationX) or isnotnull(VibrationY) or isnotnull(VibrationZ)\n| extend MaxVib = max_of(abs(VibrationX), abs(VibrationY), abs(VibrationZ))\n| extend TotalClipping = toint(coalesce(Clipping0, 0)) + toint(coalesce(Clipping1, 0)) + toint(coalesce(Clipping2, 0))\n| where MaxVib > vibThreshold or TotalClipping > 0\n| extend TriggerReason = strcat('ESC_모터_이상진동_프록시_MaxVib_', tostring(round(MaxVib,2)), '_Clipping_', tostring(TotalClipping))\n| extend Severity = 'Medium'\n| project TimeGenerated, UAVId, MaxVib, TotalClipping, VibrationX, VibrationY, VibrationZ, Clipping0, Clipping1, Clipping2, TriggerReason, Severity\n| order by TimeGenerated desc",
         "queryFrequency": "PT5M",
         "queryPeriod": "PT15M",
         "triggerOperator": "GreaterThan",
@@ -60,7 +60,7 @@
         },
         "customDetails": {
           "TriggerReason": "TriggerReason",
-          "DistinctMotors": "DistinctMotors"
+          "MaxVib": "MaxVib"
         },
         "entityMappings": [
           {

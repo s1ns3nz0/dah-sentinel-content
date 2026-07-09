@@ -15,10 +15,10 @@
       "apiVersion": "2023-12-01-preview",
       "properties": {
         "displayName": "UAV S16 - ESC Firmware Tampering (Persistent Motor Compromise)",
-        "description": "UAVFirmware_CL에서 ESC 컴포넌트로의 flash_write 이벤트 중 FirmwareHash가 Watchlist(Approved_Firmware_Hash_List)에 없거나 Signed=false인 경우 탐지. 공격자가 서명 미검증/비인가 해시의 변조 펌웨어를 ESC에 플래시해 모터 제어를 재부팅 후에도 지속 장악(persistence)하려는 시도. MITRE Enterprise ATT&CK: T1495 Firmware Corruption / MITRE ICS ATT&CK: T0879",
+        "description": "UAVPgse_CL(전기체/GSE 사전비행 무결성 검증 로그. 실제 컬럼: EventType, UAVId, Operator, Serial, ImageHashSubmitted, ImageHashExpected, HashMatch, Passed, FailReason 등 — UAVFirmware_CL/FlashEventType/ComponentId/Signed는 존재하지 않음)에서 Serial/Reason/FailReason에 'ESC' 태그가 포함된 검증 레코드 중 HashMatch=false 또는 Passed=false인 경우를 ESC 펌웨어 변조/무결성 실패로 탐지. 공격자가 서명 미검증/해시불일치 변조 펌웨어를 ESC에 반영해 모터 제어를 지속 장악(persistence)하려는 시도. MITRE Enterprise ATT&CK: T1495 Firmware Corruption / MITRE ICS ATT&CK: T0879",
         "severity": "High",
         "enabled": true,
-        "query": "let alertWindow = 1h;\nlet ApprovedHashes = _GetWatchlist('Approved_Firmware_Hash_List') | project Hash;\nUAVFirmware_CL\n| where TimeGenerated > ago(alertWindow)\n| where FlashEventType == 'flash_write'\n| where ComponentId startswith 'ESC'\n| extend isUnapprovedHash = FirmwareHash !in (ApprovedHashes)\n| extend isUnsigned = Signed == false\n| where isUnapprovedHash or isUnsigned\n| extend TriggerReason = case(\n    isUnsigned, strcat('ESC_미서명_펌웨어_플래시_', ComponentId),\n    strcat('ESC_비인가_해시_펌웨어_플래시_', ComponentId))\n| extend Severity = 'High'\n| project TimeGenerated, UAVId, ComponentId, FirmwareHash, Signed, FlashEventType, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "query": "let alertWindow = 1h;\nUAVPgse_CL\n| where TimeGenerated > ago(alertWindow)\n| where Serial has_cs 'ESC' or Reason has_cs 'ESC' or FailReason has_cs 'ESC'\n| where HashMatch == false or Passed == false\n| extend TriggerReason = case(\n    HashMatch == false, strcat('ESC_펌웨어_해시불일치_', tostring(Serial)),\n    strcat('ESC_사전비행_검증실패_', tostring(Serial)))\n| extend Severity = 'High'\n| project TimeGenerated, UAVId, EventType, Operator, Serial, ImageHashSubmitted, ImageHashExpected, HashMatch, Passed, FailReason, StatusCode, TriggerReason, Severity\n| order by TimeGenerated desc",
         "queryFrequency": "PT10M",
         "queryPeriod": "PT1H",
         "triggerOperator": "GreaterThan",
@@ -59,8 +59,8 @@
         },
         "customDetails": {
           "TriggerReason": "TriggerReason",
-          "ComponentId": "ComponentId",
-          "FirmwareHash": "FirmwareHash"
+          "Serial": "Serial",
+          "HashMatch": "HashMatch"
         },
         "entityMappings": [
           {

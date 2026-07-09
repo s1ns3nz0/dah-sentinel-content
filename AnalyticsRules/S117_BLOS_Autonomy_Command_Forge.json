@@ -15,10 +15,10 @@
       "apiVersion": "2023-12-01-preview",
       "properties": {
         "displayName": "UAV S117 - BLOS SATCOM Autonomy Command Delay/Forge",
-        "description": "UAVOpmode_CL에서 OpmodeField='blos_autonomy_command'인 SATCOM 경유 자율명령 중 Authorized=0(SByte), 비인가 발신자(Approved_Operators_List 미포함), 또는 ExpectedValue/ObservedValue 불일치(위조 의심)를 탐지. 실제 컬럼: OpmodeField/ExpectedValue/ObservedValue/ChangedBy/Authorized(SByte). MITRE: T0856 Spoof Reporting Message (BLOS 구간에서 자율명령을 지연·위조해 실제 상태와 다른 명령을 주입)",
+        "description": "UAVSatcomLink_CL에서 IntegrityStatus 비정상 또는 BeaconJitterSec 과다인 위성링크 무결성 위반 구간과, UAVTelemetry_CL의 Command 발생 시각을 UAVId 기준 ±30초로 상관분석하여 BLOS 구간 자율명령 위조/지연 의심을 탐지. UAVOpmode_CL은 존재하지 않아 실제 SATCOM 링크 무결성 테이블과 텔레메트리 명령 테이블의 조인으로 재구성. MITRE: T0856 Spoof Reporting Message (BLOS 구간에서 자율명령을 지연·위조해 실제 상태와 다른 명령을 주입)",
         "severity": "High",
         "enabled": true,
-        "query": "let alertWindow = 10m;\nlet ApprovedOps = _GetWatchlist('Approved_Operators_List') | project OperatorId;\nUAVOpmode_CL\n| where TimeGenerated > ago(alertWindow)\n| where OpmodeField == 'blos_autonomy_command'\n| extend isUnapproved = ChangedBy !in (ApprovedOps)\n| extend isMismatch = ExpectedValue != ObservedValue\n| where Authorized == 0 or isUnapproved or isMismatch\n| extend TriggerReason = case(\n    isUnapproved, strcat(\"BLOS_자율명령_비인가발신자_\", ChangedBy),\n    isMismatch, strcat(\"BLOS_자율명령_위조의심_\", ExpectedValue, \"->\", ObservedValue),\n    strcat(\"BLOS_자율명령_비인가_\", UAVId))\n| project TimeGenerated, UAVId, OpmodeField, ExpectedValue, ObservedValue, ChangedBy, Authorized, Seq, TriggerReason\n| order by TimeGenerated desc",
+        "query": "let alertWindow = 15m;\nlet JitterThresholdSec = 2.0;\nlet JoinWindowSec = 30;\nUAVSatcomLink_CL\n| where TimeGenerated > ago(alertWindow)\n| where IntegrityStatus != 'ok' or BeaconJitterSec > JitterThresholdSec\n| project LinkTime = TimeGenerated, UAVId, LinkId, IntegrityStatus, BeaconJitterSec, PayloadEntropy\n| join kind=inner (\n    UAVTelemetry_CL\n    | where TimeGenerated > ago(alertWindow)\n    | where isnotnull(Command)\n    | project CmdTime = TimeGenerated, UAVId, Command, Param1, Param2, Param3, Param4\n) on UAVId\n| where abs(datetime_diff('second', LinkTime, CmdTime)) <= JoinWindowSec\n| extend TriggerReason = strcat(\"BLOS_자율명령_위조의심_\", UAVId, \"_Integrity:\", IntegrityStatus)\n| project LinkTime, CmdTime, UAVId, LinkId, IntegrityStatus, BeaconJitterSec, Command, TriggerReason\n| order by LinkTime desc",
         "queryFrequency": "PT5M",
         "queryPeriod": "PT15M",
         "triggerOperator": "GreaterThan",
@@ -59,7 +59,7 @@
         },
         "customDetails": {
           "TriggerReason": "TriggerReason",
-          "Authorized": "Authorized"
+          "IntegrityStatus": "IntegrityStatus"
         },
         "entityMappings": [
           {
@@ -68,15 +68,6 @@
               {
                 "identifier": "HostName",
                 "columnName": "UAVId"
-              }
-            ]
-          },
-          {
-            "entityType": "Account",
-            "fieldMappings": [
-              {
-                "identifier": "Name",
-                "columnName": "ChangedBy"
               }
             ]
           }

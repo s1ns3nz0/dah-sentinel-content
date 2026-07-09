@@ -15,10 +15,10 @@
       "apiVersion": "2023-12-01-preview",
       "properties": {
         "displayName": "UAV S52 - Container Resource Exhaustion DoS (SYN Flood)",
-        "description": "UAVContainerOps_CL에서 컨테이너 CPU 고갈(>90%)과 연결 폭증(>200)이 5분 이상 2개 이상 구간에서 동시 지속되는 SYN flood형 리소스 고갈 DoS 탐지. MITRE: T0816,T1499",
+        "description": "UAVResourceMetrics_CL의 컨테이너 CPU 고갈(>90%)/메모리 한도근접(>90%)과 UAVDatalink_CL의 수신패킷 폭증이 5분 이상 2개 이상 구간에서 ContainerName+시간버킷 동시 지속되는 SYN flood형 리소스 고갈 DoS 탐지. MITRE: T0816,T1499",
         "severity": "High",
         "enabled": true,
-        "query": "let alertWindow = 20m;\nlet cpuGate = 90.0;\nlet connGate = 200;\nUAVContainerOps_CL\n| where TimeGenerated > ago(alertWindow)\n| summarize MaxCpu = max(CpuUsagePct), MaxConn = max(ConnCount) by ContainerName, UAVId, TimeBin = bin(TimeGenerated, 5m)\n| where MaxCpu > cpuGate and MaxConn > connGate\n| summarize SustainedBins = count(), FirstBin = min(TimeBin), LastBin = max(TimeBin), PeakCpu = max(MaxCpu), PeakConn = max(MaxConn) by ContainerName, UAVId\n| extend DurationMin = datetime_diff(\"minute\", LastBin, FirstBin)\n| where SustainedBins >= 2 and DurationMin >= 5\n| extend TriggerReason = strcat(ContainerName, \"_SYNflood_CPU고갈_\", tostring(toint(PeakCpu)), \"%_Conn\", tostring(PeakConn))\n| extend Severity = \"High\"\n| project LastBin, FirstBin, ContainerName, UAVId, PeakCpu, PeakConn, SustainedBins, DurationMin, TriggerReason, Severity\n| order by LastBin desc",
+        "query": "let alertWindow = 20m;\nlet cpuGate = 90.0;\nlet memRatioGate = 0.9;\nlet rxPacketGate = 50000;\nlet ResourceSpike =\n    UAVResourceMetrics_CL\n    | where TimeGenerated > ago(alertWindow)\n    | extend MemRatio = todouble(MemoryUsageBytes) / MemoryLimitBytes\n    | summarize MaxCpu = max(CpuUsagePct), MaxMemRatio = max(MemRatio) by ContainerName, TimeBin = bin(TimeGenerated, 5m)\n    | where MaxCpu > cpuGate and MaxMemRatio > memRatioGate;\nlet NetBurst =\n    UAVDatalink_CL\n    | where TimeGenerated > ago(alertWindow)\n    | summarize MaxRxPackets = max(RxPackets) by ContainerName, TimeBin = bin(TimeGenerated, 5m)\n    | where MaxRxPackets > rxPacketGate;\nResourceSpike\n| join kind=inner (NetBurst) on ContainerName, TimeBin\n| summarize SustainedBins = count(), FirstBin = min(TimeBin), LastBin = max(TimeBin), PeakCpu = max(MaxCpu), PeakMemRatio = max(MaxMemRatio), PeakRxPackets = max(MaxRxPackets) by ContainerName\n| extend DurationMin = datetime_diff(\"minute\", LastBin, FirstBin)\n| where SustainedBins >= 2 and DurationMin >= 5\n| extend TriggerReason = strcat(ContainerName, \"_리소스고갈DoS_CPU\", tostring(toint(PeakCpu)), \"%_RxPkt\", tostring(PeakRxPackets))\n| extend Severity = \"High\"\n| project TimeGenerated = LastBin, FirstBin, ContainerName, PeakCpu, PeakMemRatio, PeakRxPackets, SustainedBins, DurationMin, TriggerReason, Severity\n| order by TimeGenerated desc",
         "queryFrequency": "PT5M",
         "queryPeriod": "PT20M",
         "triggerOperator": "GreaterThan",
@@ -53,14 +53,14 @@
         },
         "alertDetailsOverride": {
           "alertDisplayNameFormat": "UAV S52 - Container Resource Exhaustion DoS (SYN Flood) - {{ContainerName}}",
-          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | PeakCpu={{PeakCpu}} | PeakConn={{PeakConn}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | PeakCpu={{PeakCpu}} | PeakRxPackets={{PeakRxPackets}}",
           "alertDynamicProperties": []
         },
         "customDetails": {
           "TriggerReason": "TriggerReason",
           "ContainerName": "ContainerName",
           "PeakCpu": "PeakCpu",
-          "PeakConn": "PeakConn"
+          "PeakRxPackets": "PeakRxPackets"
         },
         "entityMappings": [
           {
@@ -68,7 +68,7 @@
             "fieldMappings": [
               {
                 "identifier": "HostName",
-                "columnName": "UAVId"
+                "columnName": "ContainerName"
               }
             ]
           }

@@ -14,11 +14,11 @@
       "kind": "Scheduled",
       "apiVersion": "2023-12-01-preview",
       "properties": {
-        "displayName": "UAV S85 - SOC Incident Report Forgery (False State Assertion)",
-        "description": "SOC 사건보고서 위조(거짓 사건보고) 탐지. UAVSocReport_CL에서 보고서에 기재된 사건 상태(IncidentStated)가 원시 경보 데이터로부터 재구성한 실제 상태(TrueStateFromRawAlerts)와 불일치하거나, 무결성 서명(IntegritySigned)이 누락된 보고서를 탐지. 파이프라인이 정상 생성한 보고서는 항상 서명되므로 미서명 보고서는 사후 변조 또는 우회 작성 의심. MITRE: T1565",
+        "displayName": "UAV S85 - SOC Incident Report Forgery (Proxy - Instrumentation Gap)",
+        "description": "[계측 공백/최선근사] SOC 사건보고서 위조(거짓 사건보고) 탐지. 실배포 워크스페이스에는 SOC 보고서 무결성을 직접 기록하는 전용 테이블이 존재하지 않음(genuine instrumentation gap). 본 룰은 UAVServiceAudit_CL을 범용 감사 테이블로 활용해 EventType='soc_report_forge'(본 룰이 정의한 관례값)로 태깅된 레코드 중 IsDestructiveAction 또는 LogBearingTargetSuspected가 true인 경우를 위조/은폐 의심 근사 신호로 탐지한다. 전용 SOC 보고서 무결성 서명 파이프라인이 도입되기 전까지의 임시 대체(proxy) 룰이며, 실제 사건상태 불일치를 직접 판정하지 않는다. MITRE: T1565",
         "severity": "High",
         "enabled": true,
-        "query": "let alertWindow = 15m;\nUAVSocReport_CL\n| where TimeGenerated > ago(alertWindow)\n| where IntegritySigned == false or IncidentStated != TrueStateFromRawAlerts\n| extend TriggerReason = case(\n    IntegritySigned == false, strcat('SOC보고서_무결성서명_누락_', ReportId),\n    IncidentStated != TrueStateFromRawAlerts, strcat('SOC보고서_상태불일치_', IncidentStated, '_vs_', TrueStateFromRawAlerts),\n    'Unknown')\n| extend Severity = 'High'\n| project TimeGenerated, ReportId, IncidentStated, TrueStateFromRawAlerts, IntegritySigned, AuthoredBy, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "query": "let alertWindow = 15m;\nUAVServiceAudit_CL\n| where TimeGenerated > ago(alertWindow)\n| where EventType == 'soc_report_forge'\n| where IsDestructiveAction == true or LogBearingTargetSuspected == true\n| extend TriggerReason = case(\n    LogBearingTargetSuspected == true, strcat('SOC보고서_위조의심_로그대상_', ActorId),\n    IsDestructiveAction == true, strcat('SOC보고서_위조의심_파괴적작업_', ActorId),\n    'Unknown')\n| extend Severity = 'High'\n| project TimeGenerated, EventType, Action, ActorId, ServiceLabel, ProjectLabel, IsDestructiveAction, LogBearingTargetSuspected, TriggerReason, Severity\n| order by TimeGenerated desc",
         "queryFrequency": "PT10M",
         "queryPeriod": "PT20M",
         "triggerOperator": "GreaterThan",
@@ -51,14 +51,14 @@
           "aggregationKind": "SingleAlert"
         },
         "alertDetailsOverride": {
-          "alertDisplayNameFormat": "UAV S85 - SOC Incident Report Forgery - {{ReportId}}",
-          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | AuthoredBy={{AuthoredBy}} | Severity={{Severity}}",
+          "alertDisplayNameFormat": "UAV S85 - SOC Incident Report Forgery (Proxy) - {{ActorId}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | ActorId={{ActorId}} | Severity={{Severity}}",
           "alertDynamicProperties": []
         },
         "customDetails": {
           "TriggerReason": "TriggerReason",
-          "ReportId": "ReportId",
-          "IntegritySigned": "IntegritySigned"
+          "ActorId": "ActorId",
+          "LogBearingTargetSuspected": "LogBearingTargetSuspected"
         },
         "entityMappings": [
           {
@@ -66,7 +66,7 @@
             "fieldMappings": [
               {
                 "identifier": "Name",
-                "columnName": "AuthoredBy"
+                "columnName": "ActorId"
               }
             ]
           }

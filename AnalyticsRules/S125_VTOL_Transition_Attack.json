@@ -15,10 +15,10 @@
       "apiVersion": "2023-12-01-preview",
       "properties": {
         "displayName": "UAV S125 - VTOL Transition Window Attack",
-        "description": "UAVOpmode_CL에서 OpmodeField='vtol_transition_window'인 레코드 중 ExpectedValue(승인된 천이 조건: 고도/속도 창)와 ObservedValue(실제 천이 시점 조건)가 불일치하고 Authorized=0(SByte)인 비인가 강제 천이 탐지. 실제 컬럼: OpmodeField/ExpectedValue/ObservedValue/ChangedBy/Authorized(SByte). MITRE: T0827 Loss of Control (안전 천이 창을 벗어난 시점에 VTOL 천이를 강제해 통제권을 상실시킴)",
+        "description": "UAVTelemetry_CL에서 CustomMode가 호버(HoverMode)/전진비행(ForwardMode) 값 사이를 전환하는 시점(직전 레코드 대비 CustomMode 변경) 중 ClimbRate_ms가 임계값을 초과하는 이상 거동을 탐지. VTOL 천이 관련 정확한 custom_mode 수치는 미확정 — let 변수로 명시하여 추후 보정 필요. UAVOpmode_CL은 존재하지 않아 실제 텔레메트리 모드/승강률 컬럼 기반으로 재구성. MITRE: T0827 Loss of Control (안전 천이 창을 벗어난 시점에 VTOL 천이를 강제해 통제권을 상실시킴)",
         "severity": "High",
         "enabled": true,
-        "query": "let alertWindow = 10m;\nUAVOpmode_CL\n| where TimeGenerated > ago(alertWindow)\n| where OpmodeField == 'vtol_transition_window'\n| where ExpectedValue != ObservedValue and Authorized == 0\n| extend TriggerReason = strcat(\"VTOL천이_비인가강제_\", UAVId, \"_\", ExpectedValue, \"->\", ObservedValue)\n| project TimeGenerated, UAVId, OpmodeField, ExpectedValue, ObservedValue, ChangedBy, Authorized, Seq, TriggerReason\n| order by TimeGenerated desc",
+        "query": "let alertWindow = 20m;\nlet HoverMode = 18;   // VTOL 호버 모드 추정치 — 미확정, 재검증 필요\nlet ForwardMode = 10; // VTOL 전진비행(AUTO 계열) 모드 추정치 — 미확정, 재검증 필요\nlet ClimbRateThreshold = 5.0; // m/s\nUAVTelemetry_CL\n| where TimeGenerated > ago(alertWindow)\n| where CustomMode in (HoverMode, ForwardMode)\n| where isnotnull(ClimbRate_ms) and isnotnull(Airspeed_ms)\n| order by UAVId asc, TimeGenerated asc\n| serialize\n| extend PrevMode = prev(CustomMode, 1), PrevUAVId = prev(UAVId, 1)\n| where UAVId == PrevUAVId and CustomMode != PrevMode\n| where abs(ClimbRate_ms) > ClimbRateThreshold\n| extend TriggerReason = strcat(\"VTOL천이_이상거동_\", UAVId, \"_\", tostring(PrevMode), \"->\", tostring(CustomMode), \"_ClimbRate:\", tostring(ClimbRate_ms))\n| project TimeGenerated, UAVId, PrevMode, CustomMode, ClimbRate_ms, Airspeed_ms, TriggerReason\n| order by TimeGenerated desc",
         "queryFrequency": "PT5M",
         "queryPeriod": "PT15M",
         "triggerOperator": "GreaterThan",
@@ -58,7 +58,7 @@
         },
         "customDetails": {
           "TriggerReason": "TriggerReason",
-          "Authorized": "Authorized"
+          "ClimbRate_ms": "ClimbRate_ms"
         },
         "entityMappings": [
           {
@@ -67,15 +67,6 @@
               {
                 "identifier": "HostName",
                 "columnName": "UAVId"
-              }
-            ]
-          },
-          {
-            "entityType": "Account",
-            "fieldMappings": [
-              {
-                "identifier": "Name",
-                "columnName": "ChangedBy"
               }
             ]
           }

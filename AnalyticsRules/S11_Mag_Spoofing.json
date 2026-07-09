@@ -15,10 +15,10 @@
       "apiVersion": "2023-12-01-preview",
       "properties": {
         "displayName": "UAV S11 - Magnetometer Spoofing (Heading Stealthy Drift)",
-        "description": "UAVSensorFault_CL의 mag(지자기) 센서에서 매 표본의 DeltaRate가 EkfInnovationGate 미만으로 유지되어 EKF에 매번 Accepted=true로 수용되면서도, 관측 구간 시작~끝 사이 ActualValue(방위) 누적 변화량이 게이트의 5배를 초과하는 완만한 램프 주입 패턴 탐지. 방위 기만으로 항로 이탈 유발 가능. MITRE ICS ATT&CK: T0806 / EMB3D 센서변조(스텔스 램프 인젝션)",
+        "description": "UAVTelemetry_CL의 CompassVariance(EKF_STATUS_REPORT, 지자기 기반 방위 분산)를 사용해 완만한 저강도 방위 드리프트 램프를 탐지. 2시간 윈도우에 걸친 점진적 상승 추세(누적 램프량)를 낮은 절대 임계값 아래에서 탐지해 스텔스 지자기 조작(방위 기만으로 항로 이탈 유발 가능)을 식별. MITRE ICS ATT&CK: T0806 / EMB3D 센서변조(스텔스 램프 인젝션)",
         "severity": "Medium",
         "enabled": true,
-        "query": "let alertWindow = 1h;\nlet minSamples = 5;\nlet stealthMargin = 5.0;\nUAVSensorFault_CL\n| where TimeGenerated > ago(alertWindow)\n| where SensorType == 'mag'\n| where Accepted == true\n| where abs(DeltaRate) < EkfInnovationGate\n| summarize\n    (FirstTime, FirstActual) = arg_min(TimeGenerated, ActualValue),\n    (LastTime, LastActual) = arg_max(TimeGenerated, ActualValue),\n    SampleCount = count(),\n    AcceptedCount = countif(Accepted),\n    MaxAbsDeltaRate = max(abs(DeltaRate)),\n    MinGate = min(EkfInnovationGate)\n    by UAVId, SensorType\n| where SampleCount >= minSamples and AcceptedCount == SampleCount\n| extend CumulativeDrift = abs(LastActual - FirstActual)\n| where MaxAbsDeltaRate < MinGate\n| where CumulativeDrift > (MinGate * stealthMargin)\n| extend TriggerReason = strcat('지자기_스텔스_방위드리프트_누적', tostring(round(CumulativeDrift,4)), '_게이트', tostring(round(MinGate,4)))\n| extend Severity = 'Medium'\n| project FirstTime, LastTime, UAVId, SensorType, SampleCount, CumulativeDrift, MaxAbsDeltaRate, MinGate, TriggerReason, Severity\n| order by LastTime desc",
+        "query": "let alertWindow = 2h;\nlet binSize = 5m;\nlet minSamples = 6;\nlet rampThreshold = 0.02;\nlet capLevel = 0.15;\nUAVTelemetry_CL\n| where TimeGenerated > ago(alertWindow)\n| where MsgType == \"EKF_STATUS_REPORT\"\n| summarize AvgCompassVar = avg(CompassVariance) by UAVId, TimeBin = bin(TimeGenerated, binSize)\n| summarize\n    (FirstBin, FirstCompass) = arg_min(TimeBin, AvgCompassVar),\n    (LastBin, LastCompass) = arg_max(TimeBin, AvgCompassVar),\n    SampleCount = count(),\n    MaxCompass = max(AvgCompassVar)\n    by UAVId\n| where SampleCount >= minSamples\n| extend CompassRamp = LastCompass - FirstCompass\n| where CompassRamp > rampThreshold\n| where MaxCompass < capLevel\n| extend TriggerReason = strcat('지자기_스텔스_방위드리프트_램프_', tostring(round(CompassRamp,4)))\n| extend Severity = 'Medium'\n| project TimeGenerated = LastBin, UAVId, FirstBin, LastBin, SampleCount, CompassRamp, MaxCompass, TriggerReason, Severity\n| order by TimeGenerated desc",
         "queryFrequency": "PT10M",
         "queryPeriod": "PT1H",
         "triggerOperator": "GreaterThan",
@@ -60,7 +60,7 @@
         },
         "customDetails": {
           "TriggerReason": "TriggerReason",
-          "CumulativeDrift": "CumulativeDrift"
+          "CompassRamp": "CompassRamp"
         },
         "entityMappings": [
           {

@@ -15,10 +15,10 @@
       "apiVersion": "2023-12-01-preview",
       "properties": {
         "displayName": "UAV S7 - EO/IR Downlink Interception and Frame Injection",
-        "description": "UAVImagery_CL의 EO/IR 영상 다운링크에서 프레임 무결성 검증 실패(FrameHashValid=false), 동일 StreamId 내 SessionId가 짧은 시간에 복수로 전환(세션 하이재킹), 또는 프레임 출발지(FrameSourceIP)가 스트림의 기대 출발지(ExpectedSourceIP)와 불일치하는 정황을 탐지. 감청 후 중계·재주입(MITM relay) 공격 패턴. MITRE Enterprise ATT&CK: T1557 Adversary-in-the-Middle (Collection/영상 감청·프레임 주입)",
+        "description": "UAVImagery_CL(실제 컬럼: UAVId, EventType, MsgType 뿐 — FrameSeq/FrameHashValid/SessionId/StreamId 등은 존재하지 않음)에서 EventType='frame_inject'로 태깅된 프레임 주입 이벤트, 또는 동일 1분 구간 내 MsgType 다양성이 비정상적으로 높은 정황(감청 후 중계·재주입으로 인한 메시지 유형 혼입 프록시 신호)을 탐지. MITRE Enterprise ATT&CK: T1557 Adversary-in-the-Middle (Collection/영상 감청·프레임 주입)",
         "severity": "High",
         "enabled": true,
-        "query": "let alertWindow = 10m;\nUAVImagery_CL\n| where TimeGenerated > ago(alertWindow)\n| extend isBadHash = FrameHashValid == false\n| extend isSourceMismatch = isnotempty(ExpectedSourceIP) and FrameSourceIP != ExpectedSourceIP\n| where isBadHash or isSourceMismatch\n| summarize\n    BadHashCount = countif(isBadHash),\n    SourceMismatchCount = countif(isSourceMismatch),\n    DistinctSessions = dcount(SessionId),\n    DistinctSourceIPs = dcount(FrameSourceIP),\n    SampleFrameSeq = max(FrameSeq)\n    by UAVId, StreamId, bin(TimeGenerated, 1m)\n| where BadHashCount > 0 or SourceMismatchCount > 0 or DistinctSessions > 1\n| extend TriggerReason = case(\n    BadHashCount > 0, strcat('영상프레임_무결성검증실패_', tostring(BadHashCount), '건'),\n    DistinctSessions > 1, strcat('영상세션_하이재킹_의심_세션', tostring(DistinctSessions), '개'),\n    strcat('영상프레임_출발지불일치_', tostring(SourceMismatchCount), '건'))\n| extend Severity = 'High'\n| project TimeGenerated, UAVId, StreamId, BadHashCount, SourceMismatchCount, DistinctSessions, DistinctSourceIPs, SampleFrameSeq, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "query": "let alertWindow = 10m;\nlet msgTypeDiversityThreshold = 3;\nUAVImagery_CL\n| where TimeGenerated > ago(alertWindow)\n| summarize\n    TotalEvents = count(),\n    InjectCount = countif(EventType == 'frame_inject'),\n    DistinctMsgTypes = dcount(MsgType),\n    MsgTypeSet = make_set(MsgType),\n    EventTypeSet = make_set(EventType)\n    by UAVId, bin(TimeGenerated, 1m)\n| where InjectCount > 0 or DistinctMsgTypes >= msgTypeDiversityThreshold\n| extend TriggerReason = case(\n    InjectCount > 0, strcat('EOIR_다운링크_프레임주입_의심_', tostring(InjectCount), '건'),\n    strcat('EOIR_다운링크_MsgType_비정상다양성_', tostring(DistinctMsgTypes), '종'))\n| extend Severity = 'High'\n| project TimeGenerated, UAVId, TotalEvents, InjectCount, DistinctMsgTypes, MsgTypeSet, EventTypeSet, TriggerReason, Severity\n| order by TimeGenerated desc",
         "queryFrequency": "PT5M",
         "queryPeriod": "PT15M",
         "triggerOperator": "GreaterThan",
@@ -59,7 +59,7 @@
         },
         "customDetails": {
           "TriggerReason": "TriggerReason",
-          "StreamId": "StreamId"
+          "DistinctMsgTypes": "DistinctMsgTypes"
         },
         "entityMappings": [
           {

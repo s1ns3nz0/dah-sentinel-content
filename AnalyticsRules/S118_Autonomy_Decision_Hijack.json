@@ -15,10 +15,10 @@
       "apiVersion": "2023-12-01-preview",
       "properties": {
         "displayName": "UAV S118 - Onboard Autonomy Decision Hijack",
-        "description": "UAVOpmode_CL에서 OpmodeField='autonomy_decision_override'인 레코드 중 ExpectedValue(온보드 자율 판단 결과)와 ObservedValue(실제 적용된 결심)가 불일치하고 Authorized=0(SByte)인 비인가 하이재킹 탐지. 실제 컬럼: OpmodeField/ExpectedValue/ObservedValue/ChangedBy/Authorized(SByte). MITRE: T0831 Manipulation of Control (온보드 자율 의사결정 로직의 산출값을 외부에서 강제로 덮어씀)",
+        "description": "UAVTelemetry_CL에서 CustomMode=GUIDED(15) 구간 중 5분 내 서로 다른 Command 값이 3종 이상 발생하는 명령 버스트(온보드 자율 판단 결과에 대한 외부 강제 개입 의심)를 탐지. UAVOpmode_CL은 존재하지 않아 실제 텔레메트리 Command/CustomMode 기반으로 재구성. MITRE: T0831 Manipulation of Control (온보드 자율 의사결정 로직의 산출값을 외부에서 강제로 덮어씀)",
         "severity": "High",
         "enabled": true,
-        "query": "let alertWindow = 10m;\nUAVOpmode_CL\n| where TimeGenerated > ago(alertWindow)\n| where OpmodeField == 'autonomy_decision_override'\n| where ExpectedValue != ObservedValue and Authorized == 0\n| extend TriggerReason = strcat(\"자율결심_하이재킹_\", UAVId, \"_\", ExpectedValue, \"->\", ObservedValue)\n| project TimeGenerated, UAVId, OpmodeField, ExpectedValue, ObservedValue, ChangedBy, Authorized, Seq, TriggerReason\n| order by TimeGenerated desc",
+        "query": "let alertWindow = 15m;\nlet GuidedMode = 15; // ArduPilot custom_mode convention: GUIDED=15 (미확정 시 재검증 필요)\nUAVTelemetry_CL\n| where TimeGenerated > ago(alertWindow)\n| where CustomMode == GuidedMode\n| where isnotnull(Command)\n| summarize DistinctCommands = dcount(Command), CmdList = make_set(Command), SampleCount = count()\n    by UAVId, bin(TimeGenerated, 5m)\n| where DistinctCommands >= 3\n| extend TriggerReason = strcat(\"자율결심_하이재킹_명령버스트_\", tostring(DistinctCommands), \"종_\", UAVId)\n| project TimeGenerated, UAVId, DistinctCommands, CmdList, SampleCount, TriggerReason\n| order by TimeGenerated desc",
         "queryFrequency": "PT5M",
         "queryPeriod": "PT15M",
         "triggerOperator": "GreaterThan",
@@ -58,7 +58,7 @@
         },
         "customDetails": {
           "TriggerReason": "TriggerReason",
-          "Authorized": "Authorized"
+          "DistinctCommands": "DistinctCommands"
         },
         "entityMappings": [
           {
@@ -67,15 +67,6 @@
               {
                 "identifier": "HostName",
                 "columnName": "UAVId"
-              }
-            ]
-          },
-          {
-            "entityType": "Account",
-            "fieldMappings": [
-              {
-                "identifier": "Name",
-                "columnName": "ChangedBy"
               }
             ]
           }

@@ -18,7 +18,7 @@
         "description": "컨테이너 레지스트리에 푸시된 이미지의 Digest가 기대값(ImageDigestExpected)과 실제값(ImageDigestActual)이 불일치하거나, Approved_Operators_List에 없는 비인가 계정(PushedBy)의 푸시를 탐지. 공급망 무결성 훼손(이미지 변조/스푸핑) 징후. MITRE: T1195.002",
         "severity": "High",
         "enabled": true,
-        "query": "let alertWindow = 10m;\nlet ApprovedOps = _GetWatchlist('Approved_Operators_List') | project OperatorId;\nUAVSupplyChain_CL\n| where TimeGenerated > ago(alertWindow)\n| where EventType == 'RegistryPush'\n| extend isDigestMismatch = (ImageDigestExpected != ImageDigestActual)\n| extend isUnknownPusher = PushedBy !in (ApprovedOps)\n| where isDigestMismatch or isUnknownPusher\n| extend TriggerReason = case(\n    isDigestMismatch and isUnknownPusher, strcat(\"레지스트리_다이제스트불일치_비인가푸시_\", PushedBy),\n    isDigestMismatch, strcat(\"레지스트리_다이제스트불일치_\", Registry),\n    strcat(\"레지스트리_비인가_푸시자_\", PushedBy))\n| extend Severity = \"High\"\n| project TimeGenerated, Registry, PushedBy, ImageDigestExpected, ImageDigestActual, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "query": "let alertWindow = 10m;\nUAVDevOps_CL\n| where TimeGenerated > ago(alertWindow)\n| where EventType == \"registry_tamper\"\n| where DigestMismatch == true\n| extend TriggerReason = strcat(\"레지스트리_다이제스트불일치_\", Target, \"_\", Actor)\n| extend Severity = \"High\"\n| project TimeGenerated, Target, Actor, DigestMismatch, StatusCode, TriggerReason, Severity\n| order by TimeGenerated desc",
         "queryFrequency": "PT5M",
         "queryPeriod": "PT15M",
         "triggerOperator": "GreaterThan",
@@ -50,14 +50,14 @@
           "aggregationKind": "SingleAlert"
         },
         "alertDetailsOverride": {
-          "alertDisplayNameFormat": "UAV S67 - Container Registry Image Tampering - {{Registry}}",
-          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Expected={{ImageDigestExpected}} | Actual={{ImageDigestActual}}",
+          "alertDisplayNameFormat": "UAV S67 - Container Registry Image Tampering - {{Target}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | DigestMismatch={{DigestMismatch}}",
           "alertDynamicProperties": []
         },
         "customDetails": {
           "TriggerReason": "TriggerReason",
-          "Registry": "Registry",
-          "PushedBy": "PushedBy"
+          "Target": "Target",
+          "Actor": "Actor"
         },
         "entityMappings": [
           {
@@ -65,7 +65,7 @@
             "fieldMappings": [
               {
                 "identifier": "Name",
-                "columnName": "PushedBy"
+                "columnName": "Actor"
               }
             ]
           }

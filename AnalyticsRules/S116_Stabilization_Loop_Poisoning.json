@@ -15,10 +15,10 @@
       "apiVersion": "2023-12-01-preview",
       "properties": {
         "displayName": "UAV S116 - Stabilization Loop Poisoning (Attitude Control Input Corruption)",
-        "description": "UAVOpmode_CL에서 OpmodeField='stabilization_input'인 레코드 중 ExpectedValue(정상 자세제어 입력)와 ObservedValue(실제 입력값)가 불일치하고 Authorized=0(SByte)인 비인가 오염 탐지. 실제 컬럼: OpmodeField/ExpectedValue/ObservedValue/ChangedBy/Authorized(SByte). MITRE: T0835 Manipulate I/O Image (자세제어 루프 입력값을 조작해 기체 안정성을 저해)",
+        "description": "UAVTelemetry_CL(MsgType=ATTITUDE)에서 5분 구간별 RollSpeed_rads/PitchSpeed_rads/YawSpeed_rads의 표준편차가 임계값을 초과하는 자세제어 루프 발산(오염) 징후를 탐지. UAVOpmode_CL은 존재하지 않아 실제 자세 각속도 텔레메트리 기반으로 재구성. MITRE: T0835 Manipulate I/O Image (자세제어 루프 입력값을 조작해 기체 안정성을 저해)",
         "severity": "High",
         "enabled": true,
-        "query": "let alertWindow = 10m;\nUAVOpmode_CL\n| where TimeGenerated > ago(alertWindow)\n| where OpmodeField == 'stabilization_input'\n| where ExpectedValue != ObservedValue and Authorized == 0\n| extend TriggerReason = strcat(\"자세제어입력_오염_\", UAVId, \"_\", ExpectedValue, \"->\", ObservedValue)\n| project TimeGenerated, UAVId, OpmodeField, ExpectedValue, ObservedValue, ChangedBy, Authorized, Seq, TriggerReason\n| order by TimeGenerated desc",
+        "query": "let alertWindow = 15m;\nlet RateStdThreshold = 3.0; // rad/s 표준편차, 추후 조정\nUAVTelemetry_CL\n| where TimeGenerated > ago(alertWindow)\n| where MsgType == 'ATTITUDE'\n| where isnotnull(RollSpeed_rads) and isnotnull(PitchSpeed_rads) and isnotnull(YawSpeed_rads)\n| summarize StdRoll = stdev(RollSpeed_rads), StdPitch = stdev(PitchSpeed_rads), StdYaw = stdev(YawSpeed_rads), SampleCount = count()\n    by UAVId, bin(TimeGenerated, 5m)\n| where StdRoll > RateStdThreshold or StdPitch > RateStdThreshold or StdYaw > RateStdThreshold\n| extend TriggerReason = strcat(\"자세제어루프_오염_변동성초과_\", UAVId)\n| project TimeGenerated, UAVId, StdRoll, StdPitch, StdYaw, SampleCount, TriggerReason\n| order by TimeGenerated desc",
         "queryFrequency": "PT5M",
         "queryPeriod": "PT15M",
         "triggerOperator": "GreaterThan",
@@ -59,7 +59,7 @@
         },
         "customDetails": {
           "TriggerReason": "TriggerReason",
-          "Authorized": "Authorized"
+          "StdYaw": "StdYaw"
         },
         "entityMappings": [
           {
@@ -68,15 +68,6 @@
               {
                 "identifier": "HostName",
                 "columnName": "UAVId"
-              }
-            ]
-          },
-          {
-            "entityType": "Account",
-            "fieldMappings": [
-              {
-                "identifier": "Name",
-                "columnName": "ChangedBy"
               }
             ]
           }

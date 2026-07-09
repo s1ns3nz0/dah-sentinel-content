@@ -15,10 +15,10 @@
       "apiVersion": "2023-12-01-preview",
       "properties": {
         "displayName": "UAV S53 - Weapon Endpoint IDOR (Auth Bypass)",
-        "description": "UAVWebAccess_CL에서 무기(/weapon,/arm,/fire) 엔드포인트에 대해 Operator_UAV_Binding_List 미등록 바인딩(IDOR: 타 UAV 리소스 ID로 200 성공 응답)을 탐지. 인증우회형 직접객체참조 취약점 악용 의심. MITRE: T1078",
+        "description": "UAVWebAudit_CL에서 무기(weapon/arm/fire) 엔드포인트 요청자(RequesterId)가 자신의 소유가 아닌 타 UAV/자원(TargetId)에 접근하는 IDOR(직접객체참조) 의심 이벤트를 IdorSuspected 플래그로 탐지. 인증우회형 취약점 악용 의심. MITRE: T1078",
         "severity": "High",
         "enabled": true,
-        "query": "let alertWindow = 15m;\nlet Binding =\n    _GetWatchlist('Operator_UAV_Binding_List')\n    | project Operator = OperatorId, ResourceId = AllowedUAVId, Role;\nUAVWebAccess_CL\n| where TimeGenerated > ago(alertWindow)\n| where Path has_any (\"/weapon\", \"/arm\", \"/fire\")\n| where StatusCode == 200\n| join kind=leftouter (Binding) on Operator, ResourceId\n| extend RequestedByOwnerAccount = isnotnull(Role)\n| where not(RequestedByOwnerAccount)\n| extend TriggerReason = strcat(\"IDOR_무기엔드포인트_비인가접근_\", Operator, \"_\", ResourceId)\n| extend Severity = \"High\"\n| project TimeGenerated, Operator, ClientIp, Method, Path, ResourceId, StatusCode, RequestedByOwnerAccount, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "query": "let alertWindow = 15m;\nUAVWebAudit_CL\n| where TimeGenerated > ago(alertWindow)\n| where IdorSuspected == true\n| where RequesterId != TargetId\n| extend TriggerReason = strcat(\"IDOR_비인가접근_\", RequesterId, \"_대상_\", TargetId)\n| extend Severity = \"High\"\n| project TimeGenerated, RequesterId, TargetId, StatusCode, IdorSuspected, TriggerReason, Severity\n| order by TimeGenerated desc",
         "queryFrequency": "PT5M",
         "queryPeriod": "PT15M",
         "triggerOperator": "GreaterThan",
@@ -52,15 +52,14 @@
           "aggregationKind": "SingleAlert"
         },
         "alertDetailsOverride": {
-          "alertDisplayNameFormat": "UAV S53 - Weapon Endpoint IDOR (Auth Bypass) - {{Operator}}",
-          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Path={{Path}} | ResourceId={{ResourceId}}",
+          "alertDisplayNameFormat": "UAV S53 - Weapon Endpoint IDOR (Auth Bypass) - {{RequesterId}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | TargetId={{TargetId}} | StatusCode={{StatusCode}}",
           "alertDynamicProperties": []
         },
         "customDetails": {
           "TriggerReason": "TriggerReason",
-          "Path": "Path",
-          "ResourceId": "ResourceId",
-          "Method": "Method"
+          "TargetId": "TargetId",
+          "StatusCode": "StatusCode"
         },
         "entityMappings": [
           {
@@ -68,16 +67,16 @@
             "fieldMappings": [
               {
                 "identifier": "Name",
-                "columnName": "Operator"
+                "columnName": "RequesterId"
               }
             ]
           },
           {
-            "entityType": "IP",
+            "entityType": "Host",
             "fieldMappings": [
               {
-                "identifier": "Address",
-                "columnName": "ClientIp"
+                "identifier": "HostName",
+                "columnName": "TargetId"
               }
             ]
           }

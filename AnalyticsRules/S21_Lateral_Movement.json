@@ -15,10 +15,10 @@
       "apiVersion": "2023-12-01-preview",
       "properties": {
         "displayName": "UAV S21 - Ground Segment Lateral Movement (impacket/crackmapexec Signatures)",
-        "description": "UAVLateralMove_CL에서 지상통제 세그먼트(GCS/C4I 호스트) 간 SMB/WMI 계열 공격 툴 시그니처(impacket-wmiexec, impacket-psexec, crackmapexec 등) 또는 NTLM-Relay/Guest 인증 사용을 탐지. 단일 SourceHost가 다수 PeerIp로 확산 시도 시 High로 상향. MITRE: T1570, T1021",
+        "description": "근사 탐지(제안 스키마 미배포 — 실 워크스페이스에 전용 측면이동 텔레메트리 테이블 없음): 실제 UAVFileAudit_CL(ProcessName/Syscall/User/ContainerName)에서 impacket/crackmapexec류 알려진 측면이동 도구 프로세스명을 탐지하고, 동일 운영자(User)가 다수 컨테이너에 걸쳐 해당 프로세스를 실행한 패턴을 집계. 향후 전용 EDR/네트워크 인증 텔레메트리 소스 추가 시 정교화 필요.",
         "severity": "High",
         "enabled": true,
-        "query": "let alertWindow = 15m;\nlet knownTools = dynamic(['impacket-wmiexec', 'impacket-psexec', 'impacket-smbexec', 'impacket-secretsdump', 'impacket-atexec', 'crackmapexec', 'evil-winrm']);\nUAVLateralMove_CL\n| where TimeGenerated > ago(alertWindow)\n| where ToolSignature in (knownTools) or AuthMethod in ('NTLM-Relay', 'Guest')\n| summarize AttemptCount = count(), PeerCount = dcount(PeerIp), Tools = make_set(ToolSignature), Auths = make_set(AuthMethod), LastSeen = max(TimeGenerated) by SourceHost\n| extend TriggerReason = strcat('측면이동_툴시그니처_', tostring(Tools), '_대상수:', tostring(PeerCount))\n| extend Severity = iff(PeerCount >= 3, 'High', 'Medium')\n| project TimeGenerated = LastSeen, SourceHost, AttemptCount, PeerCount, Tools, Auths, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "query": "let alertWindow = 15m;\nlet knownTools = dynamic(['impacket-wmiexec', 'impacket-psexec', 'impacket-smbexec', 'impacket-secretsdump', 'impacket-atexec', 'crackmapexec', 'evil-winrm', 'psexec', 'wmiexec', 'smbexec']);\nUAVFileAudit_CL\n| where TimeGenerated > ago(alertWindow)\n| where ProcessName has_any (knownTools)\n| summarize AttemptCount = count(), PeerCount = dcount(ContainerName), Containers = make_set(ContainerName), Processes = make_set(ProcessName), LastSeen = max(TimeGenerated) by User\n| extend TriggerReason = strcat('측면이동_툴시그니처_의심(근사탐지,UAVFileAudit_CL기반)_', tostring(Processes), '_대상컨테이너수:', tostring(PeerCount))\n| extend Severity = iff(PeerCount >= 3, 'High', 'Medium')\n| project TimeGenerated = LastSeen, User, PeerCount, AttemptCount, Containers, Processes, TriggerReason, Severity\n| order by TimeGenerated desc",
         "queryFrequency": "PT15M",
         "queryPeriod": "PT15M",
         "triggerOperator": "GreaterThan",
@@ -43,7 +43,7 @@
             "lookbackDuration": "PT2H",
             "matchingMethod": "AllEntities",
             "groupByEntities": [
-              "Host"
+              "Account"
             ],
             "groupByAlertDetails": [],
             "groupByCustomDetails": []
@@ -53,8 +53,8 @@
           "aggregationKind": "SingleAlert"
         },
         "alertDetailsOverride": {
-          "alertDisplayNameFormat": "UAV S21 - Ground Segment Lateral Movement (impacket/crackmapexec Signatures) - {{SourceHost}}",
-          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Severity={{Severity}}",
+          "alertDisplayNameFormat": "UAV S21 - Ground Segment Lateral Movement (impacket/crackmapexec Signatures) - {{User}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | AttemptCount={{AttemptCount}} | PeerCount={{PeerCount}} | Severity={{Severity}}",
           "alertDynamicProperties": []
         },
         "customDetails": {
@@ -65,11 +65,11 @@
         },
         "entityMappings": [
           {
-            "entityType": "Host",
+            "entityType": "Account",
             "fieldMappings": [
               {
-                "identifier": "HostName",
-                "columnName": "SourceHost"
+                "identifier": "Name",
+                "columnName": "User"
               }
             ]
           }

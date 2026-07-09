@@ -18,7 +18,7 @@
         "description": "텔레메트리 수집(ingest) 경로에서 페이로드 체크섬 검증 실패(PayloadChecksumValid=false)를 탐지. 수집 소스(IngestSource)의 위조/오염된 텔레메트리 주입 시도. MITRE: T1565.001",
         "severity": "High",
         "enabled": true,
-        "query": "let alertWindow = 10m;\nUAVFleetApi_CL\n| where TimeGenerated > ago(alertWindow)\n| where EventType == 'TelemetryIngest'\n| where PayloadChecksumValid == false\n| extend TriggerReason = strcat(\"텔레메트리_ingest_체크섬불일치_\", IngestSource)\n| extend Severity = \"High\"\n| project TimeGenerated, IngestSource, PayloadChecksumValid, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "query": "let alertWindow = 10m;\nlet pctThreshold = 0.5;\nUAVFleetInfra_CL\n| where TimeGenerated > ago(alertWindow)\n| where isnotempty(Rule)\n| extend PctChange = iif(ValueBefore != 0, abs(ValueAfter - ValueBefore) / abs(ValueBefore), real(null))\n| where isnotnull(PctChange) and PctChange > pctThreshold\n| extend TriggerReason = strcat(\"텔레메트리_ingest_이상값변경_\", Rule, \"_before:\", ValueBefore, \"_after:\", ValueAfter)\n| extend Severity = \"High\"\n| project TimeGenerated, FleetId, TargetId, Rule, ValueBefore, ValueAfter, ChangedBy, StatusCode, TriggerReason, Severity\n| order by TimeGenerated desc",
         "queryFrequency": "PT5M",
         "queryPeriod": "PT15M",
         "triggerOperator": "GreaterThan",
@@ -50,14 +50,14 @@
           "aggregationKind": "SingleAlert"
         },
         "alertDetailsOverride": {
-          "alertDisplayNameFormat": "UAV S82 - Telemetry Ingest Poisoning - {{IngestSource}}",
-          "alertDescriptionFormat": "TriggerReason={{TriggerReason}}",
+          "alertDisplayNameFormat": "UAV S82 - Telemetry Ingest Poisoning - {{Rule}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | ValueBefore={{ValueBefore}} | ValueAfter={{ValueAfter}}",
           "alertDynamicProperties": []
         },
         "customDetails": {
           "TriggerReason": "TriggerReason",
-          "IngestSource": "IngestSource",
-          "PayloadChecksumValid": "PayloadChecksumValid"
+          "Rule": "Rule",
+          "ChangedBy": "ChangedBy"
         },
         "entityMappings": [
           {
@@ -65,7 +65,7 @@
             "fieldMappings": [
               {
                 "identifier": "HostName",
-                "columnName": "IngestSource"
+                "columnName": "FleetId"
               }
             ]
           }

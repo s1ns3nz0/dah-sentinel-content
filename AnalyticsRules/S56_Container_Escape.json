@@ -15,10 +15,10 @@
       "apiVersion": "2023-12-01-preview",
       "properties": {
         "displayName": "UAV S56 - Container Escape (Privileged / docker.sock hostPath)",
-        "description": "UAVContainerOps_CL에서 privileged=true 또는 /var/run/docker.sock hostPath 마운트로 생성되는 컨테이너 탐지. 컨테이너 탈출을 통한 호스트 장악 위험. MITRE: T1611",
+        "description": "UAVWebAudit_CL에서 컨테이너 탈출 기법(EscapeMethod, 예: privileged/docker.sock/cgroup release_agent 등)이 기록된 이벤트를 탐지. 컨테이너 탈출을 통한 호스트 장악 위험. MITRE: T1611",
         "severity": "High",
         "enabled": true,
-        "query": "let alertWindow = 15m;\nUAVContainerOps_CL\n| where TimeGenerated > ago(alertWindow)\n| where Action == \"create\"\n| where Privileged == true or HostPathMount == \"/var/run/docker.sock\"\n| extend TriggerReason = case(\n    Privileged == true and HostPathMount == \"/var/run/docker.sock\", strcat(ContainerName, \"_privileged_dockersock마운트_컨테이너탈출위험\"),\n    Privileged == true, strcat(ContainerName, \"_privileged_컨테이너생성\"),\n    strcat(ContainerName, \"_dockersock마운트_컨테이너탈출위험\"))\n| extend Severity = \"High\"\n| project TimeGenerated, UAVId, ContainerName, Namespace, ActorId, Privileged, HostPathMount, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "query": "let alertWindow = 15m;\nUAVWebAudit_CL\n| where TimeGenerated > ago(alertWindow)\n| where isnotempty(EscapeMethod)\n| extend TriggerReason = strcat(\"컨테이너탈출_\", EscapeMethod, \"_호스트장악위험\")\n| extend Severity = \"High\"\n| project TimeGenerated, RequesterId, EscapeMethod, TargetPath, StatusCode, TriggerReason, Severity\n| order by TimeGenerated desc",
         "queryFrequency": "PT5M",
         "queryPeriod": "PT15M",
         "triggerOperator": "GreaterThan",
@@ -52,32 +52,23 @@
           "aggregationKind": "SingleAlert"
         },
         "alertDetailsOverride": {
-          "alertDisplayNameFormat": "UAV S56 - Container Escape (Privileged / docker.sock hostPath) - {{ContainerName}}",
-          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Privileged={{Privileged}} | HostPathMount={{HostPathMount}}",
+          "alertDisplayNameFormat": "UAV S56 - Container Escape (Privileged / docker.sock hostPath) - {{RequesterId}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | EscapeMethod={{EscapeMethod}} | TargetPath={{TargetPath}}",
           "alertDynamicProperties": []
         },
         "customDetails": {
           "TriggerReason": "TriggerReason",
-          "ContainerName": "ContainerName",
-          "Privileged": "Privileged",
-          "HostPathMount": "HostPathMount"
+          "EscapeMethod": "EscapeMethod",
+          "TargetPath": "TargetPath",
+          "StatusCode": "StatusCode"
         },
         "entityMappings": [
-          {
-            "entityType": "Host",
-            "fieldMappings": [
-              {
-                "identifier": "HostName",
-                "columnName": "UAVId"
-              }
-            ]
-          },
           {
             "entityType": "Account",
             "fieldMappings": [
               {
                 "identifier": "Name",
-                "columnName": "ActorId"
+                "columnName": "RequesterId"
               }
             ]
           }

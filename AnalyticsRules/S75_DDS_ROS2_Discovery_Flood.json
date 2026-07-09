@@ -18,7 +18,7 @@
         "description": "DDS/ROS2 discovery 메시지율(DiscoveryMsgRate) 또는 참여자 수(ParticipantCount)가 UAV_Threshold_List 동적 임계(MaxDiscoveryMsgRate/MaxParticipantCount)를 초과하는 discovery 플러딩(가용성 공격)을 탐지. MITRE: T1499",
         "severity": "Medium",
         "enabled": true,
-        "query": "let alertWindow = 10m;\nlet msgRateGate = toscalar(_GetWatchlist('UAV_Threshold_List') | where ThresholdKey == 'MaxDiscoveryMsgRate' | project toint(Value));\nlet participantGate = toscalar(_GetWatchlist('UAV_Threshold_List') | where ThresholdKey == 'MaxParticipantCount' | project toint(Value));\nUAVMiddleware_CL\n| where TimeGenerated > ago(alertWindow)\n| where EventType == 'DiscoveryFlood'\n| where toint(DiscoveryMsgRate) > msgRateGate or toint(ParticipantCount) > participantGate\n| extend TriggerReason = strcat(\"DDS_discovery_플러딩_\", UAVId, \"_rate:\", DiscoveryMsgRate, \"_participants:\", ParticipantCount)\n| extend Severity = \"High\"\n| project TimeGenerated, UAVId, DiscoveryMsgRate, ParticipantCount, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "query": "let alertWindow = 10m;\nlet participantGate = 20;\nUAVDevOps_CL\n| where TimeGenerated > ago(alertWindow)\n| where EventType == \"dds_flood\"\n| where FloodSuspected == true and ParticipantCount > participantGate\n| extend TriggerReason = strcat(\"DDS_discovery_플러딩_\", Target, \"_participants:\", ParticipantCount)\n| extend Severity = \"High\"\n| project TimeGenerated, Target, Actor, ParticipantCount, FloodSuspected, StatusCode, TriggerReason, Severity\n| order by TimeGenerated desc",
         "queryFrequency": "PT5M",
         "queryPeriod": "PT15M",
         "triggerOperator": "GreaterThan",
@@ -50,13 +50,13 @@
           "aggregationKind": "SingleAlert"
         },
         "alertDetailsOverride": {
-          "alertDisplayNameFormat": "UAV S75 - DDS/ROS2 Discovery Flooding - {{UAVId}}",
-          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | DiscoveryMsgRate={{DiscoveryMsgRate}} | ParticipantCount={{ParticipantCount}}",
+          "alertDisplayNameFormat": "UAV S75 - DDS/ROS2 Discovery Flooding - {{Target}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | ParticipantCount={{ParticipantCount}}",
           "alertDynamicProperties": []
         },
         "customDetails": {
           "TriggerReason": "TriggerReason",
-          "DiscoveryMsgRate": "DiscoveryMsgRate",
+          "Target": "Target",
           "ParticipantCount": "ParticipantCount"
         },
         "entityMappings": [
@@ -65,7 +65,7 @@
             "fieldMappings": [
               {
                 "identifier": "HostName",
-                "columnName": "UAVId"
+                "columnName": "Target"
               }
             ]
           }

@@ -15,10 +15,10 @@
       "apiVersion": "2023-12-01-preview",
       "properties": {
         "displayName": "UAV S63 - Firmware Update Mode Forced Entry",
-        "description": "UAVMavsec_CL에서 COMMAND_LONG(cmd=246 PREFLIGHT_REBOOT_SHUTDOWN, param1=3 FW업데이트모드진입)이 정비콘솔(maintenance-console) 외 소스 또는 야간 비정비시간대(OffHours)에서 발생하는 비인가 FW 업데이트모드 강제진입 탐지. MITRE: T0800",
+        "description": "UAVTelemetry_CL에서 COMMAND_LONG(Command=246 MAV_CMD_PREFLIGHT_REBOOT_SHUTDOWN, Param1=3 FW업데이트모드진입)이 야간 비정비시간대(OffHours)에 발생하는 비인가 FW 업데이트모드 강제진입 탐지. MITRE: T0800",
         "severity": "High",
         "enabled": true,
-        "query": "let alertWindow = 10m;\nlet offHoursStart = toscalar(_GetWatchlist('UAV_Threshold_List') | where ThresholdKey == 'OffHoursStart' | project toint(Value));\nlet offHoursEnd = toscalar(_GetWatchlist('UAV_Threshold_List') | where ThresholdKey == 'OffHoursEnd' | project toint(Value));\nUAVMavsec_CL\n| where TimeGenerated > ago(alertWindow)\n| where MsgType == \"COMMAND_LONG\"\n| where Command == 246\n| where Param1 == 3\n| extend HourOfDay = hourofday(TimeGenerated)\n| extend isOffHours = HourOfDay >= offHoursStart or HourOfDay < offHoursEnd\n| where SourceSystem != \"maintenance-console\" or isOffHours\n| extend TriggerReason = strcat(\"FW업데이트모드_강제진입_PREFLIGHT_REBOOT_SHUTDOWN_\", SourceSystem, iff(isOffHours, \"_야간시간대\", \"_정비창외\"))\n| extend Severity = \"High\"\n| project TimeGenerated, UAVId, SourceSystem, SourceComponent, TargetSystem, SenderIp, Command, Param1, isOffHours, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "query": "let alertWindow = 10m;\nlet offHoursStart = 22;\nlet offHoursEnd = 6;\nUAVTelemetry_CL\n| where TimeGenerated > ago(alertWindow)\n| where Command == 246\n| where Param1 == 3\n| extend HourOfDay = hourofday(TimeGenerated)\n| extend isOffHours = HourOfDay >= offHoursStart or HourOfDay < offHoursEnd\n| where isOffHours\n| extend TriggerReason = strcat(\"FW업데이트모드_강제진입_PREFLIGHT_REBOOT_SHUTDOWN_\", UAVId, \"_야간시간대\")\n| extend Severity = \"High\"\n| project TimeGenerated, UAVId, SystemId, ComponentId, TargetSystem, TargetComponent, Command, Param1, isOffHours, TriggerReason, Severity\n| order by TimeGenerated desc",
         "queryFrequency": "PT5M",
         "queryPeriod": "PT15M",
         "triggerOperator": "GreaterThan",
@@ -51,14 +51,14 @@
         },
         "alertDetailsOverride": {
           "alertDisplayNameFormat": "UAV S63 - Firmware Update Mode Forced Entry - {{UAVId}}",
-          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | SourceSystem={{SourceSystem}} | isOffHours={{isOffHours}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Command={{Command}} | isOffHours={{isOffHours}}",
           "alertDynamicProperties": []
         },
         "customDetails": {
           "TriggerReason": "TriggerReason",
-          "SourceSystem": "SourceSystem",
           "Command": "Command",
-          "Param1": "Param1"
+          "Param1": "Param1",
+          "isOffHours": "isOffHours"
         },
         "entityMappings": [
           {
@@ -67,15 +67,6 @@
               {
                 "identifier": "HostName",
                 "columnName": "UAVId"
-              }
-            ]
-          },
-          {
-            "entityType": "IP",
-            "fieldMappings": [
-              {
-                "identifier": "Address",
-                "columnName": "SenderIp"
               }
             ]
           }

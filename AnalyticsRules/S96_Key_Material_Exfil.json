@@ -18,7 +18,7 @@
         "description": "UAVExfilFlow_CL에서 KeyType(signing/session/tls)이 지정된 암호키 접근/유출 이벤트 중 AccessorIdentity가 Approved_Operators_List에 비등록이거나, UAV_Threshold_List의 OffHoursStart/OffHoursEnd 기준 야간 시간대에 발생한 것을 탐지. 서명키·세션토큰·TLS키 유출은 UAV 도메인 특성상 표준 자격증명 저장소 개념과 완전히 일치하지 않아 근사매핑으로 분류(techniques 필드 미기재). MITRE: T1552 Unsecured Credentials, T1555 Credentials from Password Stores (근사매핑)",
         "severity": "High",
         "enabled": true,
-        "query": "let alertWindow = 15m;\nlet ApprovedOps = _GetWatchlist('Approved_Operators_List') | project OperatorId;\nlet offHoursStart = toscalar(_GetWatchlist('UAV_Threshold_List') | where ThresholdKey == 'OffHoursStart' | project toint(Value) | take 1);\nlet offHoursEnd = toscalar(_GetWatchlist('UAV_Threshold_List') | where ThresholdKey == 'OffHoursEnd' | project toint(Value) | take 1);\nUAVExfilFlow_CL\n| where TimeGenerated > ago(alertWindow)\n| where isnotempty(KeyType)\n| extend AccessHour = hourofday(TimeGenerated)\n| extend isUnknownAccessor = AccessorIdentity !in (ApprovedOps)\n| extend isOffHours = (AccessHour >= offHoursStart or AccessHour < offHoursEnd)\n| where isUnknownAccessor or isOffHours\n| extend TriggerReason = case(\n    isUnknownAccessor, strcat(\"암호키유출_비인가접근자_\", AccessorIdentity, \"_KeyType_\", KeyType),\n    strcat(\"암호키유출_야간시간대_\", tostring(AccessHour), \"시_KeyType_\", KeyType))\n| extend Severity = \"High\"\n| project TimeGenerated, UAVId, Operator, AccessorIdentity, KeyType, AssetType, DestIp, DestPort, BytesTransferred, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "query": "let alertWindow = 15m;\nlet entropyThreshold = 7.5;\nlet bytesThreshold = 1000.0;\nUAVSatcomLink_CL\n| where TimeGenerated > ago(alertWindow)\n| where isnotnull(PayloadEntropy) and PayloadEntropy > entropyThreshold and PayloadBytes > bytesThreshold\n| extend TriggerReason = strcat(\"암호키자재유출의심_고엔트로피SATCOM페이로드_entropy_\", tostring(PayloadEntropy), \"_bytes_\", tostring(PayloadBytes))\n| extend Severity = \"High\"\n| project TimeGenerated, UAVId, LinkId, SessionId, SrcAddr, DstAddr, Mode, Encoding, PayloadEntropy, PayloadBytes, TriggerReason, Severity\n| order by TimeGenerated desc",
         "queryFrequency": "PT5M",
         "queryPeriod": "PT20M",
         "triggerOperator": "GreaterThan",
@@ -49,13 +49,14 @@
         },
         "alertDetailsOverride": {
           "alertDisplayNameFormat": "UAV S96 - Cryptographic Key Material Exfiltration - {{UAVId}}",
-          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | KeyType={{KeyType}} | AccessorIdentity={{AccessorIdentity}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | PayloadEntropy={{PayloadEntropy}} | PayloadBytes={{PayloadBytes}}",
           "alertDynamicProperties": []
         },
         "customDetails": {
           "TriggerReason": "TriggerReason",
-          "KeyType": "KeyType",
-          "AccessorIdentity": "AccessorIdentity"
+          "PayloadEntropy": "PayloadEntropy",
+          "PayloadBytes": "PayloadBytes",
+          "DstAddr": "DstAddr"
         },
         "entityMappings": [
           {
@@ -68,11 +69,11 @@
             ]
           },
           {
-            "entityType": "Account",
+            "entityType": "IP",
             "fieldMappings": [
               {
-                "identifier": "Name",
-                "columnName": "AccessorIdentity"
+                "identifier": "Address",
+                "columnName": "DstAddr"
               }
             ]
           }

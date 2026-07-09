@@ -18,7 +18,7 @@
         "description": "지리펜스(geofence) 경계값 변경 이벤트에서 변경폭(ShiftAmount)이 UAV_Threshold_List 동적 임계(MaxGeofenceShift_m)를 초과하거나, Approved_Operators_List 상 approver/superadmin 권한이 없는 자(ChangedBy)의 변경을 탐지. MITRE: T0836",
         "severity": "High",
         "enabled": true,
-        "query": "let alertWindow = 10m;\nlet shiftGate = toscalar(_GetWatchlist('UAV_Threshold_List') | where ThresholdKey == 'MaxGeofenceShift_m' | project toint(Value));\nlet ApprovedOps = _GetWatchlist('Approved_Operators_List') | where Role in ('approver','superadmin') | project OperatorId;\nUAVMiddleware_CL\n| where TimeGenerated > ago(alertWindow)\n| where EventType == 'GeofenceChange'\n| extend ShiftAmount = abs(toint(BoundaryValueAfter) - toint(BoundaryValueBefore))\n| extend isUnapprovedChanger = ChangedBy !in (ApprovedOps)\n| where ShiftAmount > shiftGate or isUnapprovedChanger\n| extend TriggerReason = case(\n    ShiftAmount > shiftGate and isUnapprovedChanger, strcat(\"지오펜스_대폭변경_비인가변경자_\", ChangedBy),\n    ShiftAmount > shiftGate, strcat(\"지오펜스_변경폭임계초과_\", GeofenceId, \"_shift:\", ShiftAmount),\n    strcat(\"지오펜스_비인가_변경자_\", ChangedBy))\n| extend Severity = \"High\"\n| project TimeGenerated, GeofenceId, BoundaryValueBefore, BoundaryValueAfter, ChangedBy, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "query": "let alertWindow = 10m;\nUAVCompanion_CL\n| where TimeGenerated > ago(alertWindow)\n| where EventType == \"geofence_tamper\"\n| where ConfigField == \"geofence\"\n| where Authorized == false\n| extend TriggerReason = strcat(\"지오펜스_비인가변경_\", Target, \"_\", ChangedBy, \"_before:\", ValueBefore, \"_after:\", ValueAfter)\n| extend Severity = \"High\"\n| project TimeGenerated, Target, ConfigField, ValueBefore, ValueAfter, ChangedBy, Authorized, StatusCode, TriggerReason, Severity\n| order by TimeGenerated desc",
         "queryFrequency": "PT5M",
         "queryPeriod": "PT15M",
         "triggerOperator": "GreaterThan",
@@ -50,13 +50,13 @@
           "aggregationKind": "SingleAlert"
         },
         "alertDetailsOverride": {
-          "alertDisplayNameFormat": "UAV S77 - Geofence Tampering/Bypass - {{GeofenceId}}",
-          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Before={{BoundaryValueBefore}} | After={{BoundaryValueAfter}}",
+          "alertDisplayNameFormat": "UAV S77 - Geofence Tampering/Bypass - {{Target}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Before={{ValueBefore}} | After={{ValueAfter}}",
           "alertDynamicProperties": []
         },
         "customDetails": {
           "TriggerReason": "TriggerReason",
-          "GeofenceId": "GeofenceId",
+          "Target": "Target",
           "ChangedBy": "ChangedBy"
         },
         "entityMappings": [
@@ -65,7 +65,7 @@
             "fieldMappings": [
               {
                 "identifier": "HostName",
-                "columnName": "GeofenceId"
+                "columnName": "Target"
               }
             ]
           }

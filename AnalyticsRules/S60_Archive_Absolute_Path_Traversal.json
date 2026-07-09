@@ -15,10 +15,10 @@
       "apiVersion": "2023-12-01-preview",
       "properties": {
         "displayName": "UAV S60 - Archive Tar Absolute-Path Traversal",
-        "description": "UAVArchiveExtract_CL에서 tar 아카이브 엔트리가 절대경로(/로 시작)로 기록되어 추출 루트를 무시하고 임의 경로에 파일을 기록하는 절대경로 순회 탐지. MITRE: T1195",
+        "description": "UAVArchiveAudit_CL에서 tar 아카이브 엔트리가 절대경로(/로 시작)로 기록되어 추출 루트를 무시하는 절대경로 순회가 AbsolutePathDetected 플래그로 탐지된 이벤트. MITRE: T1195",
         "severity": "Medium",
         "enabled": true,
-        "query": "let alertWindow = 15m;\nUAVArchiveExtract_CL\n| where TimeGenerated > ago(alertWindow)\n| where AbsolutePathEntry == true\n| extend TriggerReason = strcat(\"tar_절대경로순회_\", ArchiveEntry)\n| extend Severity = \"Medium\"\n| project TimeGenerated, UAVId, ArchiveName, ArchiveEntry, ExtractPathResolved, UploadedBy, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "query": "let alertWindow = 15m;\nUAVArchiveAudit_CL\n| where TimeGenerated > ago(alertWindow)\n| where AbsolutePathDetected == true\n| extend TriggerReason = strcat(\"tar_절대경로순회_\", ArchiveName, \"_\", EntryPath)\n| extend Severity = \"Medium\"\n| project TimeGenerated, ArchiveName, Mode, EntryPath, AbsolutePathDetected, ExtractedCount, BlockedCount, StatusCode, TriggerReason, Severity\n| order by TimeGenerated desc",
         "queryFrequency": "PT5M",
         "queryPeriod": "PT15M",
         "triggerOperator": "GreaterThan",
@@ -50,15 +50,15 @@
           "aggregationKind": "SingleAlert"
         },
         "alertDetailsOverride": {
-          "alertDisplayNameFormat": "UAV S60 - Archive Tar Absolute-Path Traversal - {{UAVId}}",
-          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | ArchiveEntry={{ArchiveEntry}} | ExtractPathResolved={{ExtractPathResolved}}",
+          "alertDisplayNameFormat": "UAV S60 - Archive Tar Absolute-Path Traversal - {{ArchiveName}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | EntryPath={{EntryPath}} | BlockedCount={{BlockedCount}}",
           "alertDynamicProperties": []
         },
         "customDetails": {
           "TriggerReason": "TriggerReason",
-          "ArchiveEntry": "ArchiveEntry",
-          "ExtractPathResolved": "ExtractPathResolved",
-          "UploadedBy": "UploadedBy"
+          "ArchiveName": "ArchiveName",
+          "EntryPath": "EntryPath",
+          "BlockedCount": "BlockedCount"
         },
         "entityMappings": [
           {
@@ -66,16 +66,7 @@
             "fieldMappings": [
               {
                 "identifier": "HostName",
-                "columnName": "UAVId"
-              }
-            ]
-          },
-          {
-            "entityType": "Account",
-            "fieldMappings": [
-              {
-                "identifier": "Name",
-                "columnName": "UploadedBy"
+                "columnName": "ArchiveName"
               }
             ]
           }

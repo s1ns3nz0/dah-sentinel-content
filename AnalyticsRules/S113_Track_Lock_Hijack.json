@@ -15,10 +15,10 @@
       "apiVersion": "2023-12-01-preview",
       "properties": {
         "displayName": "UAV S113 - Target Track Lock Hijack (Unauthorized Track Target Substitution)",
-        "description": "UAVOpmode_CL에서 OpmodeField='track_lock_target_id'인 레코드 중 ExpectedValue(승인된 추적 표적ID)와 ObservedValue(실제 락온 표적ID)가 불일치하고 Authorized=0(SByte)인 비인가 표적 전환(락 탈취) 탐지. 실제 컬럼: OpmodeField/ExpectedValue/ObservedValue/ChangedBy/Authorized(SByte). MITRE: T0831 Manipulation of Control (추적 락 대상을 비인가로 전환시켜 무장 오사격 위험 유발)",
+        "description": "UAVC4I_CL에서 동일 UnitCallsign에 대해 5분 내 서로 다른 TargetId가 2개 이상 할당되는 추적 표적 전환(락 탈취) 버스트를 탐지. UAVOpmode_CL은 존재하지 않으며 UAVTelemetry_CL에는 표적추적 필드가 없어, C4I 표적 핸드오프 로그(TargetId/UnitCallsign/IssuedBy)를 사용해 재구성. MITRE: T0831 Manipulation of Control (추적 락 대상을 비인가로 전환시켜 무장 오사격 위험 유발)",
         "severity": "High",
         "enabled": true,
-        "query": "let alertWindow = 10m;\nUAVOpmode_CL\n| where TimeGenerated > ago(alertWindow)\n| where OpmodeField == 'track_lock_target_id'\n| where ExpectedValue != ObservedValue and Authorized == 0\n| extend TriggerReason = strcat(\"추적락_비인가전환_\", UAVId, \"_\", ExpectedValue, \"->\", ObservedValue)\n| project TimeGenerated, UAVId, OpmodeField, ExpectedValue, ObservedValue, ChangedBy, Authorized, Seq, TriggerReason\n| order by TimeGenerated desc",
+        "query": "let alertWindow = 15m;\nUAVC4I_CL\n| where TimeGenerated > ago(alertWindow)\n| where isnotempty(TargetId) and isnotempty(UnitCallsign)\n| summarize DistinctTargets = dcount(TargetId), TargetList = make_set(TargetId), IssuedByList = make_set(IssuedBy),\n    FirstSeen = min(TimeGenerated), LastSeen = max(TimeGenerated)\n    by UnitCallsign, bin(TimeGenerated, 5m)\n| where DistinctTargets >= 2\n| extend TriggerReason = strcat(\"추적표적_비인가전환_\", tostring(DistinctTargets), \"개_\", UnitCallsign)\n| project FirstSeen, LastSeen, UnitCallsign, DistinctTargets, TargetList, IssuedByList, TriggerReason\n| order by FirstSeen desc",
         "queryFrequency": "PT5M",
         "queryPeriod": "PT15M",
         "triggerOperator": "GreaterThan",
@@ -58,7 +58,7 @@
         },
         "customDetails": {
           "TriggerReason": "TriggerReason",
-          "Authorized": "Authorized"
+          "DistinctTargets": "DistinctTargets"
         },
         "entityMappings": [
           {
@@ -66,16 +66,7 @@
             "fieldMappings": [
               {
                 "identifier": "HostName",
-                "columnName": "UAVId"
-              }
-            ]
-          },
-          {
-            "entityType": "Account",
-            "fieldMappings": [
-              {
-                "identifier": "Name",
-                "columnName": "ChangedBy"
+                "columnName": "UnitCallsign"
               }
             ]
           }

@@ -18,7 +18,7 @@
         "description": "내부 패키지명과 동일한 이름이 공개 레지스트리(RegistrySource=public)에서 비정상적으로 높은 버전으로 설치(VersionJump)되는 의존성 혼동 공격을 탐지. MITRE: T1195.001",
         "severity": "Medium",
         "enabled": true,
-        "query": "let alertWindow = 15m;\nlet maxVersionJump = 2;\nUAVSupplyChain_CL\n| where TimeGenerated > ago(alertWindow)\n| where EventType == 'PackageInstall'\n| where RegistrySource == 'public'\n| where toint(VersionJump) >= maxVersionJump\n| extend TriggerReason = strcat(\"의존성혼동_공개레지스트리_버전점프_\", PackageName, \"_jump:\", VersionJump)\n| extend Severity = \"Medium\"\n| project TimeGenerated, PackageName, RegistrySource, VersionJump, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "query": "let alertWindow = 15m;\nUAVDevOps_CL\n| where TimeGenerated > ago(alertWindow)\n| where EventType == \"dependency_confusion\"\n| where DependencyConfusionSuspected == true\n| extend TriggerReason = strcat(\"의존성혼동_의심_\", Target, \"_\", Actor)\n| extend Severity = \"Medium\"\n| project TimeGenerated, Target, Actor, DependencyConfusionSuspected, StatusCode, TriggerReason, Severity\n| order by TimeGenerated desc",
         "queryFrequency": "PT5M",
         "queryPeriod": "PT15M",
         "triggerOperator": "GreaterThan",
@@ -50,14 +50,14 @@
           "aggregationKind": "SingleAlert"
         },
         "alertDetailsOverride": {
-          "alertDisplayNameFormat": "UAV S71 - Dependency Confusion Attack - {{PackageName}}",
-          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | RegistrySource={{RegistrySource}}",
+          "alertDisplayNameFormat": "UAV S71 - Dependency Confusion Attack - {{Target}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | DependencyConfusionSuspected={{DependencyConfusionSuspected}}",
           "alertDynamicProperties": []
         },
         "customDetails": {
           "TriggerReason": "TriggerReason",
-          "PackageName": "PackageName",
-          "VersionJump": "VersionJump"
+          "Target": "Target",
+          "Actor": "Actor"
         },
         "entityMappings": [
           {
@@ -65,7 +65,7 @@
             "fieldMappings": [
               {
                 "identifier": "HostName",
-                "columnName": "PackageName"
+                "columnName": "Target"
               }
             ]
           }

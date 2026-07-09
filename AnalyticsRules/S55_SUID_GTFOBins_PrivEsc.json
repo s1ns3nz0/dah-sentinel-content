@@ -15,10 +15,10 @@
       "apiVersion": "2023-12-01-preview",
       "properties": {
         "displayName": "UAV S55 - SUID/GTFOBins Privilege Escalation",
-        "description": "UAVHostAudit_CL에서 SUID 비트가 설정된 GTFOBins 알려진 바이너리(bash,find,vim,python 등)가 EUID=0으로 실행되는 권한상승 탐지. MITRE: T1548.001,T1068",
+        "description": "UAVWebAudit_CL에서 GTFOBins 알려진 바이너리 실행이 GtfobinsMatch로 탐지되고 실행 전후 권한(PrivilegeBefore/PrivilegeAfter)이 상승하는 권한상승 탐지. MITRE: T1548.001,T1068",
         "severity": "High",
         "enabled": true,
-        "query": "let alertWindow = 15m;\nlet gtfobins = dynamic([\"bash\",\"find\",\"vim\",\"python\",\"python3\",\"perl\",\"nmap\",\"cp\",\"awk\",\"less\",\"more\",\"env\",\"nice\",\"tar\",\"git\",\"nano\"]);\nUAVHostAudit_CL\n| where TimeGenerated > ago(alertWindow)\n| where EventType == \"exec_suid\"\n| where SetuidBit == true\n| where EUID == 0\n| extend BinaryName = tostring(split(Binary, \"/\")[-1])\n| where BinaryName in (gtfobins)\n| extend TriggerReason = strcat(\"GTFOBins_SUID_권한상승_\", BinaryName)\n| extend Severity = \"High\"\n| project TimeGenerated, UAVId, ActorId, Binary, BinaryName, ExecArgs, EUID, SetuidBit, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "query": "let alertWindow = 15m;\nUAVWebAudit_CL\n| where TimeGenerated > ago(alertWindow)\n| where GtfobinsMatch == true\n| where PrivilegeBefore != PrivilegeAfter\n| extend TriggerReason = strcat(\"GTFOBins_권한상승_\", Binary, \"_\", PrivilegeBefore, \"에서\", PrivilegeAfter, \"로\")\n| extend Severity = \"High\"\n| project TimeGenerated, RequesterId, Binary, Args, PrivilegeBefore, PrivilegeAfter, GtfobinsMatch, TriggerReason, Severity\n| order by TimeGenerated desc",
         "queryFrequency": "PT5M",
         "queryPeriod": "PT15M",
         "triggerOperator": "GreaterThan",
@@ -56,32 +56,23 @@
           "aggregationKind": "SingleAlert"
         },
         "alertDetailsOverride": {
-          "alertDisplayNameFormat": "UAV S55 - SUID/GTFOBins Privilege Escalation - {{UAVId}}",
-          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Binary={{Binary}} | ExecArgs={{ExecArgs}}",
+          "alertDisplayNameFormat": "UAV S55 - SUID/GTFOBins Privilege Escalation - {{RequesterId}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Binary={{Binary}} | Args={{Args}}",
           "alertDynamicProperties": []
         },
         "customDetails": {
           "TriggerReason": "TriggerReason",
           "Binary": "Binary",
-          "ExecArgs": "ExecArgs",
-          "EUID": "EUID"
+          "Args": "Args",
+          "PrivilegeAfter": "PrivilegeAfter"
         },
         "entityMappings": [
-          {
-            "entityType": "Host",
-            "fieldMappings": [
-              {
-                "identifier": "HostName",
-                "columnName": "UAVId"
-              }
-            ]
-          },
           {
             "entityType": "Account",
             "fieldMappings": [
               {
                 "identifier": "Name",
-                "columnName": "ActorId"
+                "columnName": "RequesterId"
               }
             ]
           }

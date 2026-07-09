@@ -15,10 +15,10 @@
       "apiVersion": "2023-12-01-preview",
       "properties": {
         "displayName": "UAV S115 - Control Mode Transition Attack (Manual/Auto Hijack)",
-        "description": "UAVOpmode_CL에서 OpmodeField='control_mode_transition'(Manual↔Auto)이 Authorized=0(SByte)으로 발생하는 비인가 제어권 전환 탐지. 실제 컬럼: OpmodeField/ExpectedValue/ObservedValue/ChangedBy/Authorized(SByte). MITRE: T0827 Loss of Control (조종권을 비인가로 강제 전환시켜 운용자 통제권을 상실시킴)",
+        "description": "UAVMissionEvent_CL에서 CustomModeBefore/CustomModeAfter가 Manual(0)↔Auto(10) 사이를 5분 내 2회 이상 오가는 비인가 제어권 전환 버스트를 탐지. UAVOpmode_CL은 존재하지 않아 실제 미션 이벤트 테이블 기반으로 재구성. MITRE: T0827 Loss of Control (조종권을 비인가로 강제 전환시켜 운용자 통제권을 상실시킴)",
         "severity": "High",
         "enabled": true,
-        "query": "let alertWindow = 10m;\nUAVOpmode_CL\n| where TimeGenerated > ago(alertWindow)\n| where OpmodeField == 'control_mode_transition'\n| where Authorized == 0\n| summarize FlipCount = count(), FirstSeen = min(TimeGenerated), LastExpected = max(ExpectedValue), LastObserved = max(ObservedValue)\n    by UAVId, ChangedBy, bin(TimeGenerated, 5m)\n| where FlipCount >= 1\n| extend TriggerReason = strcat(\"제어권전환_비인가_\", tostring(FlipCount), \"회_\", UAVId, \"_\", LastExpected, \"->\", LastObserved)\n| project FirstSeen, UAVId, ChangedBy, FlipCount, LastExpected, LastObserved, TriggerReason\n| order by FirstSeen desc",
+        "query": "let alertWindow = 15m;\nlet ManualMode = 0; // ArduPilot custom_mode convention: MANUAL=0 (미확정 시 재검증 필요)\nlet AutoMode = 10;  // ArduPilot custom_mode convention: AUTO=10 (미확정 시 재검증 필요)\nUAVMissionEvent_CL\n| where TimeGenerated > ago(alertWindow)\n| where (CustomModeBefore == ManualMode and CustomModeAfter == AutoMode)\n    or (CustomModeBefore == AutoMode and CustomModeAfter == ManualMode)\n| summarize FlipCount = count(), FirstSeen = min(TimeGenerated), LastSeen = max(TimeGenerated)\n    by UAVId, bin(TimeGenerated, 5m)\n| where FlipCount >= 2\n| extend TriggerReason = strcat(\"제어권전환_비인가버스트_\", tostring(FlipCount), \"회_\", UAVId)\n| project FirstSeen, LastSeen, UAVId, FlipCount, TriggerReason\n| order by FirstSeen desc",
         "queryFrequency": "PT5M",
         "queryPeriod": "PT15M",
         "triggerOperator": "GreaterThan",
@@ -67,15 +67,6 @@
               {
                 "identifier": "HostName",
                 "columnName": "UAVId"
-              }
-            ]
-          },
-          {
-            "entityType": "Account",
-            "fieldMappings": [
-              {
-                "identifier": "Name",
-                "columnName": "ChangedBy"
               }
             ]
           }

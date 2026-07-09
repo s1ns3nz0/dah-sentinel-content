@@ -14,11 +14,11 @@
       "kind": "Scheduled",
       "apiVersion": "2023-12-01-preview",
       "properties": {
-        "displayName": "UAV S90 - SOC LLM Prompt Injection",
-        "description": "SOC LLM(코파일럿/분석보조 에이전트) 프롬프트 인젝션 탐지. UAVAiInference_CL의 InferenceType='llm_prompt' 레코드 중 인젝션 마커(InjectionMarkerDetected)가 검출된 경우를 탐지. 경보/티켓/로그 등 LLM에 전달되는 입력에 은닉 지시문을 삽입해 SOC 판단 로직이나 후속 자동화 액션(TargetSystem)을 조작하려는 시도. MITRE: AML.T0051",
+        "displayName": "UAV S90 - SOC LLM Prompt Injection (Proxy - Instrumentation Gap)",
+        "description": "[계측 공백/최선근사] SOC LLM(코파일럿/분석보조 에이전트) 프롬프트 인젝션 탐지. 실배포 워크스페이스에는 AI/ML 추론 계층(LLM 프롬프트, 인젝션 마커 등)을 기록하는 전용 텔레메트리가 존재하지 않음(genuine instrumentation gap — AI 추론 로깅 미도입). 본 룰은 UAVOpAudit_CL을 범용 운영감사 테이블로 활용해 EventType='llm_prompt_inject'(본 룰이 정의한 관례값)로 태깅된 레코드 중 Detail 필드에 이상 콘텐츠 패턴이 기록된 경우를 근사 신호로 탐지한다. 실제 인젝션 마커 검출 로직을 포함하지 않으며, 전용 AI 추론 계측이 도입되기 전까지의 임시 대체(proxy) 룰이다. MITRE: AML.T0051",
         "severity": "High",
         "enabled": true,
-        "query": "let alertWindow = 10m;\nUAVAiInference_CL\n| where TimeGenerated > ago(alertWindow)\n| where InferenceType == 'llm_prompt'\n| where InjectionMarkerDetected == true\n| extend TriggerReason = strcat('SOC_LLM_프롬프트인젝션_', TargetSystem)\n| extend Severity = 'High'\n| project TimeGenerated, ModelEndpoint, RequesterId, PromptText, InjectionMarkerDetected, TargetSystem, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "query": "let alertWindow = 10m;\nUAVOpAudit_CL\n| where TimeGenerated > ago(alertWindow)\n| where EventType == 'llm_prompt_inject'\n| where isnotempty(Detail)\n| extend TriggerReason = strcat('SOC_LLM_프롬프트인젝션_근사탐지_', Operator, '_', Detail)\n| extend Severity = 'High'\n| project TimeGenerated, EventType, Operator, ClientIp, SessionId, StatusCode, Detail, TriggerReason, Severity\n| order by TimeGenerated desc",
         "queryFrequency": "PT5M",
         "queryPeriod": "PT15M",
         "triggerOperator": "GreaterThan",
@@ -51,22 +51,22 @@
           "aggregationKind": "SingleAlert"
         },
         "alertDetailsOverride": {
-          "alertDisplayNameFormat": "UAV S90 - SOC LLM Prompt Injection - {{TargetSystem}}",
-          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Severity={{Severity}}",
+          "alertDisplayNameFormat": "UAV S90 - SOC LLM Prompt Injection (Proxy) - {{Operator}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Detail={{Detail}} | Severity={{Severity}}",
           "alertDynamicProperties": []
         },
         "customDetails": {
           "TriggerReason": "TriggerReason",
-          "TargetSystem": "TargetSystem",
-          "InjectionMarkerDetected": "InjectionMarkerDetected"
+          "Operator": "Operator",
+          "Detail": "Detail"
         },
         "entityMappings": [
           {
-            "entityType": "Host",
+            "entityType": "Account",
             "fieldMappings": [
               {
-                "identifier": "HostName",
-                "columnName": "ModelEndpoint"
+                "identifier": "Name",
+                "columnName": "Operator"
               }
             ]
           }

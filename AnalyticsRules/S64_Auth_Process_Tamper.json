@@ -15,10 +15,10 @@
       "apiVersion": "2023-12-01-preview",
       "properties": {
         "displayName": "UAV S64 - Authentication Process Tamper (Auth-Stub Backdoor)",
-        "description": "UAVOpAudit_CL에서 auth-service 바이너리 해시가 24h 베이스라인 다수해시와 불일치하거나, 로그인 성공률이 100%로 치솟는(항상통과 백도어 의심) 이상 탐지. MITRE: T1556",
+        "description": "UAVOpAudit_CL에서 Operator별 인증 성공률(StatusCode==200 비율)을 5분 단위 시계열로 집계 후 series_decompose_anomalies로 24h 베이스라인 대비 이상 급등(z-score)을 탐지. 성공률이 사실상 100%로 치솟는(항상통과 백도어 의심) 패턴을 인증 프로세스 변조 신호로 사용. S1과 동일한 z-score/anomaly-decompose 기법. MITRE: T1556",
         "severity": "High",
         "enabled": true,
-        "query": "let baselineWindow = 24h;\nlet alertWindow = 15m;\nlet successRateGate = 1.0;\nlet minAttempts = 10;\nlet BaselineHash = toscalar(\n    UAVOpAudit_CL\n    | where TimeGenerated between (ago(baselineWindow) .. ago(alertWindow))\n    | where ServiceName == \"auth-service\" and EventType == \"login_attempt\"\n    | summarize HashCount = count() by BinaryHash\n    | top 1 by HashCount desc\n    | project BinaryHash\n);\nUAVOpAudit_CL\n| where TimeGenerated > ago(alertWindow)\n| where ServiceName == \"auth-service\" and EventType == \"login_attempt\"\n| summarize SuccessCount = countif(Result == \"success\"), FailCount = countif(Result == \"fail\"), TotalCount = count(),\n    (LastSeen, CurrentHash) = arg_max(TimeGenerated, BinaryHash) by System\n| extend SuccessRate = todouble(SuccessCount) / TotalCount\n| extend HashMismatch = (CurrentHash != BaselineHash)\n| where TotalCount >= minAttempts and (SuccessRate >= successRateGate or HashMismatch)\n| extend TriggerReason = case(\n    HashMismatch and SuccessRate >= successRateGate, \"인증바이너리해시불일치_전수성공_백도어의심\",\n    HashMismatch, \"인증바이너리해시불일치_백도어의심\",\n    \"인증프로세스_100%성공률_이상\")\n| extend Severity = \"High\"\n| project LastSeen, System, SuccessCount, FailCount, TotalCount, SuccessRate, CurrentHash, BaselineHash, HashMismatch, TriggerReason, Severity\n| order by LastSeen desc",
+        "query": "let baselineWindow = 24h;\nlet lookbackWindow = 5m;\nlet alertWindow = 15m;\nlet zScoreThreshold = 3.0;\nlet minAttempts = 5;\nlet successRateGate = 0.99;\nlet PerBin =\n    UAVOpAudit_CL\n    | where TimeGenerated > ago(baselineWindow)\n    | summarize TotalCount = count(), SuccessCount = countif(StatusCode == 200) by Operator, TimeBin = bin(TimeGenerated, lookbackWindow)\n    | extend SuccessRate = todouble(SuccessCount) / TotalCount;\nPerBin\n| make-series AvgSuccessRate = avg(SuccessRate) default=0, AvgTotalCount = avg(TotalCount) default=0\n    on TimeBin step lookbackWindow by Operator\n| extend (Anomalies, Score, Baseline) = series_decompose_anomalies(AvgSuccessRate, zScoreThreshold)\n| mv-expand TimeBin, AvgSuccessRate, AvgTotalCount, Anomalies, Score\n| where todatetime(TimeBin) > ago(alertWindow)\n| where toint(Anomalies) == 1\n| where todouble(AvgSuccessRate) >= successRateGate and todouble(AvgTotalCount) >= minAttempts\n| extend TriggerReason = strcat(\"인증프로세스_이상성공률스파이크_백도어의심_\", Operator)\n| extend Severity = \"High\"\n| project TimeGenerated = todatetime(TimeBin), Operator, AvgSuccessRate = todouble(AvgSuccessRate), AvgTotalCount = todouble(AvgTotalCount), AnomalyScore = todouble(Score), TriggerReason, Severity\n| order by TimeGenerated desc",
         "queryFrequency": "PT10M",
         "queryPeriod": "P1D",
         "triggerOperator": "GreaterThan",
@@ -53,23 +53,23 @@
           "aggregationKind": "SingleAlert"
         },
         "alertDetailsOverride": {
-          "alertDisplayNameFormat": "UAV S64 - Authentication Process Tamper (Auth-Stub Backdoor) - {{System}}",
-          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | SuccessRate={{SuccessRate}} | HashMismatch={{HashMismatch}}",
+          "alertDisplayNameFormat": "UAV S64 - Authentication Process Tamper (Auth-Stub Backdoor) - {{Operator}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | AvgSuccessRate={{AvgSuccessRate}} | AnomalyScore={{AnomalyScore}}",
           "alertDynamicProperties": []
         },
         "customDetails": {
           "TriggerReason": "TriggerReason",
-          "SuccessRate": "SuccessRate",
-          "CurrentHash": "CurrentHash",
-          "HashMismatch": "HashMismatch"
+          "AvgSuccessRate": "AvgSuccessRate",
+          "AvgTotalCount": "AvgTotalCount",
+          "AnomalyScore": "AnomalyScore"
         },
         "entityMappings": [
           {
-            "entityType": "Host",
+            "entityType": "Account",
             "fieldMappings": [
               {
-                "identifier": "HostName",
-                "columnName": "System"
+                "identifier": "Name",
+                "columnName": "Operator"
               }
             ]
           }

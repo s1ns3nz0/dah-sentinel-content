@@ -18,7 +18,7 @@
         "description": "UAVMavsec_CL에서 COMMAND_LONG/PARAM_SET 명령 중 Failsafe 관련 파라미터(FS_GCS_ENABLE/FS_EKF_THRESH/FENCE_ENABLE 등)를 대상으로 하는 명령의 SourceSystemId가 Approved_SystemId_List(UAVId별 인가 SystemId)에 없으면 비인가 주입에 의한 Failsafe 억제 시도로 탐지. MITRE: T1692 / MITRE ICS ATT&CK: T0842(Network Sniffing 계열 — Enterprise 근접기법 T1040으로 매핑)",
         "severity": "High",
         "enabled": true,
-        "query": "let alertWindow = 10m;\nlet failsafeParams = dynamic(['FS_GCS_ENABLE', 'FS_EKF_THRESH', 'FENCE_ENABLE', 'FS_THR_ENABLE', 'FS_LONG_ACTN']);\nlet ApprovedSystems = _GetWatchlist('Approved_SystemId_List') | project SystemId = toint(SystemId), UAVId;\nUAVMavsec_CL\n| where TimeGenerated > ago(alertWindow)\n| where Command in ('COMMAND_LONG', 'PARAM_SET')\n| where isempty(TargetParam) or TargetParam in (failsafeParams)\n| join kind=leftouter (ApprovedSystems) on $left.SourceSystemId == $right.SystemId, UAVId\n| extend SourceSystemIdAnomaly = isnull(SystemId)\n| where SourceSystemIdAnomaly\n| extend TriggerReason = strcat('MAVLink_비인가주입_Failsafe억제_SourceSystemId:', tostring(SourceSystemId), '_Param:', TargetParam)\n| extend Severity = 'High'\n| project TimeGenerated, UAVId, SourceSystemId, Command, TargetParam, SourceSystemIdAnomaly, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "query": "let alertWindow = 10m;\nlet ApprovedSystems = _GetWatchlist('Approved_SystemId_List') | project SystemId = toint(SystemId), UAVId;\nUAVOperator_CL\n| where TimeGenerated > ago(alertWindow)\n| join kind=leftouter (ApprovedSystems) on $left.SourceSystemId == $right.SystemId, UAVId\n| extend SourceSystemIdAnomaly = isnull(SystemId)\n| where SourceSystemIdAnomaly\n| extend TriggerReason = strcat('MAVLink_비인가주입_Failsafe억제의심_SourceSystemId:', tostring(SourceSystemId), '_Action:', ActionName)\n| extend Severity = 'High'\n| project TimeGenerated, UAVId, SourceSystemId, Command, ActionName, SourceSystemIdAnomaly, TriggerReason, Severity\n| order by TimeGenerated desc",
         "queryFrequency": "PT5M",
         "queryPeriod": "PT15M",
         "triggerOperator": "GreaterThan",
@@ -56,7 +56,7 @@
         },
         "alertDetailsOverride": {
           "alertDisplayNameFormat": "UAV S20 - Unauthorized MAVLink Injection (Failsafe Suppression Observation) - {{UAVId}}",
-          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Severity={{Severity}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | SourceSystemId={{SourceSystemId}} | Severity={{Severity}}",
           "alertDynamicProperties": []
         },
         "customDetails": {

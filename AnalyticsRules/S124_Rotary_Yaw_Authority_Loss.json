@@ -54,7 +54,7 @@
         },
         "alertDetailsOverride": {
           "alertDisplayNameFormat": "UAV S124 - Rotary-Wing Yaw Authority Loss (Motor Differential Manipulation) - {{UAVId}}",
-          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | ChangedBy={{ChangedBy}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}}",
           "alertDynamicProperties": []
         },
         "customDetails": {

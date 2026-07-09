@@ -54,7 +54,7 @@
         },
         "alertDetailsOverride": {
           "alertDisplayNameFormat": "UAV S21 - Ground Segment Lateral Movement (impacket/crackmapexec Signatures) - {{User}}",
-          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | AttemptCount={{AttemptCount}} | PeerCount={{PeerCount}} | Severity={{Severity}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | AttemptCount={{AttemptCount}} | PeerCount={{PeerCount}}",
           "alertDynamicProperties": []
         },
         "customDetails": {

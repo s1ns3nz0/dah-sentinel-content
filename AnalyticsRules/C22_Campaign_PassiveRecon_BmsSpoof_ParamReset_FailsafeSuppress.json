@@ -27,16 +27,19 @@
         "suppressionEnabled": false,
         "startTimeUtc": null,
         "tactics": [
-          "Reconnaissance",
           "DefenseEvasion",
-          "Impact"
+          "Impact",
+          "Reconnaissance"
         ],
         "techniques": [
           "T1595",
+          "T1565",
+          "T1562"
+        ],
+        "subTechniques": [
           "T1565.002",
           "T1562.001"
         ],
-        "subTechniques": [],
         "alertRuleTemplateName": null,
         "incidentConfiguration": {
           "createIncident": true,
@@ -63,8 +66,7 @@
         "customDetails": {
           "CampaignType": "CampaignType",
           "StepSummary": "StepSummary",
-          "UAVId": "UAVId",
-          "StageCount": "StageCount"
+          "UAVId": "UAVId"
         },
         "entityMappings": [
           {

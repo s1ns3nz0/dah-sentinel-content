@@ -53,7 +53,7 @@
         },
         "alertDetailsOverride": {
           "alertDisplayNameFormat": "UAV S30 - RC Override Command Injection - {{UavId}}",
-          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Channel={{Channel}} | ChannelValue={{ChannelValue}} | Severity={{Severity}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Channel={{Channel}} | ChannelValue={{ChannelValue}}",
           "alertDynamicProperties": []
         },
         "customDetails": {

@@ -51,7 +51,7 @@
         },
         "alertDetailsOverride": {
           "alertDisplayNameFormat": "UAV S80 - ISR Handoff Target Data Tampering - {{TargetId}}",
-          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | PrevLat={{PrevLat}} | Lat={{Lat}} | PrevLon={{PrevLon}} | Lon={{Lon}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | PrevLat={{PrevLat}} | Lat={{Lat}}",
           "alertDynamicProperties": []
         },
         "customDetails": {

@@ -28,7 +28,7 @@
         "startTimeUtc": null,
         "tactics": [
           "Collection",
-          "Credential Access"
+          "CredentialAccess"
         ],
         "techniques": [
           "T1557"

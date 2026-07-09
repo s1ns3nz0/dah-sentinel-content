@@ -28,7 +28,7 @@
         "startTimeUtc": null,
         "tactics": [
           "Persistence",
-          "Privilege Escalation"
+          "PrivilegeEscalation"
         ],
         "techniques": [
           "T1053",
@@ -45,9 +45,7 @@
             "reopenClosedIncident": false,
             "lookbackDuration": "PT5H",
             "matchingMethod": "AllEntities",
-            "groupByEntities": [
-              "Host"
-            ],
+            "groupByEntities": [],
             "groupByAlertDetails": [],
             "groupByCustomDetails": []
           }

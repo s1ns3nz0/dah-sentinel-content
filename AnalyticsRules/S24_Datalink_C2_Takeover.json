@@ -27,11 +27,11 @@
         "suppressionEnabled": false,
         "startTimeUtc": null,
         "tactics": [
+          "CommandAndControl",
           "Impact",
-          "CommandAndControl"
+          "InhibitResponseFunction"
         ],
         "techniques": [
-          "T1695",
           "T1499"
         ],
         "subTechniques": [],

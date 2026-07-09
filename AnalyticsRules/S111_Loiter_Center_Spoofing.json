@@ -53,7 +53,7 @@
         },
         "alertDetailsOverride": {
           "alertDisplayNameFormat": "UAV S111 - Loiter Center Spoofing (Unauthorized Loiter Point Manipulation) - {{UAVId}}",
-          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | ChangedBy={{ChangedBy}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}}",
           "alertDynamicProperties": []
         },
         "customDetails": {

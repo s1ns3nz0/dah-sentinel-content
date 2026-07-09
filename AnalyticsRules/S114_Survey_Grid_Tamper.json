@@ -53,7 +53,7 @@
         },
         "alertDetailsOverride": {
           "alertDisplayNameFormat": "UAV S114 - Survey Grid Parameter Tamper (Unauthorized Survey Grid Modification) - {{UAVId}}",
-          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | ChangedBy={{ChangedBy}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}}",
           "alertDynamicProperties": []
         },
         "customDetails": {

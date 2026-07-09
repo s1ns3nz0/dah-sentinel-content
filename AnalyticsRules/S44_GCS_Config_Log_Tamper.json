@@ -53,7 +53,7 @@
         },
         "alertDetailsOverride": {
           "alertDisplayNameFormat": "UAV S44 - GCS Config/Log Tampering (Unapproved Change) - {{Target}}",
-          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | ConfigField={{ConfigField}} | ValueBefore={{ValueBefore}} | ValueAfter={{ValueAfter}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | ConfigField={{ConfigField}} | ValueBefore={{ValueBefore}}",
           "alertDynamicProperties": []
         },
         "customDetails": {

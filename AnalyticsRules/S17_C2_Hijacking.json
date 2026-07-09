@@ -54,7 +54,7 @@
         },
         "alertDetailsOverride": {
           "alertDisplayNameFormat": "UAV S17 - MAVLink C2/Mode-Change Hijack Observation - {{UAVId}}",
-          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | PrevCustomMode={{PrevCustomMode}} | CustomMode={{CustomMode}} | UnsignedCount={{UnsignedCount}} | Severity={{Severity}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | PrevCustomMode={{PrevCustomMode}} | CustomMode={{CustomMode}}",
           "alertDynamicProperties": []
         },
         "customDetails": {

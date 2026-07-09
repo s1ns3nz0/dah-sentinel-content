@@ -53,7 +53,7 @@
         },
         "alertDetailsOverride": {
           "alertDisplayNameFormat": "UAV S120 - RTL/LAND Failsafe Recovery Block - {{UAVId}}",
-          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | ChangedBy={{ChangedBy}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}}",
           "alertDynamicProperties": []
         },
         "customDetails": {

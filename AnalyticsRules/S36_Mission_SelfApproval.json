@@ -28,7 +28,8 @@
         "startTimeUtc": null,
         "tactics": [
           "Execution",
-          "Impact"
+          "Impact",
+          "InitialAccess"
         ],
         "techniques": [
           "T1204",

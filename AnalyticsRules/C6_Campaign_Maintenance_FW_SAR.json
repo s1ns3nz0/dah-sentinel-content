@@ -28,6 +28,7 @@
         "startTimeUtc": null,
         "tactics": [
           "Exfiltration",
+          "InitialAccess",
           "Persistence"
         ],
         "techniques": [

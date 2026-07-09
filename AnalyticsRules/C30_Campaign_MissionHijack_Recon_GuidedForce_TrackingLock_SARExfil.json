@@ -27,16 +27,18 @@
         "suppressionEnabled": false,
         "startTimeUtc": null,
         "tactics": [
-          "Reconnaissance",
+          "Exfiltration",
           "Impact",
-          "Exfiltration"
+          "Reconnaissance"
         ],
         "techniques": [
           "T1595",
-          "T1499.004",
+          "T1499",
           "T1041"
         ],
-        "subTechniques": [],
+        "subTechniques": [
+          "T1499.004"
+        ],
         "alertRuleTemplateName": null,
         "incidentConfiguration": {
           "createIncident": true,
@@ -63,8 +65,7 @@
         "customDetails": {
           "CampaignType": "CampaignType",
           "StepSummary": "StepSummary",
-          "UAVId": "UAVId",
-          "StageCount": "StageCount"
+          "UAVId": "UAVId"
         },
         "entityMappings": [
           {

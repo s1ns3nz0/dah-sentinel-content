@@ -27,15 +27,17 @@
         "suppressionEnabled": false,
         "startTimeUtc": null,
         "tactics": [
-          "ResourceDevelopment",
-          "Impact"
+          "Impact",
+          "ResourceDevelopment"
         ],
         "techniques": [
           "T1584",
+          "T1565"
+        ],
+        "subTechniques": [
           "T1565.001",
           "T1565.002"
         ],
-        "subTechniques": [],
         "alertRuleTemplateName": null,
         "incidentConfiguration": {
           "createIncident": true,
@@ -62,8 +64,7 @@
         "customDetails": {
           "CampaignType": "CampaignType",
           "StepSummary": "StepSummary",
-          "SwarmId": "SwarmId",
-          "StageCount": "StageCount"
+          "SwarmId": "SwarmId"
         },
         "entityMappings": [
           {

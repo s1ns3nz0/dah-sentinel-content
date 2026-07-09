@@ -32,13 +32,10 @@
           "CommandAndControl"
         ],
         "techniques": [
-          "T1692",
           "T1040",
           "T1557"
         ],
-        "subTechniques": [
-          "T1692.001"
-        ],
+        "subTechniques": [],
         "alertRuleTemplateName": null,
         "incidentConfiguration": {
           "createIncident": false,

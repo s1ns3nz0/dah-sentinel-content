@@ -27,8 +27,11 @@
         "suppressionEnabled": false,
         "startTimeUtc": null,
         "tactics": [
+          "CredentialAccess",
           "Execution",
-          "Impact"
+          "Impact",
+          "InitialAccess",
+          "PrivilegeEscalation"
         ],
         "techniques": [
           "T1110",

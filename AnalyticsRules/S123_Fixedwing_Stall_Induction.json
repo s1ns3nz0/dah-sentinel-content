@@ -54,7 +54,7 @@
         },
         "alertDetailsOverride": {
           "alertDisplayNameFormat": "UAV S123 - Fixed-Wing Stall Induction (Airspeed/Control Surface Manipulation) - {{UAVId}}",
-          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | ChangedBy={{ChangedBy}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}}",
           "alertDynamicProperties": []
         },
         "customDetails": {

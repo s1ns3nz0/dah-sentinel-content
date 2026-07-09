@@ -27,7 +27,7 @@
         "suppressionEnabled": false,
         "startTimeUtc": null,
         "tactics": [
-          "Lateral Movement"
+          "LateralMovement"
         ],
         "techniques": [
           "T1080"

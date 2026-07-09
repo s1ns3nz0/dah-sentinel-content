@@ -54,7 +54,7 @@
         },
         "alertDetailsOverride": {
           "alertDisplayNameFormat": "UAV S117 - BLOS SATCOM Autonomy Command Delay/Forge - {{UAVId}}",
-          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | ChangedBy={{ChangedBy}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}}",
           "alertDynamicProperties": []
         },
         "customDetails": {

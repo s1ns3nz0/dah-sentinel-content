@@ -33,7 +33,6 @@
         ],
         "techniques": [
           "T1195",
-          "T1693",
           "T1495"
         ],
         "subTechniques": [],

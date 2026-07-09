@@ -27,8 +27,8 @@
         "suppressionEnabled": false,
         "startTimeUtc": null,
         "tactics": [
-          "Privilege Escalation",
-          "Defense Evasion"
+          "DefenseEvasion",
+          "PrivilegeEscalation"
         ],
         "techniques": [
           "T1548",
@@ -45,9 +45,7 @@
             "reopenClosedIncident": false,
             "lookbackDuration": "PT5H",
             "matchingMethod": "AllEntities",
-            "groupByEntities": [
-              "Host"
-            ],
+            "groupByEntities": [],
             "groupByAlertDetails": [],
             "groupByCustomDetails": []
           }

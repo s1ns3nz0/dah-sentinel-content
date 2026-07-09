@@ -27,9 +27,10 @@
         "suppressionEnabled": false,
         "startTimeUtc": null,
         "tactics": [
-          "Reconnaissance",
           "CredentialAccess",
-          "Impact"
+          "Impact",
+          "InitialAccess",
+          "Reconnaissance"
         ],
         "techniques": [
           "T1595",
@@ -63,8 +64,7 @@
         "customDetails": {
           "CampaignType": "CampaignType",
           "StepSummary": "StepSummary",
-          "SwarmId": "SwarmId",
-          "StageCount": "StageCount"
+          "SwarmId": "SwarmId"
         },
         "entityMappings": [
           {

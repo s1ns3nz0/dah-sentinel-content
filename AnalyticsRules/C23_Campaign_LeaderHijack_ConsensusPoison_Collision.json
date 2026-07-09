@@ -28,14 +28,17 @@
         "startTimeUtc": null,
         "tactics": [
           "CredentialAccess",
-          "Impact"
+          "Impact",
+          "InitialAccess"
         ],
         "techniques": [
           "T1078",
-          "T1565.001",
+          "T1565",
           "T1499"
         ],
-        "subTechniques": [],
+        "subTechniques": [
+          "T1565.001"
+        ],
         "alertRuleTemplateName": null,
         "incidentConfiguration": {
           "createIncident": true,

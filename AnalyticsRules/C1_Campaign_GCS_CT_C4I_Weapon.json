@@ -28,14 +28,18 @@
         "startTimeUtc": null,
         "tactics": [
           "Execution",
-          "Impact"
+          "Impact",
+          "InitialAccess",
+          "PrivilegeEscalation"
         ],
         "techniques": [
           "T1078",
           "T1548",
+          "T1565"
+        ],
+        "subTechniques": [
           "T1565.002"
         ],
-        "subTechniques": [],
         "alertRuleTemplateName": null,
         "incidentConfiguration": {
           "createIncident": true,

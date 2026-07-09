@@ -27,8 +27,9 @@
         "suppressionEnabled": false,
         "startTimeUtc": null,
         "tactics": [
+          "Collection",
           "Exfiltration",
-          "Collection"
+          "PrivilegeEscalation"
         ],
         "techniques": [
           "T1020",

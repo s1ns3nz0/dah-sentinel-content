@@ -27,8 +27,8 @@
         "suppressionEnabled": false,
         "startTimeUtc": null,
         "tactics": [
-          "Reconnaissance",
-          "InitialAccess"
+          "InitialAccess",
+          "Reconnaissance"
         ],
         "techniques": [
           "T1078",
@@ -59,8 +59,7 @@
           "alertDynamicProperties": []
         },
         "customDetails": {
-          "TriggerReason": "TriggerReason",
-          "ClientIp": "ClientIp"
+          "TriggerReason": "TriggerReason"
         },
         "entityMappings": [
           {

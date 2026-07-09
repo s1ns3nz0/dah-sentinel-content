@@ -54,7 +54,7 @@
         },
         "alertDetailsOverride": {
           "alertDisplayNameFormat": "UAV S32 - GNSS Spoofing Slow Walk-off (Forced Landing Lure, RQ-170 Style) - {{UAVId}}",
-          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | CumulativeDriftDeg={{CumulativeDriftDeg}} | SampleCount={{SampleCount}} | Severity={{Severity}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | CumulativeDriftDeg={{CumulativeDriftDeg}} | SampleCount={{SampleCount}}",
           "alertDynamicProperties": []
         },
         "customDetails": {

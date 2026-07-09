@@ -27,15 +27,20 @@
         "suppressionEnabled": false,
         "startTimeUtc": null,
         "tactics": [
-          "InitialAccess",
-          "Impact"
+          "DefenseEvasion",
+          "Impact",
+          "InitialAccess"
         ],
         "techniques": [
+          "T1195",
+          "T1601",
+          "T1565"
+        ],
+        "subTechniques": [
           "T1195.002",
           "T1601.001",
           "T1565.002"
         ],
-        "subTechniques": [],
         "alertRuleTemplateName": null,
         "incidentConfiguration": {
           "createIncident": true,
@@ -62,8 +67,7 @@
         "customDetails": {
           "CampaignType": "CampaignType",
           "StepSummary": "StepSummary",
-          "UAVId": "UAVId",
-          "StageCount": "StageCount"
+          "UAVId": "UAVId"
         },
         "entityMappings": [
           {

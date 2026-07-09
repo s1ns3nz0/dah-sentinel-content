@@ -27,10 +27,13 @@
         "suppressionEnabled": false,
         "startTimeUtc": null,
         "tactics": [
-          "Execution"
+          "Execution",
+          "ImpairProcessControl",
+          "InitialAccess",
+          "PrivilegeEscalation"
         ],
         "techniques": [
-          "T1692"
+          "T1078"
         ],
         "subTechniques": [],
         "alertRuleTemplateName": null,

@@ -27,16 +27,19 @@
         "suppressionEnabled": false,
         "startTimeUtc": null,
         "tactics": [
+          "Impact",
           "InitialAccess",
-          "PrivilegeEscalation",
-          "Impact"
+          "Persistence",
+          "PrivilegeEscalation"
         ],
         "techniques": [
-          "T1505.003",
+          "T1505",
           "T1611",
           "T1078"
         ],
-        "subTechniques": [],
+        "subTechniques": [
+          "T1505.003"
+        ],
         "alertRuleTemplateName": null,
         "incidentConfiguration": {
           "createIncident": true,

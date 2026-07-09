@@ -28,7 +28,8 @@
         "startTimeUtc": null,
         "tactics": [
           "Collection",
-          "Exfiltration"
+          "Exfiltration",
+          "InitialAccess"
         ],
         "techniques": [
           "T1078",
@@ -62,8 +63,7 @@
         "customDetails": {
           "CampaignType": "CampaignType",
           "StepSummary": "StepSummary",
-          "SwarmId": "SwarmId",
-          "StageCount": "StageCount"
+          "SwarmId": "SwarmId"
         },
         "entityMappings": [
           {

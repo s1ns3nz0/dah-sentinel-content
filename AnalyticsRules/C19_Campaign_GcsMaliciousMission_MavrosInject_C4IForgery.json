@@ -31,11 +31,14 @@
           "Impact"
         ],
         "techniques": [
-          "T1204.002",
+          "T1204",
           "T1059",
+          "T1565"
+        ],
+        "subTechniques": [
+          "T1204.002",
           "T1565.002"
         ],
-        "subTechniques": [],
         "alertRuleTemplateName": null,
         "incidentConfiguration": {
           "createIncident": true,

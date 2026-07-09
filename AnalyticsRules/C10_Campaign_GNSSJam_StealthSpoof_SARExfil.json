@@ -27,15 +27,17 @@
         "suppressionEnabled": false,
         "startTimeUtc": null,
         "tactics": [
-          "Impact",
-          "Exfiltration"
+          "Exfiltration",
+          "Impact"
         ],
         "techniques": [
           "T1499",
-          "T1565.002",
+          "T1565",
           "T1041"
         ],
-        "subTechniques": [],
+        "subTechniques": [
+          "T1565.002"
+        ],
         "alertRuleTemplateName": null,
         "incidentConfiguration": {
           "createIncident": true,

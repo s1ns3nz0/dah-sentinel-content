@@ -28,14 +28,17 @@
         "startTimeUtc": null,
         "tactics": [
           "Collection",
-          "Impact"
+          "Impact",
+          "InitialAccess"
         ],
         "techniques": [
           "T1195",
+          "T1565"
+        ],
+        "subTechniques": [
           "T1565.001",
           "T1565.002"
         ],
-        "subTechniques": [],
         "alertRuleTemplateName": null,
         "incidentConfiguration": {
           "createIncident": true,

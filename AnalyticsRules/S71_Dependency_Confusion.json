@@ -27,7 +27,7 @@
         "suppressionEnabled": false,
         "startTimeUtc": null,
         "tactics": [
-          "Initial Access"
+          "InitialAccess"
         ],
         "techniques": [
           "T1195"

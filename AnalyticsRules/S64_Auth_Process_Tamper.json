@@ -27,8 +27,8 @@
         "suppressionEnabled": false,
         "startTimeUtc": null,
         "tactics": [
-          "Credential Access",
-          "Defense Evasion"
+          "CredentialAccess",
+          "DefenseEvasion"
         ],
         "techniques": [
           "T1556"
@@ -42,9 +42,7 @@
             "reopenClosedIncident": false,
             "lookbackDuration": "PT5H",
             "matchingMethod": "AllEntities",
-            "groupByEntities": [
-              "Host"
-            ],
+            "groupByEntities": [],
             "groupByAlertDetails": [],
             "groupByCustomDetails": []
           }

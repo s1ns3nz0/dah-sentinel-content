@@ -28,6 +28,7 @@
         "startTimeUtc": null,
         "tactics": [
           "DefenseEvasion",
+          "Impact",
           "Persistence"
         ],
         "techniques": [
@@ -58,7 +59,7 @@
         "customDetails": {
           "TriggerReason": "TriggerReason",
           "ActorId": "ActorId",
-          "LogBearingTargetSuspected": "LogBearingTargetSuspected"
+          "LogBearingSuspect": "LogBearingTargetSuspected"
         },
         "entityMappings": [
           {

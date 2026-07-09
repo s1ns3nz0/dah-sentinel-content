@@ -53,7 +53,7 @@
         },
         "alertDetailsOverride": {
           "alertDisplayNameFormat": "UAV S27 - WiFi RF Jamming (Loss of Control) - {{UAVId}}",
-          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | AvgJsRatio={{AvgJsRatio}} | AvgEirp={{AvgEirp}} | Severity={{Severity}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | AvgJsRatio={{AvgJsRatio}} | AvgEirp={{AvgEirp}}",
           "alertDynamicProperties": []
         },
         "customDetails": {

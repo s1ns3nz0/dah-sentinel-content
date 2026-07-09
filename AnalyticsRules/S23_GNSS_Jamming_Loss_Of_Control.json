@@ -55,7 +55,7 @@
         },
         "alertDetailsOverride": {
           "alertDisplayNameFormat": "UAV S23 - GNSS Jamming (Loss of Control/Availability) - {{UAVId}}",
-          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | JsRatio_dB={{JsRatio_dB}} | Band={{Band}} | Severity={{Severity}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | JsRatio_dB={{JsRatio_dB}} | Band={{Band}}",
           "alertDynamicProperties": []
         },
         "customDetails": {

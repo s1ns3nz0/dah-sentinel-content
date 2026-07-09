@@ -32,10 +32,12 @@
         ],
         "techniques": [
           "T1557",
-          "T1565.002",
+          "T1565",
           "T1499"
         ],
-        "subTechniques": [],
+        "subTechniques": [
+          "T1565.002"
+        ],
         "alertRuleTemplateName": null,
         "incidentConfiguration": {
           "createIncident": true,

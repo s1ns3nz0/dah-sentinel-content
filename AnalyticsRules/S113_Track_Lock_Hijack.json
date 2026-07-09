@@ -52,8 +52,8 @@
           "aggregationKind": "SingleAlert"
         },
         "alertDetailsOverride": {
-          "alertDisplayNameFormat": "UAV S113 - Target Track Lock Hijack (Unauthorized Track Target Substitution) - {{UAVId}}",
-          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | ChangedBy={{ChangedBy}}",
+          "alertDisplayNameFormat": "UAV S113 - Target Track Lock Hijack (Unauthorized Track Target Substitution)",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}}",
           "alertDynamicProperties": []
         },
         "customDetails": {

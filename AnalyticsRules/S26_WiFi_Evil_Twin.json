@@ -27,8 +27,8 @@
         "suppressionEnabled": false,
         "startTimeUtc": null,
         "tactics": [
-          "CredentialAccess",
-          "Collection"
+          "Collection",
+          "CredentialAccess"
         ],
         "techniques": [
           "T1557"
@@ -54,7 +54,7 @@
         },
         "alertDetailsOverride": {
           "alertDisplayNameFormat": "UAV S26 - WiFi Evil Twin (Rogue AP C2 Hijack) - {{UavId}}",
-          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Ssid={{Ssid}} | MismatchCount={{MismatchCount}} | Severity={{Severity}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Ssid={{Ssid}} | MismatchCount={{MismatchCount}}",
           "alertDynamicProperties": []
         },
         "customDetails": {

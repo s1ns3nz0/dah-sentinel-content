@@ -53,7 +53,7 @@
         },
         "alertDetailsOverride": {
           "alertDisplayNameFormat": "UAV S31 - RC Protocol Downgrade (Unencrypted Fallback) - {{UavId}}",
-          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | ProtocolRequested={{ProtocolRequested}} | ProtocolNegotiated={{ProtocolNegotiated}} | Severity={{Severity}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | ProtocolRequested={{ProtocolRequested}} | ProtocolNegotiated={{ProtocolNegotiated}}",
           "alertDynamicProperties": []
         },
         "customDetails": {

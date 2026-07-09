@@ -58,7 +58,17 @@
           "ReplayCount": "ReplayCount",
           "FleetIds": "FleetIds"
         },
-        "entityMappings": [],
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "CommonCommand"
+              }
+            ]
+          }
+        ],
         "sentinelEntitiesMappings": null,
         "templateVersion": null
       }

@@ -53,7 +53,7 @@
         },
         "alertDetailsOverride": {
           "alertDisplayNameFormat": "UAV S19 - SOC Alert Capacity Threshold Exceeded - {{SocId}}",
-          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | AlertCountPerWindow={{AlertCountPerWindow}} | CapacityThreshold={{CapacityThreshold}} | Severity={{Severity}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | AlertCountPerWindow={{AlertCountPerWindow}} | CapacityThreshold={{CapacityThreshold}}",
           "alertDynamicProperties": []
         },
         "customDetails": {

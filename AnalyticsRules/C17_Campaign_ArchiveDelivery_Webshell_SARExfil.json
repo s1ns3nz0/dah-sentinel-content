@@ -27,15 +27,19 @@
         "suppressionEnabled": false,
         "startTimeUtc": null,
         "tactics": [
+          "Exfiltration",
           "InitialAccess",
-          "Exfiltration"
+          "Persistence"
         ],
         "techniques": [
-          "T1195.002",
-          "T1505.003",
+          "T1195",
+          "T1505",
           "T1041"
         ],
-        "subTechniques": [],
+        "subTechniques": [
+          "T1195.002",
+          "T1505.003"
+        ],
         "alertRuleTemplateName": null,
         "incidentConfiguration": {
           "createIncident": true,
@@ -62,8 +66,7 @@
         "customDetails": {
           "CampaignType": "CampaignType",
           "StepSummary": "StepSummary",
-          "Operator": "Operator",
-          "StageCount": "StageCount"
+          "Operator": "Operator"
         },
         "entityMappings": [
           {

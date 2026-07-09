@@ -32,7 +32,6 @@
           "Impact"
         ],
         "techniques": [
-          "T1692",
           "T1040"
         ],
         "subTechniques": [],
@@ -63,7 +62,7 @@
           "TriggerReason": "TriggerReason",
           "SourceSystemId": "SourceSystemId",
           "Command": "Command",
-          "SourceSystemIdAnomaly": "SourceSystemIdAnomaly"
+          "SrcSysIdAnomaly": "SourceSystemIdAnomaly"
         },
         "entityMappings": [
           {

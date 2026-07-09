@@ -27,7 +27,7 @@
         "suppressionEnabled": false,
         "startTimeUtc": null,
         "tactics": [
-          "Privilege Escalation"
+          "PrivilegeEscalation"
         ],
         "techniques": [
           "T1611"
@@ -41,9 +41,7 @@
             "reopenClosedIncident": false,
             "lookbackDuration": "PT5H",
             "matchingMethod": "AllEntities",
-            "groupByEntities": [
-              "Host"
-            ],
+            "groupByEntities": [],
             "groupByAlertDetails": [],
             "groupByCustomDetails": []
           }

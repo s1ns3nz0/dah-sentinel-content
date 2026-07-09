@@ -42,8 +42,7 @@
             "lookbackDuration": "PT2H",
             "matchingMethod": "AllEntities",
             "groupByEntities": [
-              "Host",
-              "IP"
+              "Host"
             ],
             "groupByAlertDetails": [],
             "groupByCustomDetails": []

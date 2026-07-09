@@ -59,7 +59,17 @@
           "SignalCount": "SignalCount",
           "MaxMetric": "MaxMetric"
         },
-        "entityMappings": [],
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "MaxMetric"
+              }
+            ]
+          }
+        ],
         "sentinelEntitiesMappings": null,
         "templateVersion": null
       }

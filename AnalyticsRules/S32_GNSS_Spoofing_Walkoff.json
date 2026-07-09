@@ -1,0 +1,82 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/5b664e1c-b4a5-41ae-9c3e-6a13a0a68482')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/5b664e1c-b4a5-41ae-9c3e-6a13a0a68482')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S32 - GNSS Spoofing Slow Walk-off (Forced Landing Lure, RQ-170 Style)",
+        "description": "UAVTelemetry_CL에서 UAVId별 연속 샘플 간 Lat/Lon 변화량(DeltaLat/DeltaLon)이 개별적으로는 정상 GPS 노이즈 이하로 미세하지만(walk-off), 동일 방향으로 다수 샘플(10개 이상) 지속되고 누적 이동량이 임계를 초과하면 GNSS 스푸핑에 의한 서서히 좌표를 유인 지점으로 끌고 가는 나포·강제착륙 유도 패턴으로 탐지. S1(EKF 분산 급변 탐지)과 달리 급격한 분산 스파이크가 아닌 완만하고 일관된 좌표 드리프트를 탐지 대상으로 함. MITRE ICS ATT&CK: T0831(Manipulation of Control), T0827(Loss of Control) / MITRE: T1499, T1565(근접기법)",
+        "severity": "High",
+        "enabled": true,
+        "query": "let baselineWindow = 2h;\nlet alertWindow = 30m;\nlet minConsistentSamples = 10;\nlet minCumulativeDriftDeg = 0.01;\nUAVTelemetry_CL\n| where TimeGenerated > ago(baselineWindow)\n| where isnotnull(Lat) and isnotnull(Lon)\n| order by UAVId asc, TimeGenerated asc\n| extend PrevLat = prev(Lat), PrevLon = prev(Lon), PrevUAVId = prev(UAVId)\n| where UAVId == PrevUAVId\n| extend DeltaLat = Lat - PrevLat, DeltaLon = Lon - PrevLon\n| extend DriftDirLat = sign(DeltaLat), DriftDirLon = sign(DeltaLon)\n| where abs(DeltaLat) > 0 and abs(DeltaLat) < 0.0005\n| summarize\n    SampleCount = count(),\n    ConsistentLatDir = iff(min(DriftDirLat) == max(DriftDirLat), min(DriftDirLat), 0),\n    ConsistentLonDir = iff(min(DriftDirLon) == max(DriftDirLon), min(DriftDirLon), 0),\n    CumulativeDeltaLat = sum(DeltaLat),\n    CumulativeDeltaLon = sum(DeltaLon),\n    LastSeen = max(TimeGenerated)\n    by UAVId, TimeBin = bin(TimeGenerated, alertWindow)\n| where SampleCount >= minConsistentSamples\n| where ConsistentLatDir != 0 or ConsistentLonDir != 0\n| extend CumulativeDriftDeg = sqrt(CumulativeDeltaLat * CumulativeDeltaLat + CumulativeDeltaLon * CumulativeDeltaLon)\n| where CumulativeDriftDeg > minCumulativeDriftDeg\n| extend TriggerReason = strcat('GNSS_스푸핑_좌표워크오프_강제착륙유도_누적드리프트:', tostring(round(CumulativeDriftDeg,5)), 'deg_', tostring(SampleCount), '샘플')\n| extend Severity = 'High'\n| project TimeGenerated = LastSeen, UAVId, SampleCount, CumulativeDriftDeg, ConsistentLatDir, ConsistentLonDir, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "queryFrequency": "PT15M",
+        "queryPeriod": "P1D",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "Impact"
+        ],
+        "techniques": [
+          "T1499",
+          "T1565"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT2H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Host"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S32 - GNSS Spoofing Slow Walk-off (Forced Landing Lure, RQ-170 Style) - {{UAVId}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | CumulativeDriftDeg={{CumulativeDriftDeg}} | SampleCount={{SampleCount}} | Severity={{Severity}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "CumulativeDriftDeg": "CumulativeDriftDeg",
+          "SampleCount": "SampleCount",
+          "Severity": "Severity"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "UAVId"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

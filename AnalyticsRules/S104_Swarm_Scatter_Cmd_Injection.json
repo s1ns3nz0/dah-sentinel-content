@@ -1,0 +1,86 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/17d7d16e-3579-4681-9b28-c17610968f17')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/17d7d16e-3579-4681-9b28-c17610968f17')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S104 - Unauthorized Scatter/Break-Formation Command Injection",
+        "description": "UAVSwarmComms_CL의 scatter_cmd 메시지에서 Authorized=false이거나 ScatterCommandIssuedBy가 Approved_Operators_List에 비등록인 대형 분산/이탈 명령주입(scatter) 탐지. MITRE: T0855 Unauthorized Command Message (ICS 근사매핑 — description 참조)",
+        "severity": "High",
+        "enabled": true,
+        "query": "let alertWindow = 10m;\nlet ApprovedOps = _GetWatchlist('Approved_Operators_List') | project OperatorId;\nUAVSwarmComms_CL\n| where TimeGenerated > ago(alertWindow)\n| where MessageType == \"scatter_cmd\"\n| extend isUnknownIssuer = ScatterCommandIssuedBy !in (ApprovedOps)\n| where Authorized == false or isUnknownIssuer\n| extend TriggerReason = case(\n    Authorized == false, strcat(\"대형분산이탈명령_비인가주입_발신:\", ScatterCommandIssuedBy),\n    strcat(\"대형분산이탈명령_미등록발신자_\", ScatterCommandIssuedBy))\n| extend Severity = \"High\"\n| project TimeGenerated, SwarmId, MemberId, UAVId, MessageType, ScatterCommandIssuedBy, Authorized, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "queryFrequency": "PT5M",
+        "queryPeriod": "PT15M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "Impact"
+        ],
+        "techniques": [],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": false,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT5H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S104 - Unauthorized Scatter/Break-Formation Command Injection - {{UAVId}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Severity={{Severity}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "ScatterCommandIssuedBy": "ScatterCommandIssuedBy",
+          "Authorized": "Authorized",
+          "SwarmId": "SwarmId"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "UAVId"
+              }
+            ]
+          },
+          {
+            "entityType": "Account",
+            "fieldMappings": [
+              {
+                "identifier": "Name",
+                "columnName": "ScatterCommandIssuedBy"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

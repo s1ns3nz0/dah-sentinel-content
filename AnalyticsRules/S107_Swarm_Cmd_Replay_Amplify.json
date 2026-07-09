@@ -1,0 +1,77 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/400d1b56-34db-44ef-b07b-b5809fd18c79')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/400d1b56-34db-44ef-b07b-b5809fd18c79')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S107 - Swarm Command Replay/Amplification (1:N)",
+        "description": "UAVSwarmComms_CL의 command_replay 메시지에서 동일 CommandId가 원본 발생 60초 이내 3회 초과 재생(ReplayCount)되는 스웜 명령 리플레이/증폭(1:N) 탐지. MITRE: T0857 System Firmware (ICS 근사매핑 — description 참조, 실제 공격패턴은 명령 메시지 재생/증폭)",
+        "severity": "Medium",
+        "enabled": true,
+        "query": "let alertWindow = 10m;\nlet maxReplayCount = 3;\nlet maxReplayWindowSeconds = 60;\nUAVSwarmComms_CL\n| where TimeGenerated > ago(alertWindow)\n| where MessageType == \"command_replay\"\n| where ReplayCount > maxReplayCount and TimeSinceOriginal <= maxReplayWindowSeconds\n| extend TriggerReason = strcat(\"스웜명령리플레이증폭_CommandId:\", CommandId, \"_재생횟수:\", tostring(ReplayCount), \"_원본후경과:\", tostring(TimeSinceOriginal), \"초\")\n| extend Severity = \"Medium\"\n| project TimeGenerated, SwarmId, MemberId, UAVId, MessageType, CommandId, ReplayCount, TimeSinceOriginal, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "queryFrequency": "PT5M",
+        "queryPeriod": "PT15M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "CommandAndControl"
+        ],
+        "techniques": [],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": false,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT5H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S107 - Swarm Command Replay/Amplification - {{UAVId}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Severity={{Severity}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "CommandId": "CommandId",
+          "ReplayCount": "ReplayCount",
+          "TimeSinceOriginal": "TimeSinceOriginal"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "UAVId"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

@@ -1,0 +1,81 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/c6f76155-4e9c-4903-ab84-7433c3c33ee8')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/c6f76155-4e9c-4903-ab84-7433c3c33ee8')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S34 - Operator Reconnaissance / Credential Brute Force",
+        "description": "UAV 운영자 계정 정찰 및 자격증명 브루트포스 탐지. [A] 단일 IP 1분 내 로그인 실패 5회 이상(브루트포스) [B] 단일 IP 5분 내 서로 다른 Operator 4개 이상 시도(계정 목록 정찰/스캐닝) [C] Approved_Operators_List 미포함 Operator의 로그인 성공(비인가 접근). UAVOpAudit_CL 기반. MITRE: T1078, T1595",
+        "severity": "Medium",
+        "enabled": true,
+        "query": "let approvedOps = _GetWatchlist('Approved_Operators_List') | project OperatorId;\nlet lookback = 1h;\n// [블록 A] 브루트포스 - 1분 내 동일 IP 5회 이상 실패\nlet BruteForce =\n    UAVOpAudit_CL\n    | where TimeGenerated > ago(lookback)\n    | where EventType == \"login_failure\"\n    | summarize FailCount = count(), Operators = make_set(Operator)\n        by ClientIp, bin(TimeGenerated, 1m)\n    | where FailCount >= 5\n    | extend TriggerReason = \"정찰_브루트포스_단일IP_다중실패\"\n    | extend DetectionDetail = strcat(\n        \"ClientIp:\", ClientIp,\n        \"|FailCount:\", FailCount,\n        \"|Operators:\", tostring(Operators)\n    )\n    | extend UAVId = \"SOC-AUTH\"\n    | project TimeGenerated, UAVId, TriggerReason, DetectionDetail, ClientIp;\n// [블록 B] 계정 목록 정찰 - 5분 내 동일 IP에서 서로 다른 Operator 4개 이상 시도\nlet Recon =\n    UAVOpAudit_CL\n    | where TimeGenerated > ago(lookback)\n    | where EventType == \"login_failure\"\n    | summarize DistinctOperators = dcount(Operator), TriedOperators = make_set(Operator)\n        by ClientIp, bin(TimeGenerated, 5m)\n    | where DistinctOperators >= 4\n    | extend TriggerReason = \"정찰_계정목록_스캐닝_다중Operator시도\"\n    | extend DetectionDetail = strcat(\n        \"ClientIp:\", ClientIp,\n        \"|DistinctOperators:\", DistinctOperators,\n        \"|Tried:\", tostring(TriedOperators)\n    )\n    | extend UAVId = \"SOC-AUTH\"\n    | project TimeGenerated, UAVId, TriggerReason, DetectionDetail, ClientIp;\n// [블록 C] 비인가 Operator 로그인 성공\nlet UnauthorizedOperator =\n    UAVOpAudit_CL\n    | where TimeGenerated > ago(lookback)\n    | where EventType == \"login_success\"\n    | where Operator !in (approvedOps)\n    | extend TriggerReason = \"비인가_Operator_로그인성공\"\n    | extend DetectionDetail = strcat(\"Operator:\", Operator, \"|ClientIp:\", ClientIp)\n    | extend UAVId = \"SOC-AUTH\"\n    | project TimeGenerated, UAVId, TriggerReason, DetectionDetail, ClientIp;\nBruteForce\n| union Recon\n| union UnauthorizedOperator\n| sort by TimeGenerated desc",
+        "queryFrequency": "PT10M",
+        "queryPeriod": "PT1H",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT5H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "Reconnaissance",
+          "InitialAccess"
+        ],
+        "techniques": [
+          "T1078",
+          "T1595"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT5H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "IP"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S34 - Operator Reconnaissance / Credential Brute Force [{{TriggerReason}}]",
+          "alertDescriptionFormat": "Authentication attack detected: {{DetectionDetail}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "ClientIp": "ClientIp"
+        },
+        "entityMappings": [
+          {
+            "entityType": "IP",
+            "fieldMappings": [
+              {
+                "identifier": "Address",
+                "columnName": "ClientIp"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

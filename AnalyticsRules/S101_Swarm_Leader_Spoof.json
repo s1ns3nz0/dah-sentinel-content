@@ -1,0 +1,77 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/d66b76db-827a-4ed3-bf80-4f59525976bf')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/d66b76db-827a-4ed3-bf80-4f59525976bf')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S101 - Swarm Leader Spoofing / Hijacking",
+        "description": "UAVSwarmComms_CL의 leader_beacon 메시지에서 ObservedLeaderId가 ExpectedLeaderId와 상이한 편대 리더 스푸핑·하이재킹 탐지. MITRE: T0856 Spoof Reporting Message (ICS 근사매핑 — description 참조)",
+        "severity": "High",
+        "enabled": true,
+        "query": "let alertWindow = 10m;\nUAVSwarmComms_CL\n| where TimeGenerated > ago(alertWindow)\n| where MessageType == \"leader_beacon\"\n| where isnotempty(ObservedLeaderId) and isnotempty(ExpectedLeaderId)\n| where ObservedLeaderId != ExpectedLeaderId\n| extend TriggerReason = strcat(\"편대리더_스푸핑_기대:\", ExpectedLeaderId, \"_관측:\", ObservedLeaderId)\n| extend Severity = \"High\"\n| project TimeGenerated, SwarmId, MemberId, UAVId, MessageType, ExpectedLeaderId, ObservedLeaderId, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "queryFrequency": "PT5M",
+        "queryPeriod": "PT15M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "Impact"
+        ],
+        "techniques": [],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": false,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT5H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S101 - Swarm Leader Spoofing / Hijacking - {{UAVId}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Severity={{Severity}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "ExpectedLeaderId": "ExpectedLeaderId",
+          "ObservedLeaderId": "ObservedLeaderId",
+          "SwarmId": "SwarmId"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "UAVId"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

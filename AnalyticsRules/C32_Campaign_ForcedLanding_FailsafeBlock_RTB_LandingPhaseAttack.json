@@ -1,0 +1,83 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/db1d9bd0-e711-4d44-bdfe-5de969425095')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/db1d9bd0-e711-4d44-bdfe-5de969425095')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV Campaign C32 - Failsafe Blocked → Forced RTB → Landing-Phase Attack",
+        "description": "3단계 킬체인(2/3 단계 이상 관측 시 트리거, near-miss 허용): 착륙강제: 페일세이프 차단→RTB 강제→이착륙 위상 공격. 체인: Failsafe Blocked(S120) → Forced RTB(S112) → Landing-Phase Attack(S126). 연결키: UAVId. MITRE: T1562.001, T1499.004",
+        "severity": "High",
+        "enabled": true,
+        "query": "let windowSize = 30m;\n\n// S120: Failsafe Blocked\nlet S120 =\n    UAVOpmode_CL\n    | where TimeGenerated > ago(windowSize)\n    | where EventType == 'failsafe_blocked'\n    | extend Stage = 'S120', UAVId = tostring(UAVId)\n    | where isnotempty(UAVId)\n    | project TimeGenerated, Stage, UAVId;\n\n// S112: Forced RTB\nlet S112 =\n    UAVOpmode_CL\n    | where TimeGenerated > ago(windowSize)\n    | where EventType == 'rtb_forced'\n    | extend Stage = 'S112', UAVId = tostring(UAVId)\n    | where isnotempty(UAVId)\n    | project TimeGenerated, Stage, UAVId;\n\n// S126: Landing-Phase Attack\nlet S126 =\n    UAVOpmode_CL\n    | where TimeGenerated > ago(windowSize)\n    | where EventType == 'landing_phase_attack'\n    | extend Stage = 'S126', UAVId = tostring(UAVId)\n    | where isnotempty(UAVId)\n    | project TimeGenerated, Stage, UAVId;\n\nunion S120, S112, S126\n| summarize StagesSeen = make_set(Stage), StageCount = dcount(Stage), FirstSeen = min(TimeGenerated), LastSeen = max(TimeGenerated) by UAVId\n| where StageCount >= 2\n| extend CampaignType = \"C32_착륙강제_페일세이프차단_RTB강제_이착륙위상공격\"\n| extend StepSummary = strcat(\"Stages=\", tostring(StagesSeen), \" | First=\", tostring(FirstSeen), \" | Last=\", tostring(LastSeen))\n| extend Severity = \"High\"\n| project FirstSeen, LastSeen, UAVId, StagesSeen, StageCount, CampaignType, StepSummary, Severity",
+        "queryFrequency": "PT10M",
+        "queryPeriod": "PT30M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT1H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "DefenseEvasion",
+          "Impact"
+        ],
+        "techniques": [
+          "T1562.001",
+          "T1499.004"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": true,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT1H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Host"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "[CAMPAIGN] UAV Campaign C32 - Failsafe Blocked → Forced RTB → Landing-Phase Attack - {{UAVId}}",
+          "alertDescriptionFormat": "CampaignType={{CampaignType}} | Steps={{StepSummary}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "CampaignType": "CampaignType",
+          "StepSummary": "StepSummary",
+          "UAVId": "UAVId",
+          "StageCount": "StageCount"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "UAVId"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

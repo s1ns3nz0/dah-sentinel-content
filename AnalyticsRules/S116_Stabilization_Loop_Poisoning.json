@@ -1,0 +1,89 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/b9be1200-670e-4708-9763-975356b0bd7a')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/b9be1200-670e-4708-9763-975356b0bd7a')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S116 - Stabilization Loop Poisoning (Attitude Control Input Corruption)",
+        "description": "UAVOpmode_CL에서 OpmodeField='stabilization_input'인 레코드 중 ExpectedValue(정상 자세제어 입력)와 ObservedValue(실제 입력값)가 불일치하고 Authorized=0(SByte)인 비인가 오염 탐지. 실제 컬럼: OpmodeField/ExpectedValue/ObservedValue/ChangedBy/Authorized(SByte). MITRE: T0835 Manipulate I/O Image (자세제어 루프 입력값을 조작해 기체 안정성을 저해)",
+        "severity": "High",
+        "enabled": true,
+        "query": "let alertWindow = 10m;\nUAVOpmode_CL\n| where TimeGenerated > ago(alertWindow)\n| where OpmodeField == 'stabilization_input'\n| where ExpectedValue != ObservedValue and Authorized == 0\n| extend TriggerReason = strcat(\"자세제어입력_오염_\", UAVId, \"_\", ExpectedValue, \"->\", ObservedValue)\n| project TimeGenerated, UAVId, OpmodeField, ExpectedValue, ObservedValue, ChangedBy, Authorized, Seq, TriggerReason\n| order by TimeGenerated desc",
+        "queryFrequency": "PT5M",
+        "queryPeriod": "PT15M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "Collection",
+          "Impact"
+        ],
+        "techniques": [
+          "T1565"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT5H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Host"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S116 - Stabilization Loop Poisoning (Attitude Control Input Corruption) - {{UAVId}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | ChangedBy={{ChangedBy}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "Authorized": "Authorized"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "UAVId"
+              }
+            ]
+          },
+          {
+            "entityType": "Account",
+            "fieldMappings": [
+              {
+                "identifier": "Name",
+                "columnName": "ChangedBy"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

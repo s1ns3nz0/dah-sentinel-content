@@ -1,0 +1,78 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/58522cc0-8611-4560-b756-82000108e161')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/58522cc0-8611-4560-b756-82000108e161')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S81 - Fleet Management API Authorization Bypass (IDOR)",
+        "description": "함대관리 API 호출 시 호출자 소속 함대(CallerFleetId)와 요청 대상 함대(RequestedFleetId)가 불일치하는 IDOR(비인가 객체 직접 참조) 시도를 탐지. MITRE: T1190",
+        "severity": "High",
+        "enabled": true,
+        "query": "let alertWindow = 10m;\nUAVFleetApi_CL\n| where TimeGenerated > ago(alertWindow)\n| where isnotempty(RequestedFleetId) and isnotempty(CallerFleetId)\n| where RequestedFleetId != CallerFleetId\n| extend TriggerReason = strcat(\"함대API_IDOR_\", Endpoint, \"_caller:\", CallerFleetId, \"_requested:\", RequestedFleetId)\n| extend Severity = \"High\"\n| project TimeGenerated, Endpoint, Method, CallerFleetId, RequestedFleetId, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "queryFrequency": "PT5M",
+        "queryPeriod": "PT15M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "Initial Access"
+        ],
+        "techniques": [
+          "T1190"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": false,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT2H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S81 - Fleet API IDOR - {{Endpoint}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Method={{Method}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "CallerFleetId": "CallerFleetId",
+          "RequestedFleetId": "RequestedFleetId"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "Endpoint"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

@@ -1,0 +1,84 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/1d78a9d2-47ec-43f5-82cd-fe985fcb242b')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/1d78a9d2-47ec-43f5-82cd-fe985fcb242b')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV Campaign C23 - Leader Hijack → Consensus Poisoning → Collision Course",
+        "description": "3단계 킬체인(2/3 단계 이상 관측 시 트리거, near-miss 허용): 리더 하이재킹→합의 포이즈닝→충돌 유도(군집 붕괴). 체인: Leader Hijack(S101) → Consensus Poisoning(S102) → Collision Course(S103). 연결키: SwarmId. MITRE: T1078, T1565.001, T1499",
+        "severity": "High",
+        "enabled": true,
+        "query": "let windowSize = 30m;\n\n// S101: Leader Hijack\nlet S101 =\n    UAVSwarmComms_CL\n    | where TimeGenerated > ago(windowSize)\n    | where EventType == 'leader_hijack'\n    | extend Stage = 'S101', SwarmId = tostring(SwarmId)\n    | where isnotempty(SwarmId)\n    | project TimeGenerated, Stage, SwarmId;\n\n// S102: Consensus Poisoning\nlet S102 =\n    UAVSwarmComms_CL\n    | where TimeGenerated > ago(windowSize)\n    | where EventType == 'consensus_poison'\n    | extend Stage = 'S102', SwarmId = tostring(SwarmId)\n    | where isnotempty(SwarmId)\n    | project TimeGenerated, Stage, SwarmId;\n\n// S103: Collision Course\nlet S103 =\n    UAVSwarmComms_CL\n    | where TimeGenerated > ago(windowSize)\n    | where EventType == 'collision_course'\n    | extend Stage = 'S103', SwarmId = tostring(SwarmId)\n    | where isnotempty(SwarmId)\n    | project TimeGenerated, Stage, SwarmId;\n\nunion S101, S102, S103\n| summarize StagesSeen = make_set(Stage), StageCount = dcount(Stage), FirstSeen = min(TimeGenerated), LastSeen = max(TimeGenerated) by SwarmId\n| where StageCount >= 2\n| extend CampaignType = \"C23_리더하이재킹_합의포이즈닝_충돌유도\"\n| extend StepSummary = strcat(\"Stages=\", tostring(StagesSeen), \" | First=\", tostring(FirstSeen), \" | Last=\", tostring(LastSeen))\n| extend Severity = \"High\"\n| project FirstSeen, LastSeen, SwarmId, StagesSeen, StageCount, CampaignType, StepSummary, Severity",
+        "queryFrequency": "PT10M",
+        "queryPeriod": "PT30M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT1H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "CredentialAccess",
+          "Impact"
+        ],
+        "techniques": [
+          "T1078",
+          "T1565.001",
+          "T1499"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": true,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT1H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Host"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "[CAMPAIGN] UAV Campaign C23 - Leader Hijack → Consensus Poisoning → Collision Course - {{SwarmId}}",
+          "alertDescriptionFormat": "CampaignType={{CampaignType}} | Steps={{StepSummary}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "CampaignType": "CampaignType",
+          "StepSummary": "StepSummary",
+          "SwarmId": "SwarmId",
+          "StageCount": "StageCount"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "SwarmId"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

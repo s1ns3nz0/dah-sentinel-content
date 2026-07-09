@@ -1,0 +1,81 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/e6b75b75-0d5f-42df-bbbe-c6b810ed6c82')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/e6b75b75-0d5f-42df-bbbe-c6b810ed6c82')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S48 - Modem/SATCOM Terminal Firmware Tampering",
+        "description": "모뎀/SATCOM 터미널 펌웨어 변조 탐지 — UAVDatalinkInfra_CL의 firmware_report 이벤트에서 보고된 펌웨어 해시(ReportedValue)가 Approved_Firmware_Hash_List에 없거나, IntegrityStatus가 ok가 아닌(예: unsigned) 경우를 탐지. MITRE ICS ATT&CK: T0857 System Firmware",
+        "severity": "High",
+        "enabled": true,
+        "query": "let approvedHashes = _GetWatchlist('Approved_Firmware_Hash_List') | project Hash;\nlet alertWindow = 1d;\nUAVDatalinkInfra_CL\n| where TimeGenerated > ago(alertWindow)\n| where EventType == \"firmware_report\"\n| extend isUnapprovedHash = ReportedValue !in (approvedHashes)\n| where isUnapprovedHash or IntegrityStatus != \"ok\"\n| extend TriggerReason = case(\n    isUnapprovedHash and IntegrityStatus != \"ok\", \"모뎀SATCOM_펌웨어_미승인해시_무결성위반_동시\",\n    isUnapprovedHash, \"모뎀SATCOM_펌웨어_미승인_해시\",\n    \"모뎀SATCOM_펌웨어_무결성상태_이상\")\n| extend Severity = \"High\"\n| project TimeGenerated, UAVId, DeviceId, ReportedValue, IntegrityStatus, RemoteHost, SessionId, Operator, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "queryFrequency": "PT10M",
+        "queryPeriod": "P1D",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT5H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "DefenseEvasion",
+          "Persistence"
+        ],
+        "techniques": [
+          "T1542"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT5H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Host"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S48 - Modem/SATCOM Terminal Firmware Tampering - {{DeviceId}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | ReportedValue={{ReportedValue}} | IntegrityStatus={{IntegrityStatus}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "DeviceId": "DeviceId",
+          "IntegrityStatus": "IntegrityStatus"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "UAVId"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

@@ -14,11 +14,11 @@
       "kind": "Scheduled",
       "apiVersion": "2023-12-01-preview",
       "properties": {
-        "displayName": "UAV Campaign C1 - GCS Breach → CT Downgrade → Off-hours C4I → Weapon",
-        "description": "4단계 APT 킬체인: GCS 계정탈취(S6) → CT 레벨 하향(S13) → 야간 비인가 C4I(S15) → 비인가 무장(S11). 연결키: Operator. 실제 컬럼: Operator(OperatorId 아님), ChangedBy, IssuedBy. MITRE: T1078 Credential Access, T0821, T0831",
+        "displayName": "UAV Campaign C1 - Recon/BruteForce → CT Downgrade → Off-hours C4I → Weapon Arm",
+        "description": "4단계 APT 킬체인: 정찰/무차별 계정접근(S34) → CT 레벨 하향(S37) → 야간 비인가 C4I(S79) → 비인가 무장(S3). 연결키: Operator. 실제 컬럼: Operator(OperatorId 아님), ClientIp, ChangedBy, IssuedBy. MITRE: T1078, T1548, T1565.002",
         "severity": "High",
         "enabled": true,
-        "query": "let windowSize = 2h;\nlet ApprovedOps = _GetWatchlist('Approved_Arm_Operator_List') | project OperatorId;\nlet ApprovedCT  = _GetWatchlist('Approved_CT_Transition_List') | project OperatorId;\nlet ApprovedCmds = _GetWatchlist('Approved_Mission_Command_List') | project CommandType;\nlet ApprovedArm = _GetWatchlist('Approved_Arm_Operator_List') | project OperatorId;\n// S6: GCS 침해\nlet S6 =\n    UAVOpAudit_CL\n    | where TimeGenerated > ago(windowSize)\n    | where EventType == 'login_failure'\n        or (EventType == 'login_success' and Operator !in (ApprovedOps))\n    | summarize S6_Count=count(), T1=min(TimeGenerated) by Operator;\n// S13: CT 레벨 하향\nlet S13 =\n    UAVCyberPosture_CL\n    | where TimeGenerated > ago(windowSize)\n    | where ChangedBy !in (ApprovedCT)\n    | summarize T2=min(TimeGenerated) by Operator=ChangedBy, PreviousLevel, Level;\n// S15: 야간 비인가 C4I\nlet S15 =\n    UAVC4I_CL\n    | where TimeGenerated > ago(windowSize)\n    | where hourofday(TimeGenerated) >= 23 or hourofday(TimeGenerated) < 5\n    | where EventType !in (ApprovedCmds)\n    | summarize T3=min(TimeGenerated) by Operator=IssuedBy, EventType;\n// S11: 비인가 무장 (UAVId 없이 Operator만)\nlet S11 =\n    UAVWeapon_CL\n    | where TimeGenerated > ago(windowSize)\n    | where EventType in ('arm','fire')\n    | where ArmedBy == Operator or Operator !in (ApprovedArm)\n    | project T4=TimeGenerated, Operator, WeaponId;\n// 체인 결합 — join은 Operator 등치만, 시간조건은 join 이후 where\nS6\n| join kind=inner (S13) on Operator\n| where T2 >= T1 and T2 <= T1 + 60m\n| join kind=inner (S15) on Operator\n| where T3 >= T2 and T3 <= T2 + 60m\n| join kind=inner (S11) on Operator\n| where T4 >= T3 and T4 <= T3 + 30m\n| extend CampaignType = \"C1_GCS침해_CT하향_야간C4I_무장\"\n| extend StepSummary = strcat(\"S6@\", tostring(T1), \"→S13@\", tostring(T2), \"→S15@\", tostring(T3), \"→S11@\", tostring(T4))\n| extend Severity = \"High\"\n| project T1, T2, T3, T4, Operator, WeaponId, CampaignType, StepSummary, Severity",
+        "query": "let windowSize = 2h;\nlet ApprovedOps = _GetWatchlist('Approved_Arm_Operator_List') | project OperatorId;\nlet ApprovedCT  = _GetWatchlist('Approved_CT_Transition_List') | project OperatorId;\nlet ApprovedCmds = _GetWatchlist('Approved_Mission_Command_List') | project CommandType;\nlet ApprovedArm = _GetWatchlist('Approved_Arm_Operator_List') | project OperatorId;\n// S34: 정찰/무차별 계정접근\nlet S34 =\n    UAVOpAudit_CL\n    | where TimeGenerated > ago(windowSize)\n    | where EventType == 'login_failure'\n        or (EventType == 'login_success' and Operator !in (ApprovedOps))\n    | summarize S34_Count=count(), T1=min(TimeGenerated) by Operator, ClientIp;\n// S37: CT 레벨 하향\nlet S37 =\n    UAVCyberPosture_CL\n    | where TimeGenerated > ago(windowSize)\n    | where ChangedBy !in (ApprovedCT)\n    | summarize T2=min(TimeGenerated) by Operator=ChangedBy, PreviousLevel, Level;\n// S79: 야간 비인가 C4I\nlet S79 =\n    UAVC4I_CL\n    | where TimeGenerated > ago(windowSize)\n    | where hourofday(TimeGenerated) >= 23 or hourofday(TimeGenerated) < 5\n    | where EventType !in (ApprovedCmds)\n    | summarize T3=min(TimeGenerated) by Operator=IssuedBy, EventType;\n// S3: 비인가 무장 (UAVId 없이 Operator만)\nlet S3 =\n    UAVWeapon_CL\n    | where TimeGenerated > ago(windowSize)\n    | where EventType in ('arm','fire')\n    | where ArmedBy == Operator or Operator !in (ApprovedArm)\n    | project T4=TimeGenerated, Operator, WeaponId;\n// 체인 결합 — join은 Operator 등치만, 시간조건은 join 이후 where\nS34\n| join kind=inner (S37) on Operator\n| where T2 >= T1 and T2 <= T1 + 60m\n| join kind=inner (S79) on Operator\n| where T3 >= T2 and T3 <= T2 + 60m\n| join kind=inner (S3) on Operator\n| where T4 >= T3 and T4 <= T3 + 30m\n| extend CampaignType = \"C1_정찰_CT하향_야간C4I_무장\"\n| extend StepSummary = strcat(\"S34@\", tostring(T1), \"→S37@\", tostring(T2), \"→S79@\", tostring(T3), \"→S3@\", tostring(T4))\n| extend Severity = \"High\"\n| project T1, T2, T3, T4, Operator, WeaponId, CampaignType, StepSummary, Severity",
         "queryFrequency": "PT15M",
         "queryPeriod": "PT2H",
         "triggerOperator": "GreaterThan",
@@ -30,7 +30,11 @@
           "Execution",
           "Impact"
         ],
-        "techniques": [],
+        "techniques": [
+          "T1078",
+          "T1548",
+          "T1565.002"
+        ],
         "subTechniques": [],
         "alertRuleTemplateName": null,
         "incidentConfiguration": {
@@ -51,7 +55,7 @@
           "aggregationKind": "SingleAlert"
         },
         "alertDetailsOverride": {
-          "alertDisplayNameFormat": "[CAMPAIGN] UAV Campaign C1 - GCS Breach → CT Downgrade → Off-hours C4I → Weapon - {{Operator}}",
+          "alertDisplayNameFormat": "[CAMPAIGN] UAV Campaign C1 - Recon/BruteForce → CT Downgrade → Off-hours C4I → Weapon Arm - {{Operator}}",
           "alertDescriptionFormat": "CampaignType={{CampaignType}} | Steps={{StepSummary}}",
           "alertDynamicProperties": []
         },

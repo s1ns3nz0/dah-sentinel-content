@@ -1,0 +1,81 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/1b9c00cc-0447-4799-8bb4-abec40e31f65')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/1b9c00cc-0447-4799-8bb4-abec40e31f65')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S29 - RC Link Binding Hijack (DSMX/FrSky/ELRS)",
+        "description": "UAVRcLink_CL에서 BindEvent(bind_start/bind_complete) 발생 시 ObservedTxId(관측된 송신기 ID)가 ExpectedTxId(등록된 송신기 ID)와 불일치하면 RC 링크 바인딩 탈취 시도로 탐지. MITRE: T1555",
+        "severity": "Medium",
+        "enabled": true,
+        "query": "let alertWindow = 10m;\nUAVRcLink_CL\n| where TimeGenerated > ago(alertWindow)\n| where BindEvent in ('bind_start', 'bind_complete')\n| where isnotempty(ExpectedTxId) and ObservedTxId != ExpectedTxId\n| extend TriggerReason = strcat('RC링크_바인딩탈취_', Protocol, '_Expected:', ExpectedTxId, '_Observed:', ObservedTxId)\n| extend Severity = 'Medium'\n| project TimeGenerated, UAVId, Protocol, BindEvent, ExpectedTxId, ObservedTxId, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "queryFrequency": "PT5M",
+        "queryPeriod": "PT15M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "CredentialAccess"
+        ],
+        "techniques": [
+          "T1555"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT2H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Host"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S29 - RC Link Binding Hijack (DSMX/FrSky/ELRS) - {{UAVId}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | ExpectedTxId={{ExpectedTxId}} | ObservedTxId={{ObservedTxId}} | Severity={{Severity}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "Protocol": "Protocol",
+          "ExpectedTxId": "ExpectedTxId",
+          "ObservedTxId": "ObservedTxId"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "UAVId"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

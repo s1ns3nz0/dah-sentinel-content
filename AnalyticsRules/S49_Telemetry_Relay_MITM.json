@@ -1,0 +1,81 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/f48f6852-eb02-4537-958d-f60369173cd2')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/f48f6852-eb02-4537-958d-f60369173cd2')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S49 - Telemetry Relay MITM",
+        "description": "텔레메트리 릴레이 중간자공격(MITM) 탐지 — UAVDatalinkInfra_CL의 relay_session 이벤트에서 IntegrityStatus가 ok가 아니거나, 릴레이 접속 호스트(RemoteHost)가 C2_Whitelisted_GCS_List에 없는 경우를 탐지. MITRE: T1557",
+        "severity": "High",
+        "enabled": true,
+        "query": "let knownRelay = _GetWatchlist('C2_Whitelisted_GCS_List') | project GCS_IP;\nlet alertWindow = 10m;\nUAVDatalinkInfra_CL\n| where TimeGenerated > ago(alertWindow)\n| where EventType == \"relay_session\"\n| where IntegrityStatus != \"ok\" or RemoteHost !in (knownRelay)\n| extend TriggerReason = case(\n    IntegrityStatus != \"ok\" and RemoteHost !in (knownRelay), \"텔레메트리릴레이_무결성위반_비인가호스트_동시\",\n    IntegrityStatus != \"ok\", \"텔레메트리릴레이_무결성_위반\",\n    \"텔레메트리릴레이_비인가_RemoteHost\")\n| extend Severity = \"High\"\n| project TimeGenerated, UAVId, DeviceId, RemoteHost, IntegrityStatus, NumericValue, SessionId, Operator, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "queryFrequency": "PT5M",
+        "queryPeriod": "PT15M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "CredentialAccess",
+          "Collection"
+        ],
+        "techniques": [
+          "T1557"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT2H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Host"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S49 - Telemetry Relay MITM - {{UAVId}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | RemoteHost={{RemoteHost}} | IntegrityStatus={{IntegrityStatus}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "RemoteHost": "RemoteHost",
+          "IntegrityStatus": "IntegrityStatus"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "UAVId"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

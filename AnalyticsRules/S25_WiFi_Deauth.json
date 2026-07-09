@@ -1,0 +1,81 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/45b93993-eecb-4d6a-a8e9-584cc7cb88fd')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/45b93993-eecb-4d6a-a8e9-584cc7cb88fd')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S25 - WiFi Deauthentication Flood (Link Denial)",
+        "description": "UAVWifi_CL에서 FrameType == 'deauth' 프레임이 5분 윈도우 내 5건 이상 동일 BSSID/ClientMAC 조합으로 관측되면 WiFi Deauth 공격에 의한 링크 거부로 탐지. MITRE: T1499",
+        "severity": "Medium",
+        "enabled": true,
+        "query": "let alertWindow = 10m;\nlet deauthCountGate = 5;\nUAVWifi_CL\n| where TimeGenerated > ago(alertWindow)\n| where FrameType == 'deauth'\n| summarize DeauthCount = count(), Reasons = make_set(ReasonCode), LastSeen = max(TimeGenerated) by UAVId, BSSID, ClientMAC, TimeBin = bin(TimeGenerated, 5m)\n| where DeauthCount >= deauthCountGate\n| extend TriggerReason = strcat('WiFi_Deauth_링크거부_', tostring(DeauthCount), '건_BSSID:', BSSID)\n| extend Severity = 'Medium'\n| project TimeGenerated = LastSeen, UAVId, BSSID, ClientMAC, DeauthCount, Reasons, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "queryFrequency": "PT5M",
+        "queryPeriod": "PT15M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "Impact"
+        ],
+        "techniques": [
+          "T1499"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT2H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Host"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S25 - WiFi Deauthentication Flood (Link Denial) - {{UAVId}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | DeauthCount={{DeauthCount}} | Severity={{Severity}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "DeauthCount": "DeauthCount",
+          "BSSID": "BSSID",
+          "Severity": "Severity"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "UAVId"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

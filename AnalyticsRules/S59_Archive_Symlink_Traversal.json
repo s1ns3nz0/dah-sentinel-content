@@ -1,0 +1,88 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/0ecf2cdc-806b-473d-be8f-74c65c47b992')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/0ecf2cdc-806b-473d-be8f-74c65c47b992')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S59 - Archive Symlink Path Traversal",
+        "description": "UAVArchiveExtract_CL에서 아카이브 내 심볼릭 링크 엔트리의 타깃이 지정된 추출 루트(ExtractRoot) 밖을 가리키는 경로순회 탐지. MITRE: T1195",
+        "severity": "Medium",
+        "enabled": true,
+        "query": "let alertWindow = 15m;\nUAVArchiveExtract_CL\n| where TimeGenerated > ago(alertWindow)\n| where isnotempty(SymlinkTarget)\n| where not(SymlinkTarget startswith ExtractRoot)\n| extend TriggerReason = strcat(\"심볼릭링크_경로순회_\", ArchiveEntry, \"_to_\", SymlinkTarget)\n| extend Severity = \"Medium\"\n| project TimeGenerated, UAVId, ArchiveName, ArchiveEntry, SymlinkTarget, ExtractRoot, UploadedBy, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "queryFrequency": "PT5M",
+        "queryPeriod": "PT15M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "Initial Access"
+        ],
+        "techniques": [],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT5H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Host"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S59 - Archive Symlink Path Traversal - {{UAVId}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | ArchiveEntry={{ArchiveEntry}} | SymlinkTarget={{SymlinkTarget}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "ArchiveEntry": "ArchiveEntry",
+          "SymlinkTarget": "SymlinkTarget",
+          "UploadedBy": "UploadedBy"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "UAVId"
+              }
+            ]
+          },
+          {
+            "entityType": "Account",
+            "fieldMappings": [
+              {
+                "identifier": "Name",
+                "columnName": "UploadedBy"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

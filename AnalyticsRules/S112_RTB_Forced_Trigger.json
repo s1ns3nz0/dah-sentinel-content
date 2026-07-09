@@ -1,0 +1,89 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/7bc0f03c-fd65-4a20-9727-cb1b18f32e7d')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/7bc0f03c-fd65-4a20-9727-cb1b18f32e7d')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S112 - RTB Forced Trigger (Unauthorized Return-to-Base Injection)",
+        "description": "UAVOpmode_CL에서 OpmodeField='rtb_trigger'가 Authorized=0(SByte) 상태로 5분 내 2회 이상 발생하는 비인가 RTB 강제 트리거 버스트 탐지. 실제 컬럼: OpmodeField/ChangedBy/Authorized(SByte)/Seq. MITRE: T0855 Unauthorized Command Message (비인가 명령으로 임무를 강제 종료시키는 가용성 공격)",
+        "severity": "Medium",
+        "enabled": true,
+        "query": "let alertWindow = 15m;\nUAVOpmode_CL\n| where TimeGenerated > ago(alertWindow)\n| where OpmodeField == 'rtb_trigger'\n| where Authorized == 0\n| summarize TriggerCount = count(), FirstSeen = min(TimeGenerated), MinSeq = min(Seq), MaxSeq = max(Seq)\n    by UAVId, ChangedBy, bin(TimeGenerated, 5m)\n| where TriggerCount >= 2\n| extend TriggerReason = strcat(\"RTB_강제트리거_비인가_\", tostring(TriggerCount), \"회_\", UAVId)\n| project FirstSeen, UAVId, ChangedBy, TriggerCount, MinSeq, MaxSeq, TriggerReason\n| order by FirstSeen desc",
+        "queryFrequency": "PT5M",
+        "queryPeriod": "PT15M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "Collection",
+          "Impact"
+        ],
+        "techniques": [
+          "T1557"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT5H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Host"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S112 - RTB Forced Trigger (Unauthorized Return-to-Base Injection) - {{UAVId}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | ChangedBy={{ChangedBy}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "TriggerCount": "TriggerCount"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "UAVId"
+              }
+            ]
+          },
+          {
+            "entityType": "Account",
+            "fieldMappings": [
+              {
+                "identifier": "Name",
+                "columnName": "ChangedBy"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

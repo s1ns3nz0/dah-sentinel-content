@@ -1,0 +1,82 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/877354b4-7417-4a49-a8a1-fc8118995024')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/877354b4-7417-4a49-a8a1-fc8118995024')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S17 - MAVLink C2/Mode-Change Hijack Observation",
+        "description": "UAVMavsec_CL에서 SET_MODE/COMMAND_LONG 명령의 SourceSystemId가 Approved_SystemId_List(UAVId별 인가 SystemId)에 없는 경우 MAVLink C2 하이재킹 관측으로 탐지. 같은 시점 서명검증 실패(FailedCount>0)가 동반되면 신뢰도를 High로 상향(MITM/평문주입 병행 가능성). MITRE: T1071",
+        "severity": "High",
+        "enabled": true,
+        "query": "let alertWindow = 10m;\nlet ApprovedSystems = _GetWatchlist('Approved_SystemId_List') | project SystemId = toint(SystemId), UAVId;\nUAVMavsec_CL\n| where TimeGenerated > ago(alertWindow)\n| where Command in ('SET_MODE', 'COMMAND_LONG')\n| join kind=leftanti (ApprovedSystems) on $left.SourceSystemId == $right.SystemId, UAVId\n| extend isSignatureFail = FailedCount > 0\n| extend TriggerReason = iff(isSignatureFail,\n    strcat('MAVLink_C2_하이재킹_비인가SystemId_서명실패동시_', tostring(SourceSystemId)),\n    strcat('MAVLink_C2_하이재킹_비인가SystemId_모드변경_', tostring(SourceSystemId)))\n| extend Severity = iff(isSignatureFail, 'High', 'Medium')\n| project TimeGenerated, UAVId, SourceSystemId, Command, ModeValue, FailedCount, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "queryFrequency": "PT5M",
+        "queryPeriod": "PT15M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "CommandAndControl",
+          "Impact"
+        ],
+        "techniques": [
+          "T1071"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT2H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Host"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S17 - MAVLink C2/Mode-Change Hijack Observation - {{UAVId}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Severity={{Severity}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "Severity": "Severity",
+          "SourceSystemId": "SourceSystemId",
+          "Command": "Command"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "UAVId"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

@@ -1,0 +1,84 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/c7871bfb-db04-48d4-8432-f4dacbe0a65a')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/c7871bfb-db04-48d4-8432-f4dacbe0a65a')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV Campaign C25 - Sybil Node Injection → Consensus Poisoning → Imagery Hijack → Off-hours C4I",
+        "description": "4단계 킬체인(3/4 단계 이상 관측 시 트리거, near-miss 허용): 합의전복: Sybil→합의 포이즈닝→위조 영상/상황도→C4I 위조명령. 체인: Sybil Node Injection(S105) → Consensus Poisoning(S102) → Imagery Hijack(S7) → Off-hours C4I(S79). 연결키: SwarmId. MITRE: T1584, T1565.001, T1565.002",
+        "severity": "High",
+        "enabled": true,
+        "query": "let windowSize = 1h;\n\n// S105: Sybil Node Injection\nlet S105 =\n    UAVSwarmComms_CL\n    | where TimeGenerated > ago(windowSize)\n    | where EventType == 'sybil_node_join'\n    | extend Stage = 'S105', SwarmId = tostring(SwarmId)\n    | where isnotempty(SwarmId)\n    | project TimeGenerated, Stage, SwarmId;\n\n// S102: Consensus Poisoning\nlet S102 =\n    UAVSwarmComms_CL\n    | where TimeGenerated > ago(windowSize)\n    | where EventType == 'consensus_poison'\n    | extend Stage = 'S102', SwarmId = tostring(SwarmId)\n    | where isnotempty(SwarmId)\n    | project TimeGenerated, Stage, SwarmId;\n\n// S7: Imagery Hijack — 군집 임무 컨텍스트에서 UAVImagery_CL에 병기되는 SwarmId 필드\nlet S7 =\n    UAVImagery_CL\n    | where TimeGenerated > ago(windowSize)\n    | where StreamEvent in ('unauthorized_access','feed_hijack')\n    | extend Stage = 'S7', SwarmId = tostring(SwarmId)\n    | where isnotempty(SwarmId)\n    | project TimeGenerated, Stage, SwarmId;\n\n// S79: Off-hours C4I — 군집 임무 컨텍스트에서 UAVC4I_CL에 병기되는 SwarmId 필드\nlet S79 =\n    UAVC4I_CL\n    | where TimeGenerated > ago(windowSize)\n    | where hourofday(TimeGenerated) >= 23 or hourofday(TimeGenerated) < 5\n    | extend Stage = 'S79', SwarmId = tostring(SwarmId)\n    | where isnotempty(SwarmId)\n    | project TimeGenerated, Stage, SwarmId;\n\nunion S105, S102, S7, S79\n| summarize StagesSeen = make_set(Stage), StageCount = dcount(Stage), FirstSeen = min(TimeGenerated), LastSeen = max(TimeGenerated) by SwarmId\n| where StageCount >= 3\n| extend CampaignType = \"C25_합의전복_Sybil_포이즈닝_위조영상_C4I위조\"\n| extend StepSummary = strcat(\"Stages=\", tostring(StagesSeen), \" | First=\", tostring(FirstSeen), \" | Last=\", tostring(LastSeen))\n| extend Severity = \"High\"\n| project FirstSeen, LastSeen, SwarmId, StagesSeen, StageCount, CampaignType, StepSummary, Severity",
+        "queryFrequency": "PT10M",
+        "queryPeriod": "PT1H",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "ResourceDevelopment",
+          "Impact"
+        ],
+        "techniques": [
+          "T1584",
+          "T1565.001",
+          "T1565.002"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": true,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT2H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Host"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "[CAMPAIGN] UAV Campaign C25 - Sybil Node Injection → Consensus Poisoning → Imagery Hijack → Off-hours C4I - {{SwarmId}}",
+          "alertDescriptionFormat": "CampaignType={{CampaignType}} | Steps={{StepSummary}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "CampaignType": "CampaignType",
+          "StepSummary": "StepSummary",
+          "SwarmId": "SwarmId",
+          "StageCount": "StageCount"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "SwarmId"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

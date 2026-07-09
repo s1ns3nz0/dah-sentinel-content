@@ -1,0 +1,78 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/edcd32be-7751-436c-8be5-047f14ffa016')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/edcd32be-7751-436c-8be5-047f14ffa016')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S73 - Artifact Signature Bypass",
+        "description": "배포 아티팩트 서명 검증 이벤트(ArtifactSign)에서 서명 무효(SignatureValid=false) 또는 서명 우회 지표(BypassIndicator) 발생을 탐지. 신뢰 제어 우회를 통한 미서명/변조 아티팩트 배포 시도. MITRE: T1553",
+        "severity": "High",
+        "enabled": true,
+        "query": "let alertWindow = 10m;\nUAVSupplyChain_CL\n| where TimeGenerated > ago(alertWindow)\n| where EventType == 'ArtifactSign'\n| extend isInvalidSig = (SignatureValid == false)\n| extend isBypass = isnotempty(BypassIndicator)\n| where isInvalidSig or isBypass\n| extend TriggerReason = case(\n    isInvalidSig and isBypass, strcat(\"아티팩트_서명무효_우회지표_\", ArtifactId, \"_\", BypassIndicator),\n    isInvalidSig, strcat(\"아티팩트_서명무효_\", ArtifactId),\n    strcat(\"아티팩트_서명우회지표_\", ArtifactId, \"_\", BypassIndicator))\n| extend Severity = \"High\"\n| project TimeGenerated, ArtifactId, SignatureValid, BypassIndicator, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "queryFrequency": "PT5M",
+        "queryPeriod": "PT15M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "Defense Evasion"
+        ],
+        "techniques": [
+          "T1553"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": false,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT2H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S73 - Artifact Signature Bypass - {{ArtifactId}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | SignatureValid={{SignatureValid}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "ArtifactId": "ArtifactId",
+          "BypassIndicator": "BypassIndicator"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "ArtifactId"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

@@ -1,0 +1,82 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/a24bb989-cbfd-4fa9-aff6-2ff1bbb620c6')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/a24bb989-cbfd-4fa9-aff6-2ff1bbb620c6')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S43 - GCS Auto-Update MITM (Rogue Appcast)",
+        "description": "GCS 앱 자동업데이트 MITM(불법 appcast 응답) 탐지. update_check 이벤트에서 알려진 업데이트 서버 목록(updates.qgroundcontrol.com, update.dah-gcs.mil.kr)에 없는 호스트(SourceHost)로부터 응답을 받았거나, 응답 바이너리가 미서명(BinarySigned=false)인 경우 탐지. MITRE: T1195.002 (closest analogue — Compromise Software Supply Chain, subtechnique of T1195)",
+        "severity": "High",
+        "enabled": true,
+        "query": "let knownUpdateHosts = dynamic([\"updates.qgroundcontrol.com\", \"update.dah-gcs.mil.kr\"]);\nlet alertWindow = 15m;\nUAVGcsApp_CL\n| where TimeGenerated > ago(alertWindow)\n| where EventType == \"update_check\"\n| where SourceHost !in (knownUpdateHosts) or BinarySigned == false\n| extend TriggerReason = case(\n    SourceHost !in (knownUpdateHosts) and BinarySigned == false, \"GCS_업데이트_비인가호스트_미서명_동시\",\n    SourceHost !in (knownUpdateHosts), \"GCS_업데이트_비인가_AppcastHost\",\n    \"GCS_업데이트_미서명_바이너리\")\n| extend Severity = \"High\"\n| project TimeGenerated, GcsHost, Operator, SourceHost, ResultCode, BinarySigned, PayloadDetail, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "queryFrequency": "PT10M",
+        "queryPeriod": "PT30M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "InitialAccess"
+        ],
+        "techniques": [
+          "T1195"
+        ],
+        "subTechniques": [
+          "T1195.002"
+        ],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT2H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Host"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S43 - GCS Auto-Update MITM (Rogue Appcast) - {{GcsHost}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | SourceHost={{SourceHost}} | BinarySigned={{BinarySigned}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "SourceHost": "SourceHost",
+          "Operator": "Operator"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "GcsHost"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

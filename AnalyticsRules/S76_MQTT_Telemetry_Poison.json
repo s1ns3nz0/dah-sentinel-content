@@ -1,0 +1,79 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/0fba7adf-7597-4a82-95c5-2026b6a59100')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/0fba7adf-7597-4a82-95c5-2026b6a59100')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S76 - MQTT/Message Bus Telemetry Poisoning",
+        "description": "MQTT/메시지버스 텔레메트리 게시(MqttPublish)의 페이로드 이상탐지 점수(PayloadAnomalyScore)가 UAV_Threshold_List 동적 임계(MaxPayloadAnomalyScore)를 초과하는 토픽(TopicName)/게시자(PublisherId)를 탐지. MITRE: T1565.001",
+        "severity": "High",
+        "enabled": true,
+        "query": "let alertWindow = 10m;\nlet anomalyGate = toscalar(_GetWatchlist('UAV_Threshold_List') | where ThresholdKey == 'MaxPayloadAnomalyScore' | project todouble(Value));\nUAVMiddleware_CL\n| where TimeGenerated > ago(alertWindow)\n| where EventType == 'MqttPublish'\n| where todouble(PayloadAnomalyScore) > anomalyGate\n| extend TriggerReason = strcat(\"MQTT_텔레메트리_오염_\", TopicName, \"_score:\", PayloadAnomalyScore, \"_publisher:\", PublisherId)\n| extend Severity = \"High\"\n| project TimeGenerated, UAVId, TopicName, PublisherId, PayloadAnomalyScore, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "queryFrequency": "PT5M",
+        "queryPeriod": "PT15M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "Impact"
+        ],
+        "techniques": [
+          "T1565"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": false,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT2H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S76 - MQTT Telemetry Poisoning - {{TopicName}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | PayloadAnomalyScore={{PayloadAnomalyScore}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "TopicName": "TopicName",
+          "PublisherId": "PublisherId",
+          "PayloadAnomalyScore": "PayloadAnomalyScore"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "UAVId"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

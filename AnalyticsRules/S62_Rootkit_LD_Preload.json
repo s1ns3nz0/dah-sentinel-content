@@ -1,0 +1,90 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/f614dcd0-abbe-4a10-8a90-f13616cdced0')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/f614dcd0-abbe-4a10-8a90-f13616cdced0')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S62 - Rootkit (LD_PRELOAD / Kernel Module Insertion)",
+        "description": "UAVHostAudit_CL에서 /etc/ld.so.preload 변조 또는 미승인 커널모듈(LKM) 삽입을 통한 은폐형 루트킷 설치 탐지. MITRE: T1014,T0851",
+        "severity": "High",
+        "enabled": true,
+        "query": "let alertWindow = 15m;\nlet knownModules = dynamic([\"nf_conntrack\", \"overlay\", \"br_netfilter\", \"ip_tables\"]);\nUAVHostAudit_CL\n| where TimeGenerated > ago(alertWindow)\n| where EventType in (\"preload_modify\", \"kmod_insert\")\n| where (EventType == \"preload_modify\" and FilePath == \"/etc/ld.so.preload\")\n    or (EventType == \"kmod_insert\" and Binary !in (knownModules))\n| extend TriggerReason = case(\n    EventType == \"preload_modify\", \"rootkit_LD_PRELOAD_변조_은폐시도\",\n    strcat(\"rootkit_비인가_커널모듈삽입_\", Binary))\n| extend Severity = \"High\"\n| project TimeGenerated, UAVId, ActorId, EventType, Binary, ExecArgs, FilePath, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "queryFrequency": "PT5M",
+        "queryPeriod": "PT15M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "Defense Evasion"
+        ],
+        "techniques": [
+          "T1014"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT5H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Host"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S62 - Rootkit (LD_PRELOAD / Kernel Module Insertion) - {{UAVId}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | EventType={{EventType}} | Binary={{Binary}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "EventType": "EventType",
+          "Binary": "Binary",
+          "FilePath": "FilePath"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "UAVId"
+              }
+            ]
+          },
+          {
+            "entityType": "Account",
+            "fieldMappings": [
+              {
+                "identifier": "Name",
+                "columnName": "ActorId"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

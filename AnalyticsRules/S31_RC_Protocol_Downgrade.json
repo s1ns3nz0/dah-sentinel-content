@@ -1,0 +1,81 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/4a1520b3-02e0-4d7b-ab69-76c25d94d944')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/4a1520b3-02e0-4d7b-ab69-76c25d94d944')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S31 - RC Protocol Downgrade (Unencrypted Fallback)",
+        "description": "UAVRcLink_CL의 ProtocolVersion이 승인된 보안 버전 목록(secureVersions)에 없거나 EncryptionEnabled == false이면 RC 프로토콜 다운그레이드(무암호 폴백)로 탐지. MITRE: T1600",
+        "severity": "Medium",
+        "enabled": true,
+        "query": "let alertWindow = 10m;\nlet secureVersions = dynamic(['ELRS-3.0', 'ELRS-3.1', 'FrSky-ACCESS', 'DSMX-2.4']);\nUAVRcLink_CL\n| where TimeGenerated > ago(alertWindow)\n| where ProtocolVersion !in (secureVersions) or EncryptionEnabled == false\n| extend TriggerReason = strcat('RC_프로토콜_다운그레이드_무암호폴백_', Protocol, '_', ProtocolVersion)\n| extend Severity = 'Medium'\n| project TimeGenerated, UAVId, Protocol, ProtocolVersion, EncryptionEnabled, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "queryFrequency": "PT5M",
+        "queryPeriod": "PT15M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "DefenseEvasion"
+        ],
+        "techniques": [
+          "T1600"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT2H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Host"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S31 - RC Protocol Downgrade (Unencrypted Fallback) - {{UAVId}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | ProtocolVersion={{ProtocolVersion}} | EncryptionEnabled={{EncryptionEnabled}} | Severity={{Severity}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "Protocol": "Protocol",
+          "ProtocolVersion": "ProtocolVersion",
+          "EncryptionEnabled": "EncryptionEnabled"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "UAVId"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

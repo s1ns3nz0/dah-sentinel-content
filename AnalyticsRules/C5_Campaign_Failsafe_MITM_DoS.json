@@ -30,6 +30,8 @@
           "Impact"
         ],
         "techniques": [
+          "T1562",
+          "T1040",
           "T1499"
         ],
         "subTechniques": [],

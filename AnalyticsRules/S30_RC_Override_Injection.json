@@ -1,0 +1,81 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/f09e6adb-1742-44e9-a903-6685db9d4ede')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/f09e6adb-1742-44e9-a903-6685db9d4ede')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S30 - RC Override Command Injection",
+        "description": "UAVRcLink_CL의 ChannelValues(RC PWM 채널 배열, 정상범위 1000~2000)가 유효 범위를 벗어나면 RC override 명령 주입으로 탐지. 채널 값이 급격히 풀디플렉션(최대/최소치)으로 튀는 패턴은 원격 조종 신호 강제 주입의 전형적 지표. MITRE ICS ATT&CK: T0855(Unauthorized Command Message) / MITRE: T1565(근접기법)",
+        "severity": "Medium",
+        "enabled": true,
+        "query": "let alertWindow = 10m;\nlet minPwm = 1000;\nlet maxPwm = 2000;\nUAVRcLink_CL\n| where TimeGenerated > ago(alertWindow)\n| where isnotempty(ChannelValues)\n| mv-apply cv = ChannelValues to typeof(long) on (\n    summarize MinVal = min(cv), MaxVal = max(cv)\n)\n| where MinVal < minPwm or MaxVal > maxPwm\n| extend TriggerReason = strcat('RC_Override_명령주입_범위이탈_Min:', tostring(MinVal), '_Max:', tostring(MaxVal))\n| extend Severity = 'High'\n| project TimeGenerated, UAVId, Protocol, MinVal, MaxVal, ChannelValues, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "queryFrequency": "PT5M",
+        "queryPeriod": "PT15M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "Impact"
+        ],
+        "techniques": [
+          "T1565"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT2H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Host"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S30 - RC Override Command Injection - {{UAVId}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | MinVal={{MinVal}} | MaxVal={{MaxVal}} | Severity={{Severity}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "MinVal": "MinVal",
+          "MaxVal": "MaxVal",
+          "Severity": "Severity"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "UAVId"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

@@ -1,0 +1,78 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/8f7aa710-174c-43fb-a729-b6926883186d')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/8f7aa710-174c-43fb-a729-b6926883186d')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S75 - DDS/ROS2 Discovery Flooding",
+        "description": "DDS/ROS2 discovery 메시지율(DiscoveryMsgRate) 또는 참여자 수(ParticipantCount)가 UAV_Threshold_List 동적 임계(MaxDiscoveryMsgRate/MaxParticipantCount)를 초과하는 discovery 플러딩(가용성 공격)을 탐지. MITRE: T1499",
+        "severity": "Medium",
+        "enabled": true,
+        "query": "let alertWindow = 10m;\nlet msgRateGate = toscalar(_GetWatchlist('UAV_Threshold_List') | where ThresholdKey == 'MaxDiscoveryMsgRate' | project toint(Value));\nlet participantGate = toscalar(_GetWatchlist('UAV_Threshold_List') | where ThresholdKey == 'MaxParticipantCount' | project toint(Value));\nUAVMiddleware_CL\n| where TimeGenerated > ago(alertWindow)\n| where EventType == 'DiscoveryFlood'\n| where toint(DiscoveryMsgRate) > msgRateGate or toint(ParticipantCount) > participantGate\n| extend TriggerReason = strcat(\"DDS_discovery_플러딩_\", UAVId, \"_rate:\", DiscoveryMsgRate, \"_participants:\", ParticipantCount)\n| extend Severity = \"High\"\n| project TimeGenerated, UAVId, DiscoveryMsgRate, ParticipantCount, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "queryFrequency": "PT5M",
+        "queryPeriod": "PT15M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "Impact"
+        ],
+        "techniques": [
+          "T1499"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": false,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT2H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S75 - DDS/ROS2 Discovery Flooding - {{UAVId}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | DiscoveryMsgRate={{DiscoveryMsgRate}} | ParticipantCount={{ParticipantCount}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "DiscoveryMsgRate": "DiscoveryMsgRate",
+          "ParticipantCount": "ParticipantCount"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "UAVId"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

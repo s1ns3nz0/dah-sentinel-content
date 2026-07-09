@@ -1,0 +1,78 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/a135f0a9-2da4-45e9-83e5-9e61a4e64351')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/a135f0a9-2da4-45e9-83e5-9e61a4e64351')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S82 - Telemetry Ingest Poisoning (Forged Payload)",
+        "description": "텔레메트리 수집(ingest) 경로에서 페이로드 체크섬 검증 실패(PayloadChecksumValid=false)를 탐지. 수집 소스(IngestSource)의 위조/오염된 텔레메트리 주입 시도. MITRE: T1565.001",
+        "severity": "High",
+        "enabled": true,
+        "query": "let alertWindow = 10m;\nUAVFleetApi_CL\n| where TimeGenerated > ago(alertWindow)\n| where EventType == 'TelemetryIngest'\n| where PayloadChecksumValid == false\n| extend TriggerReason = strcat(\"텔레메트리_ingest_체크섬불일치_\", IngestSource)\n| extend Severity = \"High\"\n| project TimeGenerated, IngestSource, PayloadChecksumValid, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "queryFrequency": "PT5M",
+        "queryPeriod": "PT15M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "Impact"
+        ],
+        "techniques": [
+          "T1565"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": false,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT2H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S82 - Telemetry Ingest Poisoning - {{IngestSource}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "IngestSource": "IngestSource",
+          "PayloadChecksumValid": "PayloadChecksumValid"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "IngestSource"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

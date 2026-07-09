@@ -1,0 +1,79 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/102a9a9f-9f11-4932-b717-1b735ed66f6d')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/102a9a9f-9f11-4932-b717-1b735ed66f6d')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S88 - Adversarial Patch Attack Against Onboard Vision Model",
+        "description": "적대적 패치 공격(Adversarial Patch) 탐지. UAVAiInference_CL의 InferenceType='vision_classify' 레코드 중 오분류(MisclassificationDetected=true)가 발생하고 동시에 입력 이미지에서 패치성 이상 패턴(PatchIndicator)이 검출된 경우를 탐지. 표적 인식/장애물 회피 등 UAV 온보드 비전 모델의 입력을 물리적/디지털 패치로 조작해 오분류를 유도하는 AML 공격. MITRE: AML.T0043",
+        "severity": "High",
+        "enabled": true,
+        "query": "let alertWindow = 15m;\nUAVAiInference_CL\n| where TimeGenerated > ago(alertWindow)\n| where InferenceType == 'vision_classify'\n| where MisclassificationDetected == true and isnotempty(PatchIndicator)\n| extend TriggerReason = strcat('적대적패치_오분류_', ModelEndpoint, '_', PatchIndicator)\n| extend Severity = 'High'\n| project TimeGenerated, ModelEndpoint, RequesterId, InputHash, MisclassificationDetected, PatchIndicator, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "queryFrequency": "PT5M",
+        "queryPeriod": "PT15M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "DefenseEvasion",
+          "Impact"
+        ],
+        "techniques": [
+          "T1565"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": false,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT5H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S88 - Adversarial Patch Attack - {{ModelEndpoint}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | PatchIndicator={{PatchIndicator}} | Severity={{Severity}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "ModelEndpoint": "ModelEndpoint",
+          "PatchIndicator": "PatchIndicator"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "ModelEndpoint"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

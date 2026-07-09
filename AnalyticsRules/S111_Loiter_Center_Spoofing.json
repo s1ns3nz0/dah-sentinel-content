@@ -1,0 +1,88 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/8637af85-558f-423e-bce3-8d1d1d8ece7b')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/8637af85-558f-423e-bce3-8d1d1d8ece7b')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S111 - Loiter Center Spoofing (Unauthorized Loiter Point Manipulation)",
+        "description": "UAVOpmode_CL에서 OpmodeField='loiter_center'인 레코드 중 ExpectedValue(승인된 선회 중심 좌표)와 ObservedValue(실제 적용된 좌표)가 불일치하고 Authorized=0(SByte)인 비인가 변경 탐지. 실제 컬럼: OpmodeField/ExpectedValue/ObservedValue/ChangedBy/Authorized(SByte). MITRE: T0836 Modify Parameter (선회 중심 좌표 파라미터의 비인가 변조로 UAV를 의도치 않은 위치에 체류시킴)",
+        "severity": "Medium",
+        "enabled": true,
+        "query": "let alertWindow = 10m;\nUAVOpmode_CL\n| where TimeGenerated > ago(alertWindow)\n| where OpmodeField == 'loiter_center'\n| where ExpectedValue != ObservedValue and Authorized == 0\n| extend TriggerReason = strcat(\"선회중심_비인가변조_\", UAVId, \"_\", ExpectedValue, \"->\", ObservedValue)\n| project TimeGenerated, UAVId, OpmodeField, ExpectedValue, ObservedValue, ChangedBy, Authorized, Seq, TriggerReason\n| order by TimeGenerated desc",
+        "queryFrequency": "PT5M",
+        "queryPeriod": "PT15M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "DefenseEvasion"
+        ],
+        "techniques": [
+          "T1562"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT5H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Host"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S111 - Loiter Center Spoofing (Unauthorized Loiter Point Manipulation) - {{UAVId}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | ChangedBy={{ChangedBy}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "Authorized": "Authorized"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "UAVId"
+              }
+            ]
+          },
+          {
+            "entityType": "Account",
+            "fieldMappings": [
+              {
+                "identifier": "Name",
+                "columnName": "ChangedBy"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

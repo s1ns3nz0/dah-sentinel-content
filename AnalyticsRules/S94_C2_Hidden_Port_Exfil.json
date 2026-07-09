@@ -1,0 +1,89 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/11c8741c-ee69-47be-afc0-bb99a05b1747')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/11c8741c-ee69-47be-afc0-bb99a05b1747')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S94 - C2 Channel Concealed Exfiltration via Common Ports",
+        "description": "UAVExfilFlow_CL에서 DestPort가 상용 서비스 포트(443/53/80)이면서 C2_Whitelisted_GCS_List에 등록되지 않은 목적지로, 최근 24h 베이스라인 P99 x 2.5 (하한 10MB) 동적 게이트를 초과하는 바이트 전송 탐지 — 정상 C2 채널로 위장한 은닉 유출. MITRE: T1041 Exfiltration Over C2 Channel",
+        "severity": "High",
+        "enabled": true,
+        "query": "let baselineWindow = 24h;\nlet alertWindow = 15m;\nlet gateMultiplier = 2.5;\nlet floorBytes = 10000000.0;\nlet WhitelistedGCS = _GetWatchlist('C2_Whitelisted_GCS_List') | project GCS_IP;\nlet dynGate = toscalar(\n    UAVExfilFlow_CL\n    | where TimeGenerated > ago(baselineWindow)\n    | where DestPort in (443, 53, 80)\n    | summarize percentile(BytesTransferred, 99) * gateMultiplier\n);\nlet byteGate = max_of(dynGate, floorBytes);\nUAVExfilFlow_CL\n| where TimeGenerated > ago(alertWindow)\n| where DestPort in (443, 53, 80)\n| where DestIp !in (WhitelistedGCS)\n| where BytesTransferred > byteGate\n| extend TriggerReason = strcat(\"C2은닉유출_상용포트_\", tostring(DestPort), \"_\", tostring(toint(BytesTransferred/1000000)), \"MB\")\n| extend Severity = \"High\"\n| project TimeGenerated, UAVId, Operator, AssetType, DestIp, DestPort, BytesTransferred, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "queryFrequency": "PT15M",
+        "queryPeriod": "P1D",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "CommandAndControl",
+          "Exfiltration"
+        ],
+        "techniques": [
+          "T1041"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": false,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT5H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S94 - C2 Channel Concealed Exfiltration via Common Ports - {{UAVId}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | DestIp={{DestIp}} | DestPort={{DestPort}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "DestIp": "DestIp",
+          "DestPort": "DestPort",
+          "BytesTransferred": "BytesTransferred"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "UAVId"
+              }
+            ]
+          },
+          {
+            "entityType": "IP",
+            "fieldMappings": [
+              {
+                "identifier": "Address",
+                "columnName": "DestIp"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

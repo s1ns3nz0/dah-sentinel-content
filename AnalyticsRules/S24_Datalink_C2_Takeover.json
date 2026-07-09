@@ -8,28 +8,32 @@
   },
   "resources": [
     {
-      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/e4f73924-b8da-4034-8257-71bf8e9e1e55')]",
-      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/e4f73924-b8da-4034-8257-71bf8e9e1e55')]",
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/116b38df-fe3b-49d8-ba64-1418e5d69870')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/116b38df-fe3b-49d8-ba64-1418e5d69870')]",
       "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
       "kind": "Scheduled",
       "apiVersion": "2023-12-01-preview",
       "properties": {
-        "displayName": "UAV S24 - Datalink C2 Channel Takeover (Rogue PeerIp + TxBytes Anomaly)",
-        "description": "C2_Whitelisted_GCS_List 외부 PeerIp가 MAVLink 포트에 연결 + TxBytes z-score 이상 동시 탐지. 실제 컬럼: UAVId 없음(ContainerName/PeerIp 사용), LocalPort(Int32). MITRE: T1090 Proxy, T1571 Non-Standard Port",
+        "displayName": "UAV S24 - C2 Jamming/Datalink Channel Takeover",
+        "description": "UAVDatalinkConn_CL의 BlockedDuration(채널 차단 지속시간)이 임계(30초)를 초과하면 C2 재밍/통신 차단으로 인한 Datalink 채널 나포로 탐지. C2_Whitelisted_GCS_List 외부 PeerIp가 동시에 관측되면 채널 나포 후 비인가 재접속 시도로 판단해 High 상향. S23(GNSS 재밍)과 동일 테이블을 사용하되 신호는 BlockedDuration/ChannelId로 상이. MITRE: T1695 / MITRE ICS ATT&CK: T0814(Denial of Service)",
         "severity": "High",
         "enabled": true,
-        "query": "let knownPorts = dynamic([5760, 5790, 14550, 14551]);\nlet alertWindow = 10m;\nlet KnownGCS = _GetWatchlist('C2_Whitelisted_GCS_List') | project GCS_IP;\n// 비인가 PeerIp가 MAVLink 포트에 연결\nlet UnknownConn =\n    UAVDatalinkConn_CL\n    | where TimeGenerated > ago(alertWindow)\n    | where PeerIp !in (KnownGCS)\n    | where LocalPort in (knownPorts)\n    | summarize ConnCount=count(), FirstSeen=min(TimeGenerated) by PeerIp, LocalPort, State;\n// TxBytes 이상 징후 (컨테이너 단위)\nlet TxAnomaly =\n    UAVDatalink_CL\n    | where TimeGenerated > ago(24h)\n    | make-series AvgTx=avg(TxBytes) on TimeGenerated step 5m by ContainerName\n    | extend (Anom, Score, Base) = series_decompose_anomalies(AvgTx, 3.0)\n    | project ContainerName, TimeGenerated, AvgTx, Anom\n    | mv-expand TimeGenerated to typeof(datetime), AvgTx to typeof(double), Anom to typeof(double)\n    | where TimeGenerated > ago(alertWindow) and Anom == 1\n    | summarize TxAnomalyCount=count() by ContainerName;\n// 비인가 연결 + 같은 시간대 TxBytes 이상이 둘 다 존재하면 상관 경고\nUnknownConn\n| extend HasTxAnomaly = toscalar(TxAnomaly | summarize count()) > 0\n| extend TriggerReason = strcat(\"비인가IP_C2포트_연결_PeerIp:\", PeerIp, \"_Port:\", tostring(LocalPort),\n    iff(HasTxAnomaly, \"_TxBurst동시발생\", \"\"))\n| extend Severity = iff(HasTxAnomaly, \"High\", \"Medium\")\n| project FirstSeen, PeerIp, LocalPort, ConnCount, HasTxAnomaly, TriggerReason, Severity\n| order by FirstSeen desc",
-        "queryFrequency": "PT10M",
-        "queryPeriod": "P1D",
+        "query": "let alertWindow = 10m;\nlet blockDurationGateSec = 30.0;\nlet KnownGCS = _GetWatchlist('C2_Whitelisted_GCS_List') | project GCS_IP;\nUAVDatalinkConn_CL\n| where TimeGenerated > ago(alertWindow)\n| where isnotempty(UAVId)\n| where BlockedDuration > blockDurationGateSec\n| extend isRoguePeer = isnotempty(PeerIp) and PeerIp !in (KnownGCS)\n| extend TriggerReason = strcat('C2_통신차단_채널나포_Channel:', ChannelId, '_BlockedSec:', tostring(BlockedDuration), iff(isRoguePeer, '_비인가Peer동시', ''))\n| extend Severity = iff(isRoguePeer, 'High', 'Medium')\n| project TimeGenerated, UAVId, ChannelId, BlockedDuration, PeerIp, isRoguePeer, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "queryFrequency": "PT5M",
+        "queryPeriod": "PT15M",
         "triggerOperator": "GreaterThan",
         "triggerThreshold": 0,
         "suppressionDuration": "PT2H",
         "suppressionEnabled": false,
         "startTimeUtc": null,
         "tactics": [
-          "Collection"
+          "Impact",
+          "CommandAndControl"
         ],
-        "techniques": [],
+        "techniques": [
+          "T1695",
+          "T1499"
+        ],
         "subTechniques": [],
         "alertRuleTemplateName": null,
         "incidentConfiguration": {
@@ -40,7 +44,7 @@
             "lookbackDuration": "PT2H",
             "matchingMethod": "AllEntities",
             "groupByEntities": [
-              "IP"
+              "Host"
             ],
             "groupByAlertDetails": [],
             "groupByCustomDetails": []
@@ -50,22 +54,23 @@
           "aggregationKind": "SingleAlert"
         },
         "alertDetailsOverride": {
-          "alertDisplayNameFormat": "UAV S24 - Datalink C2 Channel Takeover (Rogue PeerIp + TxBytes Anomaly) - {{PeerIp}}",
-          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Severity={{Severity}}",
+          "alertDisplayNameFormat": "UAV S24 - C2 Jamming/Datalink Channel Takeover - {{UAVId}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | ChannelId={{ChannelId}} | BlockedDuration={{BlockedDuration}} | Severity={{Severity}}",
           "alertDynamicProperties": []
         },
         "customDetails": {
           "TriggerReason": "TriggerReason",
-          "PeerIp": "PeerIp",
-          "LocalPort": "LocalPort"
+          "ChannelId": "ChannelId",
+          "BlockedDuration": "BlockedDuration",
+          "Severity": "Severity"
         },
         "entityMappings": [
           {
-            "entityType": "IP",
+            "entityType": "Host",
             "fieldMappings": [
               {
-                "identifier": "Address",
-                "columnName": "PeerIp"
+                "identifier": "HostName",
+                "columnName": "UAVId"
               }
             ]
           }

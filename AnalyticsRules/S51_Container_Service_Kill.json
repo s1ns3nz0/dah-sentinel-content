@@ -1,0 +1,90 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/ee8c881c-0d72-44f6-8492-decebec687f0')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/ee8c881c-0d72-44f6-8492-decebec687f0')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S51 - Container Service Forced Kill (Slowloris-induced)",
+        "description": "UAVContainerOps_CL에서 핵심 컨테이너(telemetry-tap/mavlink-router/pgse-stub/auth-stub) 연결 폭증(slowloris형 저속 연결 고갈) 직후 강제 stop/kill 탐지. 탐지맹점 생성 및 C2 두절 위험. MITRE: T0881,T1529",
+        "severity": "High",
+        "enabled": true,
+        "query": "let alertWindow = 15m;\nlet criticalContainers = dynamic([\"telemetry-tap\",\"mavlink-router\",\"pgse-stub\",\"auth-stub\"]);\nlet connFloodGate = 150;\nlet KillEvents =\n    UAVContainerOps_CL\n    | where TimeGenerated > ago(alertWindow)\n    | where ContainerName in (criticalContainers)\n    | where Action in (\"stop\", \"kill\")\n    | project KillTime = TimeGenerated, UAVId, ContainerName, Namespace, ActorId, Action, TimeBin = bin(TimeGenerated, 5m);\nlet ConnBurst =\n    UAVContainerOps_CL\n    | where TimeGenerated > ago(alertWindow)\n    | where ContainerName in (criticalContainers)\n    | where ConnCount > connFloodGate\n    | summarize MaxConnCount = max(ConnCount) by ContainerName, TimeBin = bin(TimeGenerated, 5m);\nKillEvents\n| join kind=inner (ConnBurst) on ContainerName, TimeBin\n| extend TriggerReason = strcat(ContainerName, \"_slowloris_연결폭증후_강제중단_\", Action)\n| extend Severity = \"High\"\n| project KillTime, UAVId, ContainerName, Namespace, ActorId, Action, MaxConnCount, TriggerReason, Severity\n| order by KillTime desc",
+        "queryFrequency": "PT5M",
+        "queryPeriod": "PT20M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "Impact"
+        ],
+        "techniques": [
+          "T1529"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT5H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Host"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S51 - Container Service Forced Kill (Slowloris-induced) - {{ContainerName}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Action={{Action}} | MaxConnCount={{MaxConnCount}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "ContainerName": "ContainerName",
+          "Action": "Action",
+          "MaxConnCount": "MaxConnCount"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "UAVId"
+              }
+            ]
+          },
+          {
+            "entityType": "Account",
+            "fieldMappings": [
+              {
+                "identifier": "Name",
+                "columnName": "ActorId"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

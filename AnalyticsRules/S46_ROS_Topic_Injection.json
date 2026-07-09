@@ -1,0 +1,82 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/aa9c7f5a-f280-4033-95b7-0b4642e481dc')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/aa9c7f5a-f280-4033-95b7-0b4642e481dc')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S46 - ROS Topic/Service Injection",
+        "description": "ROS 토픽/서비스 인젝션 탐지 — Approved_ROS_Node_List에 없는 NodeName이 민감 토픽(/mavros/setpoint_velocity/cmd_vel, /mavros/setpoint_position/local, /mavros/cmd/arming)에 직접 publish/서비스 호출한 경우 탐지. MITRE ICS ATT&CK: T0855 Unauthorized Command Message",
+        "severity": "High",
+        "enabled": true,
+        "query": "let approvedNodes = _GetWatchlist('Approved_ROS_Node_List') | project NodeName;\nlet sensitiveTopics = dynamic([\"/mavros/setpoint_velocity/cmd_vel\", \"/mavros/setpoint_position/local\", \"/mavros/cmd/arming\"]);\nlet alertWindow = 10m;\nUAVRos_CL\n| where TimeGenerated > ago(alertWindow)\n| where EventType in (\"topic_publish\", \"service_call\")\n| where TopicName in (sensitiveTopics)\n| where NodeName !in (approvedNodes)\n| extend TriggerReason = strcat(\"ROS_민감토픽_비인가노드_퍼블리시_\", TopicName)\n| extend Severity = \"High\"\n| project TimeGenerated, UAVId, NodeName, PeerIp, TopicName, CommandSummary, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "queryFrequency": "PT5M",
+        "queryPeriod": "PT15M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "Impact"
+        ],
+        "techniques": [
+          "T1565"
+        ],
+        "subTechniques": [
+          "T1565.002"
+        ],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT2H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Host"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S46 - ROS Topic/Service Injection - {{UAVId}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | NodeName={{NodeName}} | TopicName={{TopicName}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "NodeName": "NodeName",
+          "TopicName": "TopicName"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "UAVId"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

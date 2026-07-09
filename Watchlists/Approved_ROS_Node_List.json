@@ -1,0 +1,33 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspaceName": {
+      "type": "string",
+      "metadata": {
+        "description": "Workspace name for Log Analytics where Sentinel is setup"
+      }
+    }
+  },
+  "resources": [
+    {
+      "name": "[concat(parameters('workspaceName'), '/Microsoft.SecurityInsights/Approved_ROS_Node_List')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/Watchlists",
+      "kind": "",
+      "properties": {
+        "displayName": "Approved_ROS_Node_List",
+        "source": "Approved_ROS_Node_List.csv",
+        "description": "Approved ROS node identities, peer IPs, and roles — detects unauthenticated ROS master access, unauthorized topic/service injection, and MAVROS command injection bypassing the mission planner path (S45/S46/S47, T1190/T0855/T0831)",
+        "provider": "DAH-BlueTeam",
+        "isDeleted": false,
+        "labels": [],
+        "defaultDuration": "P1000Y",
+        "contentType": "Text/Csv",
+        "numberOfLinesToSkip": 0,
+        "itemsSearchKey": "NodeName",
+        "rawContent": "NodeName,PeerIp,Role,ApprovedDate,Description\r\n/mission_planner_node,10.60.1.10,mission_planner,2026-01-01,MPS 임무계획기 ROS 브리지 — setpoint 발행 전담\r\n/mavros,10.60.1.11,c2_bridge,2026-01-01,MAVROS C2 브리지 노드\r\n/telemetry_bridge,10.60.1.12,telemetry_bridge,2026-01-01,텔레메트리 릴레이 브리지 노드\r\n/camera_node,10.60.1.13,sensor,2026-01-01,EO/IR 카메라 센서 노드\r\n/gcs_console,10.60.1.14,operator_console,2026-01-01,운영자 콘솔 노드"
+      },
+      "apiVersion": "2022-08-01"
+    }
+  ]
+}

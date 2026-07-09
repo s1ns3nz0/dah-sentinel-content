@@ -1,0 +1,33 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspaceName": {
+      "type": "string",
+      "metadata": {
+        "description": "Workspace name for Log Analytics where Sentinel is setup"
+      }
+    }
+  },
+  "resources": [
+    {
+      "name": "[concat(parameters('workspaceName'), '/Microsoft.SecurityInsights/Trusted_NTP_Source_List')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/Watchlists",
+      "kind": "",
+      "properties": {
+        "displayName": "Trusted_NTP_Source_List",
+        "source": "Trusted_NTP_Source_List.csv",
+        "description": "Trusted NTP time servers for GDT (ground data terminal) time sync — detects rogue NTP servers used for timestamp spoofing/replay attack staging (S50, T1195)",
+        "provider": "DAH-BlueTeam",
+        "isDeleted": false,
+        "labels": [],
+        "defaultDuration": "P1000Y",
+        "contentType": "Text/Csv",
+        "numberOfLinesToSkip": 0,
+        "itemsSearchKey": "NtpHost",
+        "rawContent": "NtpHost,IPAddress,Stratum,Description\r\ntime.dah-ground.mil.kr,10.60.0.53,1,대대 기준 시각 서버 (GPS 동기)\r\ntime2.dah-ground.mil.kr,10.60.0.54,2,백업 기준 시각 서버\r\nkriss-ntp.re.kr,203.248.240.140,1,한국표준과학연구원 국가표준시 서버"
+      },
+      "apiVersion": "2022-08-01"
+    }
+  ]
+}

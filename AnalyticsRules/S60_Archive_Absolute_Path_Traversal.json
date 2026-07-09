@@ -1,0 +1,88 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/b6ba82b1-a664-421c-a8d7-d3231dbc32ca')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/b6ba82b1-a664-421c-a8d7-d3231dbc32ca')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S60 - Archive Tar Absolute-Path Traversal",
+        "description": "UAVArchiveExtract_CL에서 tar 아카이브 엔트리가 절대경로(/로 시작)로 기록되어 추출 루트를 무시하고 임의 경로에 파일을 기록하는 절대경로 순회 탐지. MITRE: T1195",
+        "severity": "Medium",
+        "enabled": true,
+        "query": "let alertWindow = 15m;\nUAVArchiveExtract_CL\n| where TimeGenerated > ago(alertWindow)\n| where AbsolutePathEntry == true\n| extend TriggerReason = strcat(\"tar_절대경로순회_\", ArchiveEntry)\n| extend Severity = \"Medium\"\n| project TimeGenerated, UAVId, ArchiveName, ArchiveEntry, ExtractPathResolved, UploadedBy, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "queryFrequency": "PT5M",
+        "queryPeriod": "PT15M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "Initial Access"
+        ],
+        "techniques": [],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT5H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Host"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S60 - Archive Tar Absolute-Path Traversal - {{UAVId}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | ArchiveEntry={{ArchiveEntry}} | ExtractPathResolved={{ExtractPathResolved}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "ArchiveEntry": "ArchiveEntry",
+          "ExtractPathResolved": "ExtractPathResolved",
+          "UploadedBy": "UploadedBy"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "UAVId"
+              }
+            ]
+          },
+          {
+            "entityType": "Account",
+            "fieldMappings": [
+              {
+                "identifier": "Name",
+                "columnName": "UploadedBy"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

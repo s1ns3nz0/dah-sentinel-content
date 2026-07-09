@@ -1,0 +1,79 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/238c76a2-f1ea-4a93-95ca-b00fadb9883e')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/238c76a2-f1ea-4a93-95ca-b00fadb9883e')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S90 - SOC LLM Prompt Injection",
+        "description": "SOC LLM(코파일럿/분석보조 에이전트) 프롬프트 인젝션 탐지. UAVAiInference_CL의 InferenceType='llm_prompt' 레코드 중 인젝션 마커(InjectionMarkerDetected)가 검출된 경우를 탐지. 경보/티켓/로그 등 LLM에 전달되는 입력에 은닉 지시문을 삽입해 SOC 판단 로직이나 후속 자동화 액션(TargetSystem)을 조작하려는 시도. MITRE: AML.T0051",
+        "severity": "High",
+        "enabled": true,
+        "query": "let alertWindow = 10m;\nUAVAiInference_CL\n| where TimeGenerated > ago(alertWindow)\n| where InferenceType == 'llm_prompt'\n| where InjectionMarkerDetected == true\n| extend TriggerReason = strcat('SOC_LLM_프롬프트인젝션_', TargetSystem)\n| extend Severity = 'High'\n| project TimeGenerated, ModelEndpoint, RequesterId, PromptText, InjectionMarkerDetected, TargetSystem, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "queryFrequency": "PT5M",
+        "queryPeriod": "PT15M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "DefenseEvasion",
+          "Execution"
+        ],
+        "techniques": [
+          "T1059"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": false,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT5H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S90 - SOC LLM Prompt Injection - {{TargetSystem}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Severity={{Severity}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "TargetSystem": "TargetSystem",
+          "InjectionMarkerDetected": "InjectionMarkerDetected"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "ModelEndpoint"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

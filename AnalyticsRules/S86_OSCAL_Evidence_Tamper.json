@@ -1,0 +1,79 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/47959b5b-e2e8-4b6a-a646-650a57bd7a46')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/47959b5b-e2e8-4b6a-a646-650a57bd7a46')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S86 - OSCAL Compliance Evidence Tampering",
+        "description": "OSCAL 컴플라이언스 증거 변조 탐지. UAVComplianceEvidence_CL에서 무결성 서명(IntegritySigned)이 누락된 컴플라이언스 결과, 특히 'pass'로 기재된 결과 중 서명 파이프라인을 거치지 않은 레코드를 탐지. 정상 파이프라인은 컨트롤 평가 결과를 생성 시점에 항상 서명하므로 미서명 'pass' 증거는 감사 통과를 위한 사후 조작 의심. MITRE: T1565",
+        "severity": "High",
+        "enabled": true,
+        "query": "let alertWindow = 15m;\nUAVComplianceEvidence_CL\n| where TimeGenerated > ago(alertWindow)\n| where IntegritySigned == false\n| extend TriggerReason = case(\n    ResultStated == 'pass', strcat('컴플라이언스_증거_무서명_임의PASS_', ControlId),\n    strcat('컴플라이언스_증거_무서명_', ControlId))\n| extend Severity = iff(ResultStated == 'pass', 'High', 'Medium')\n| project TimeGenerated, ControlId, ResultStated, IntegritySigned, AuthoredBy, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "queryFrequency": "PT15M",
+        "queryPeriod": "PT30M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "DefenseEvasion",
+          "Impact"
+        ],
+        "techniques": [
+          "T1565"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": false,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT5H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S86 - OSCAL Compliance Evidence Tampering - {{ControlId}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | AuthoredBy={{AuthoredBy}} | Severity={{Severity}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "ControlId": "ControlId",
+          "IntegritySigned": "IntegritySigned"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Account",
+            "fieldMappings": [
+              {
+                "identifier": "Name",
+                "columnName": "AuthoredBy"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

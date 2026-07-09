@@ -1,0 +1,83 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/4d29149f-2145-4bfd-9e10-77690eb10d95')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/4d29149f-2145-4bfd-9e10-77690eb10d95')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S23 - GNSS Jamming (Loss of Control/Availability)",
+        "description": "UAVDatalinkConn_CL의 JamIndicator가 UAV_Threshold_List의 MaxJamIndicator를 초과하고 동시에 LinkState가 Degraded/Lost인 경우 GNSS 재밍으로 인한 통제·가용성 상실로 탐지. 임계값은 Watchlist로 동적 산출. MITRE ICS ATT&CK: T0814(Denial of Service), T0813(Denial of Control), T0827(Loss of Control) / MITRE: T1498(근접기법)",
+        "severity": "High",
+        "enabled": true,
+        "query": "let alertWindow = 10m;\nlet jamGate = toscalar(_GetWatchlist('UAV_Threshold_List') | where ThresholdKey == 'MaxJamIndicator' | project todouble(Value) | take 1);\nUAVDatalinkConn_CL\n| where TimeGenerated > ago(alertWindow)\n| where isnotempty(UAVId)\n| where JamIndicator > jamGate\n| where LinkState in ('Degraded', 'Lost')\n| extend TriggerReason = strcat('GNSS_재밍_통제가용성상실_JamIndicator:', tostring(JamIndicator), '_LinkState:', LinkState)\n| extend Severity = iff(LinkState == 'Lost', 'High', 'Medium')\n| project TimeGenerated, UAVId, JamIndicator, LinkState, ChannelId, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "queryFrequency": "PT5M",
+        "queryPeriod": "PT15M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "Impact"
+        ],
+        "techniques": [
+          "T1498",
+          "T1499",
+          "T1489"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT2H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Host"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S23 - GNSS Jamming (Loss of Control/Availability) - {{UAVId}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | JamIndicator={{JamIndicator}} | LinkState={{LinkState}} | Severity={{Severity}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "JamIndicator": "JamIndicator",
+          "LinkState": "LinkState",
+          "Severity": "Severity"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "UAVId"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

@@ -1,0 +1,94 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/57119be0-b20e-497e-b8f7-a0cf7558ab08')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/57119be0-b20e-497e-b8f7-a0cf7558ab08')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S54 - File Upload WebShell / Deserialization RCE",
+        "description": "UAVWebAccess_CL에서 영상(imagery) 업로드 엔드포인트로 Content-Type은 image/*로 선언했으나 실제 파일 확장자가 실행/스크립트(php,jsp,pkl 등)인 콘텐츠타입 불일치 업로드 탐지. 웹셸 적재 또는 역직렬화 RCE 시도 의심. MITRE: T1505.003,T1059",
+        "severity": "High",
+        "enabled": true,
+        "query": "let alertWindow = 15m;\nlet execExtensions = dynamic([\".php\",\".php5\",\".phtml\",\".jsp\",\".jspx\",\".asp\",\".aspx\",\".exe\",\".sh\",\".pkl\",\".pickle\",\".py\"]);\nUAVWebAccess_CL\n| where TimeGenerated > ago(alertWindow)\n| where Method == \"POST\"\n| where Path has \"/imagery/upload\"\n| where ContentType startswith \"image/\"\n| extend FileExt = tolower(extract(@\"(\\.[A-Za-z0-9]+)$\", 1, UploadFileName))\n| where FileExt in (execExtensions)\n| extend TriggerReason = strcat(\"웹셸_역직렬화RCE_ContentType불일치_\", UploadFileName, \"_선언타입_\", ContentType)\n| extend Severity = \"High\"\n| project TimeGenerated, Operator, ClientIp, Path, ResourceId, ContentType, UploadFileName, FileExt, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "queryFrequency": "PT5M",
+        "queryPeriod": "PT15M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "Persistence",
+          "Execution"
+        ],
+        "techniques": [
+          "T1505",
+          "T1059"
+        ],
+        "subTechniques": [
+          "T1505.003"
+        ],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT5H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Account"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S54 - File Upload WebShell / Deserialization RCE - {{Operator}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | UploadFileName={{UploadFileName}} | ContentType={{ContentType}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "UploadFileName": "UploadFileName",
+          "ContentType": "ContentType",
+          "FileExt": "FileExt"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Account",
+            "fieldMappings": [
+              {
+                "identifier": "Name",
+                "columnName": "Operator"
+              }
+            ]
+          },
+          {
+            "entityType": "IP",
+            "fieldMappings": [
+              {
+                "identifier": "Address",
+                "columnName": "ClientIp"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

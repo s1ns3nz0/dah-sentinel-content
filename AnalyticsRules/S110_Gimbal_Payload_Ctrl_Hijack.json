@@ -1,0 +1,90 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/641e1214-a395-4e52-80d9-1e7d473f2645')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/641e1214-a395-4e52-80d9-1e7d473f2645')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S110 - Gimbal/Payload Control Hijacking (Unauthorized Sensor Pointing)",
+        "description": "UAVPayloadCtrl_CL의 gimbal_point/payload_arm/sensor_slew 명령에서 Operator가 Watchlist(Approved_Operators_List)에 없거나 Operator-UAVId 조합이 Watchlist(Operator_UAV_Binding_List)의 유효 바인딩에 없는 경우 탐지. 비인가 주체가 짐벌/페이로드 지향 명령을 탈취해 센서 지향을 조작하는 행위. MITRE ICS ATT&CK: T0831 / EMB3D 통제신호조작",
+        "severity": "Medium",
+        "enabled": true,
+        "query": "let alertWindow = 10m;\nlet ApprovedOps = _GetWatchlist('Approved_Operators_List') | project OperatorId;\nlet ValidBindings = _GetWatchlist('Operator_UAV_Binding_List') | project OperatorId, AllowedUAVId;\nUAVPayloadCtrl_CL\n| where TimeGenerated > ago(alertWindow)\n| where EventType in ('gimbal_point', 'payload_arm', 'sensor_slew')\n| extend isUnknownOp = Operator !in (ApprovedOps)\n| join kind=leftouter (ValidBindings) on $left.Operator == $right.OperatorId, $left.UAVId == $right.AllowedUAVId\n| extend isUnboundUAV = isnull(OperatorId)\n| where isUnknownOp or isUnboundUAV\n| extend TriggerReason = case(\n    isUnknownOp, strcat('페이로드지향_비인가_Operator_', Operator),\n    strcat('페이로드지향_UAV바인딩_불일치_', Operator, '_', UAVId))\n| extend Severity = 'Medium'\n| project TimeGenerated, UAVId, Operator, EventType, PayloadCommand, TargetLat, TargetLon, CommandSource, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "queryFrequency": "PT5M",
+        "queryPeriod": "PT15M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "Impact"
+        ],
+        "techniques": [
+          "T1565"
+        ],
+        "subTechniques": [
+          "T1565.002"
+        ],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT2H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Account"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S110 - Gimbal/Payload Control Hijacking (Unauthorized Sensor Pointing) - {{Operator}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Severity={{Severity}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "PayloadCommand": "PayloadCommand"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Account",
+            "fieldMappings": [
+              {
+                "identifier": "Name",
+                "columnName": "Operator"
+              }
+            ]
+          },
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "UAVId"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

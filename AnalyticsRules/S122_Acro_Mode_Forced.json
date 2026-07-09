@@ -1,0 +1,88 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/90ae4a17-b417-44f0-8aaa-a29e7c377811')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/90ae4a17-b417-44f0-8aaa-a29e7c377811')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S122 - ACRO/Manual Forced Destabilization",
+        "description": "UAVOpmode_CL에서 OpmodeField='acro_mode_forced'인 레코드 중 ObservedValue='ACRO'로 강제 전환되었고 Authorized=0(SByte)인 비인가 불안정화 탐지. 실제 컬럼: OpmodeField/ExpectedValue/ObservedValue/ChangedBy/Authorized(SByte). MITRE: T0836 Modify Parameter (자동 안정화가 없는 ACRO/수동 모드를 비인가로 강제 주입해 기체를 불안정화)",
+        "severity": "High",
+        "enabled": true,
+        "query": "let alertWindow = 10m;\nUAVOpmode_CL\n| where TimeGenerated > ago(alertWindow)\n| where OpmodeField == 'acro_mode_forced'\n| where ObservedValue == 'ACRO' and Authorized == 0\n| extend TriggerReason = strcat(\"ACRO강제전환_불안정화_\", UAVId, \"_\", ExpectedValue, \"->\", ObservedValue)\n| project TimeGenerated, UAVId, OpmodeField, ExpectedValue, ObservedValue, ChangedBy, Authorized, Seq, TriggerReason\n| order by TimeGenerated desc",
+        "queryFrequency": "PT5M",
+        "queryPeriod": "PT15M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "DefenseEvasion"
+        ],
+        "techniques": [
+          "T1562"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT5H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Host"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S122 - ACRO/Manual Forced Destabilization - {{UAVId}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | ChangedBy={{ChangedBy}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "Authorized": "Authorized"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "UAVId"
+              }
+            ]
+          },
+          {
+            "entityType": "Account",
+            "fieldMappings": [
+              {
+                "identifier": "Name",
+                "columnName": "ChangedBy"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

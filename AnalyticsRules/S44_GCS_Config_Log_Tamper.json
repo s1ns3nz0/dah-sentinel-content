@@ -1,0 +1,80 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/3bc34769-7c41-4b0f-b748-b9b7fdbdc1aa')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/3bc34769-7c41-4b0f-b748-b9b7fdbdc1aa')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S44 - GCS Config/Log Tampering (Unapproved Change)",
+        "description": "GCS 설정/로그 변조 탐지 — config_change 이벤트가 동일 ConfigKey에 대해 같은 30분 구간 내 config_change_approval(운영자 승인 기록)과 매칭되지 않는 경우를 탐지. bin(30m) 동치 조인으로 근사 시간대별 승인 여부를 판정(부등호는 조인 조건에 사용하지 않음). MITRE: T1565",
+        "severity": "Medium",
+        "enabled": true,
+        "query": "let alertWindow = 2h;\nlet binSize = 30m;\nlet Changes =\n    UAVGcsApp_CL\n    | where TimeGenerated > ago(alertWindow)\n    | where EventType == \"config_change\"\n    | extend TimeBin = bin(TimeGenerated, binSize)\n    | project ChangeTime = TimeGenerated, GcsHost, Operator, ConfigKey = ComponentName, ConfigValue = PayloadDetail, TimeBin;\nlet Approvals =\n    UAVGcsApp_CL\n    | where TimeGenerated > ago(alertWindow)\n    | where EventType == \"config_change_approval\"\n    | extend TimeBin = bin(TimeGenerated, binSize)\n    | project ConfigKey = ComponentName, ApprovalRef = SourceHost, TimeBin;\nChanges\n| join kind=leftouter (Approvals) on ConfigKey, TimeBin\n| where isnull(ApprovalRef)\n| extend TriggerReason = strcat(\"GCS_설정변조_미승인_\", ConfigKey)\n| extend Severity = \"Medium\"\n| project TimeGenerated = ChangeTime, GcsHost, Operator, ConfigKey, ConfigValue, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "queryFrequency": "PT15M",
+        "queryPeriod": "PT3H",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "Impact"
+        ],
+        "techniques": [
+          "T1565"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT2H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Host"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S44 - GCS Config/Log Tampering (Unapproved Change) - {{GcsHost}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | ConfigKey={{ConfigKey}} | ConfigValue={{ConfigValue}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "ConfigKey": "ConfigKey",
+          "Operator": "Operator"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "GcsHost"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

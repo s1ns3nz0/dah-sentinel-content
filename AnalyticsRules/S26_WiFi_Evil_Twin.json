@@ -1,0 +1,82 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/14c9e1e9-4ae1-4607-ba89-ef52fce41982')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/14c9e1e9-4ae1-4607-ba89-ef52fce41982')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S26 - WiFi Evil Twin (Rogue AP C2 Hijack)",
+        "description": "UAVWifi_CL에서 동일 SSID가 서로 다른 BSSID(2개 이상)로 동시에 비콘 프레임을 송출하면 Evil Twin(Rogue AP)에 의한 C2 하이재킹 시도로 탐지. MITRE: T1557",
+        "severity": "Medium",
+        "enabled": true,
+        "query": "let alertWindow = 15m;\nUAVWifi_CL\n| where TimeGenerated > ago(alertWindow)\n| where FrameType == 'beacon'\n| summarize BSSIDCount = dcount(BSSID), BSSIDs = make_set(BSSID), LastSeen = max(TimeGenerated) by SSID, UAVId\n| where BSSIDCount > 1\n| extend TriggerReason = strcat('WiFi_EvilTwin_동일SSID_상이BSSID_', SSID, '_', tostring(BSSIDCount), '개')\n| extend Severity = 'Medium'\n| project TimeGenerated = LastSeen, UAVId, SSID, BSSIDCount, BSSIDs, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "queryFrequency": "PT10M",
+        "queryPeriod": "PT15M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "CredentialAccess",
+          "Collection"
+        ],
+        "techniques": [
+          "T1557"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT2H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Host"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S26 - WiFi Evil Twin (Rogue AP C2 Hijack) - {{UAVId}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | SSID={{SSID}} | BSSIDCount={{BSSIDCount}} | Severity={{Severity}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "SSID": "SSID",
+          "BSSIDCount": "BSSIDCount",
+          "Severity": "Severity"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "UAVId"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

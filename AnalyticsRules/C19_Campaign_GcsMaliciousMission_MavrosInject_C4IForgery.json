@@ -1,0 +1,84 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/3fcc873c-5ab8-4c47-a50e-65f07e6288ee')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/3fcc873c-5ab8-4c47-a50e-65f07e6288ee')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV Campaign C19 - Malicious GCS Mission Upload → MAVROS Command Injection → Forged C4I Command",
+        "description": "3단계 킬체인(2/3 단계 이상 관측 시 트리거, near-miss 허용): GCS 악성미션→MAVROS 명령주입→C4I 위조명령(지상 관통). 체인: Malicious GCS Mission Upload(S41) → MAVROS Command Injection(S47) → Forged C4I Command(S84). 연결키: UAVId. MITRE: T1204.002, T1059, T1565.002",
+        "severity": "High",
+        "enabled": true,
+        "query": "let windowSize = 1h;\n\n// S41: Malicious GCS Mission Upload — GCS 미션 업로드 로그에 기록된 대상 UAV 자산 ID\nlet S41 =\n    UAVGcsApp_CL\n    | where TimeGenerated > ago(windowSize)\n    | where EventType == 'malicious_mission_upload'\n    | extend Stage = 'S41', UAVId = tostring(TargetUAVId)\n    | where isnotempty(UAVId)\n    | project TimeGenerated, Stage, UAVId;\n\n// S47: MAVROS Command Injection\nlet S47 =\n    UAVRos_CL\n    | where TimeGenerated > ago(windowSize)\n    | where EventType == 'mavros_cmd_injection'\n    | extend Stage = 'S47', UAVId = tostring(UAVId)\n    | where isnotempty(UAVId)\n    | project TimeGenerated, Stage, UAVId;\n\n// S84: Forged C4I Command — C4I 위조명령 로그에 기록된 대상 UAV 자산 ID\nlet S84 =\n    UAVC4I_CL\n    | where TimeGenerated > ago(windowSize)\n    | where EventType == 'forged_command'\n    | extend Stage = 'S84', UAVId = tostring(TargetUAVId)\n    | where isnotempty(UAVId)\n    | project TimeGenerated, Stage, UAVId;\n\nunion S41, S47, S84\n| summarize StagesSeen = make_set(Stage), StageCount = dcount(Stage), FirstSeen = min(TimeGenerated), LastSeen = max(TimeGenerated) by UAVId\n| where StageCount >= 2\n| extend CampaignType = \"C19_GCS악성미션_MAVROS명령주입_C4I위조\"\n| extend StepSummary = strcat(\"Stages=\", tostring(StagesSeen), \" | First=\", tostring(FirstSeen), \" | Last=\", tostring(LastSeen))\n| extend Severity = \"High\"\n| project FirstSeen, LastSeen, UAVId, StagesSeen, StageCount, CampaignType, StepSummary, Severity",
+        "queryFrequency": "PT10M",
+        "queryPeriod": "PT1H",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "Execution",
+          "Impact"
+        ],
+        "techniques": [
+          "T1204.002",
+          "T1059",
+          "T1565.002"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": true,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT2H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Host"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "[CAMPAIGN] UAV Campaign C19 - Malicious GCS Mission Upload → MAVROS Command Injection → Forged C4I Command - {{UAVId}}",
+          "alertDescriptionFormat": "CampaignType={{CampaignType}} | Steps={{StepSummary}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "CampaignType": "CampaignType",
+          "StepSummary": "StepSummary",
+          "UAVId": "UAVId",
+          "StageCount": "StageCount"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "UAVId"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

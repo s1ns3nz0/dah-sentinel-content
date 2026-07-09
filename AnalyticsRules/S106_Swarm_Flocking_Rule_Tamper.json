@@ -1,0 +1,78 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/9dd44c60-f43a-47a8-bae5-bfc8d7fd964a')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/9dd44c60-f43a-47a8-bae5-bfc8d7fd964a')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S106 - Flocking Rule Parameter Tampering (Separation/Alignment/Cohesion)",
+        "description": "UAVSwarmComms_CL의 flock_rule_update 메시지에서 RuleParam(separation/alignment/cohesion)의 ValueBefore 대비 ValueAfter 변화율이 30% 초과하는 flocking 규칙 변조 탐지. MITRE: T0836 Modify Parameter (ICS — description 참조)",
+        "severity": "Medium",
+        "enabled": true,
+        "query": "let alertWindow = 10m;\nlet changeThresholdPct = 30.0;\nUAVSwarmComms_CL\n| where TimeGenerated > ago(alertWindow)\n| where MessageType == \"flock_rule_update\"\n| where isnotnull(ValueBefore) and isnotnull(ValueAfter) and ValueBefore != 0\n| extend PctChange = abs((ValueAfter - ValueBefore) / ValueBefore) * 100\n| where PctChange > changeThresholdPct\n| extend TriggerReason = strcat(\"flocking규칙변조_\", RuleParam, \"_변경률_\", tostring(toint(PctChange)), \"%_이전:\", tostring(ValueBefore), \"_이후:\", tostring(ValueAfter))\n| extend Severity = \"Medium\"\n| project TimeGenerated, SwarmId, MemberId, UAVId, MessageType, RuleParam, ValueBefore, ValueAfter, PctChange, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "queryFrequency": "PT5M",
+        "queryPeriod": "PT15M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "Impact"
+        ],
+        "techniques": [],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": false,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT5H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S106 - Flocking Rule Parameter Tampering - {{UAVId}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Severity={{Severity}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "RuleParam": "RuleParam",
+          "ValueBefore": "ValueBefore",
+          "ValueAfter": "ValueAfter",
+          "PctChange": "PctChange"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "UAVId"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

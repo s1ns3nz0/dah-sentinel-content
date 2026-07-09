@@ -1,0 +1,88 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/e13e7071-8f83-4672-a565-69ca898c9bb9')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/e13e7071-8f83-4672-a565-69ca898c9bb9')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S114 - Survey Grid Parameter Tamper (Unauthorized Survey Grid Modification)",
+        "description": "UAVOpmode_CL에서 OpmodeField='survey_grid_params'인 레코드 중 ExpectedValue(승인된 측량 격자 파라미터)와 ObservedValue(실제 적용값)가 불일치하고 Authorized=0(SByte)인 비인가 변조 탐지. 실제 컬럼: OpmodeField/ExpectedValue/ObservedValue/ChangedBy/Authorized(SByte). MITRE: T0836 Modify Parameter (측량 임무의 격자 파라미터를 비인가로 변경해 커버리지·수집구역을 조작)",
+        "severity": "Low",
+        "enabled": true,
+        "query": "let alertWindow = 10m;\nUAVOpmode_CL\n| where TimeGenerated > ago(alertWindow)\n| where OpmodeField == 'survey_grid_params'\n| where ExpectedValue != ObservedValue and Authorized == 0\n| extend TriggerReason = strcat(\"측량격자_비인가변조_\", UAVId, \"_\", ExpectedValue, \"->\", ObservedValue)\n| project TimeGenerated, UAVId, OpmodeField, ExpectedValue, ObservedValue, ChangedBy, Authorized, Seq, TriggerReason\n| order by TimeGenerated desc",
+        "queryFrequency": "PT5M",
+        "queryPeriod": "PT15M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "DefenseEvasion"
+        ],
+        "techniques": [
+          "T1562"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT5H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Host"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S114 - Survey Grid Parameter Tamper (Unauthorized Survey Grid Modification) - {{UAVId}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | ChangedBy={{ChangedBy}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "Authorized": "Authorized"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "UAVId"
+              }
+            ]
+          },
+          {
+            "entityType": "Account",
+            "fieldMappings": [
+              {
+                "identifier": "Name",
+                "columnName": "ChangedBy"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

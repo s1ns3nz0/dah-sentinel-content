@@ -1,0 +1,79 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/835a9443-d6ce-4735-a6bf-ffd5ed860f57')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/835a9443-d6ce-4735-a6bf-ffd5ed860f57')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S2 - Parameter Tampering (ARMING_CHECK/Safety Config Bypass)",
+        "description": "UAV 안전 파라미터 변조 탐지. 공격자가 MAVLink PARAM_SET으로 ARMING_CHECK/BRD_SAFETYENABLE/SIM_GPS_* 등 비행통제 컨트롤러 태스킹·안전설정 파라미터를 변경해 이륙전 안전점검을 무력화하거나 GNSS 스푸핑 사전조건을 조성하는 행위 탐지. UAVConfigAudit_CL의 param_changed 이벤트 기준. MITRE ICS ATT&CK: T0821·T0836 / EMB3D 파라미터변조",
+        "severity": "High",
+        "enabled": true,
+        "query": "let alertWindow = 1h;\nlet DangerousParams = dynamic(['ARMING_CHECK','FS_GCS_ENABL','FS_THR_ENABLE','FS_BATT_ENABLE','BRD_SAFETYENABLE','SIM_GPS_DISABLE','SIM_GPS_GLITCH_X','SIM_GPS_GLITCH_Y','SIM_GPS_GLITCH_Z']);\nUAVConfigAudit_CL\n| where TimeGenerated > ago(alertWindow)\n| where EventType == 'param_changed'\n| where ParamId in (DangerousParams)\n| extend TriggerReason = case(\n    ParamId == 'ARMING_CHECK' and ParamValueAfter == 0, '이륙전_안전점검_비활성화',\n    ParamId startswith 'FS_' and ParamValueAfter == 0, 'Failsafe_비활성화',\n    ParamId == 'BRD_SAFETYENABLE' and ParamValueAfter == 0, '하드웨어_안전스위치_비활성화',\n    ParamId startswith 'SIM_GPS_', 'GNSS_스푸핑_사전조건_파라미터_변경',\n    '위험_파라미터_변경'\n)\n| extend DetectionDetail = strcat('ParamId:', ParamId, '|Before:', ParamValueBefore, '|After:', ParamValueAfter, '|Source:', Source)\n| project TimeGenerated, UAVId, TriggerReason, DetectionDetail, ParamId, ParamValueBefore, ParamValueAfter, Source\n| sort by TimeGenerated desc",
+        "queryFrequency": "PT5M",
+        "queryPeriod": "PT1H",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "DefenseEvasion"
+        ],
+        "techniques": [
+          "T1562"
+        ],
+        "subTechniques": [
+          "T1562.001"
+        ],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": false,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT5H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S2 - Parameter Tampering (ARMING_CHECK/Safety Config Bypass) - {{UAVId}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | {{DetectionDetail}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "ParamId": "ParamId"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "UAVId"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

@@ -1,0 +1,81 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/88660e79-e7b7-4b9a-b1ce-8a5ac788ecb1')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/88660e79-e7b7-4b9a-b1ce-8a5ac788ecb1')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S19 - SOC Alert Capacity Threshold Exceeded",
+        "description": "UAVSocLoad_CL의 10분 윈도우 알림 처리량(AlertCountPerWindow)이 UAV_Threshold_List의 MaxSocAlertPerWindow(동시 처리 가능 임계)를 초과하면 SOC 용량 초과(알림 폭주로 인한 탐지 사각 발생 위험)로 탐지. 임계값은 Watchlist로 동적 산출(고정값 아님). MITRE ICS ATT&CK: T0814(Denial of Service — 방어 체계 자체를 알림 폭주로 무력화하는 가용성 공격 계열, Enterprise 근접기법 T1499로 매핑)",
+        "severity": "High",
+        "enabled": true,
+        "query": "let alertWindow = 10m;\nlet capacityThreshold = toscalar(_GetWatchlist('UAV_Threshold_List') | where ThresholdKey == 'MaxSocAlertPerWindow' | project toint(Value) | take 1);\nUAVSocLoad_CL\n| where TimeGenerated > ago(alertWindow)\n| summarize AlertCountPerWindow = sum(AlertCount), AnalystsOnDuty = max(AnalystsOnDuty), QueueDepth = max(QueueDepth) by SocId, TimeBin = bin(TimeGenerated, alertWindow)\n| extend CapacityThreshold = capacityThreshold\n| extend Exceeded = AlertCountPerWindow > CapacityThreshold\n| where Exceeded\n| extend TriggerReason = strcat('SOC_알림처리한계_초과_', SocId, '_', tostring(AlertCountPerWindow), '/', tostring(capacityThreshold))\n| extend Severity = iff(AlertCountPerWindow > capacityThreshold * 2, 'High', 'Medium')\n| project TimeGenerated = TimeBin, SocId, AlertCountPerWindow, CapacityThreshold, Exceeded, QueueDepth, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "queryFrequency": "PT10M",
+        "queryPeriod": "PT15M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "Impact"
+        ],
+        "techniques": [
+          "T1499"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT2H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Host"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S19 - SOC Alert Capacity Threshold Exceeded - {{SocId}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | AlertCountPerWindow={{AlertCountPerWindow}} | CapacityThreshold={{CapacityThreshold}} | Severity={{Severity}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "AlertCountPerWindow": "AlertCountPerWindow",
+          "CapacityThreshold": "CapacityThreshold",
+          "Exceeded": "Exceeded"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "SocId"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

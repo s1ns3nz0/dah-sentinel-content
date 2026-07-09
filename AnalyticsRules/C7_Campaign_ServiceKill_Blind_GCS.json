@@ -15,7 +15,7 @@
       "apiVersion": "2023-12-01-preview",
       "properties": {
         "displayName": "UAV Campaign C7 - Container Kill → Detection Blind Spot → GCS Breach",
-        "description": "telemetry-tap 강제 중단(S23, ActorId 컬럼) → 20분 내 GCS 비인가 로그인(S6, Operator 컬럼). 시간 인접성 체인. 실제 컬럼: ActorId(Operator 아님), Operator(OperatorId 아님). MITRE: T0881, T1078",
+        "description": "telemetry-tap 강제 중단(S23, ActorId 컬럼) → 20분 내 GCS 비인가 로그인(S6, Operator 컬럼). 시간 인접성 체인. 실제 컬럼: ActorId(Operator 아님), Operator(OperatorId 아님). MITRE: T1489, T1078",
         "severity": "High",
         "enabled": true,
         "query": "let windowSize = 30m;\nlet ApprovedOps = _GetWatchlist('Approved_Arm_Operator_List') | project OperatorId;\n// S23: telemetry-tap 강제 중단 시각 (전역 스칼라)\nlet S23_Time = toscalar(\n    UAVServiceAudit_CL\n    | where TimeGenerated > ago(windowSize)\n    | where ContainerName == 'telemetry-tap'\n    | where Action in ('stop', 'kill')\n    | summarize min(TimeGenerated));\n// S6: 탐지 맹점 구간 내 GCS 비인가 로그인\nUAVOpAudit_CL\n| where TimeGenerated > ago(windowSize)\n| where EventType == 'login_success'\n| where Operator !in (ApprovedOps)\n| where isnotnull(S23_Time) and TimeGenerated >= S23_Time and TimeGenerated <= S23_Time + 20m\n| extend T1 = S23_Time, T2 = TimeGenerated\n| extend BlindWindowMin = datetime_diff('minute', T2, T1)\n| extend CampaignType = \"C7_서비스중단_탐지맹점_GCS침해\"\n| extend StepSummary = strcat(\"S23@\", tostring(T1), \"(telemetry-tap종료)→S6@\", tostring(T2), \"(맹점\", tostring(BlindWindowMin), \"분후)\")\n| extend Severity = \"High\"\n| project T1, T2, Operator, ClientIp, BlindWindowMin, CampaignType, StepSummary, Severity",
@@ -30,7 +30,10 @@
           "Execution",
           "Impact"
         ],
-        "techniques": [],
+        "techniques": [
+          "T1489",
+          "T1078"
+        ],
         "subTechniques": [],
         "alertRuleTemplateName": null,
         "incidentConfiguration": {

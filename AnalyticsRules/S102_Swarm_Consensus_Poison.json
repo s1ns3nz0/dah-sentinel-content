@@ -1,0 +1,77 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/81757e80-34a9-45ed-915a-0737d94d9d28')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/81757e80-34a9-45ed-915a-0737d94d9d28')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S102 - Swarm Consensus Poisoning (Byzantine)",
+        "description": "UAVSwarmComms_CL의 consensus_vote 메시지에서 ConflictingStateVotes>0 또는 ByzantineThresholdExceeded=true인 군집 합의(Consensus) 포이즈닝 탐지. MITRE: T0832 Manipulation of View (ICS — description 참조)",
+        "severity": "High",
+        "enabled": true,
+        "query": "let alertWindow = 10m;\nUAVSwarmComms_CL\n| where TimeGenerated > ago(alertWindow)\n| where MessageType == \"consensus_vote\"\n| where ByzantineThresholdExceeded == true or ConflictingStateVotes > 0\n| extend TriggerReason = strcat(\"합의포이즈닝_충돌투표_\", tostring(ConflictingStateVotes), \"건_비잔틴임계초과_\", tostring(ByzantineThresholdExceeded))\n| extend Severity = \"High\"\n| project TimeGenerated, SwarmId, MemberId, UAVId, MessageType, ConflictingStateVotes, ByzantineThresholdExceeded, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "queryFrequency": "PT5M",
+        "queryPeriod": "PT15M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "Impact"
+        ],
+        "techniques": [],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": false,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT5H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S102 - Swarm Consensus Poisoning (Byzantine) - {{UAVId}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Severity={{Severity}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "ConflictingStateVotes": "ConflictingStateVotes",
+          "ByzantineThresholdExceeded": "ByzantineThresholdExceeded",
+          "SwarmId": "SwarmId"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "UAVId"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

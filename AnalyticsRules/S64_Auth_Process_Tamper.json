@@ -1,0 +1,82 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/9afcc392-c295-46ee-bf27-3437322e7be5')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/9afcc392-c295-46ee-bf27-3437322e7be5')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S64 - Authentication Process Tamper (Auth-Stub Backdoor)",
+        "description": "UAVOpAudit_CL에서 auth-service 바이너리 해시가 24h 베이스라인 다수해시와 불일치하거나, 로그인 성공률이 100%로 치솟는(항상통과 백도어 의심) 이상 탐지. MITRE: T1556",
+        "severity": "High",
+        "enabled": true,
+        "query": "let baselineWindow = 24h;\nlet alertWindow = 15m;\nlet successRateGate = 1.0;\nlet minAttempts = 10;\nlet BaselineHash = toscalar(\n    UAVOpAudit_CL\n    | where TimeGenerated between (ago(baselineWindow) .. ago(alertWindow))\n    | where ServiceName == \"auth-service\" and EventType == \"login_attempt\"\n    | summarize HashCount = count() by BinaryHash\n    | top 1 by HashCount desc\n    | project BinaryHash\n);\nUAVOpAudit_CL\n| where TimeGenerated > ago(alertWindow)\n| where ServiceName == \"auth-service\" and EventType == \"login_attempt\"\n| summarize SuccessCount = countif(Result == \"success\"), FailCount = countif(Result == \"fail\"), TotalCount = count(),\n    (LastSeen, CurrentHash) = arg_max(TimeGenerated, BinaryHash) by System\n| extend SuccessRate = todouble(SuccessCount) / TotalCount\n| extend HashMismatch = (CurrentHash != BaselineHash)\n| where TotalCount >= minAttempts and (SuccessRate >= successRateGate or HashMismatch)\n| extend TriggerReason = case(\n    HashMismatch and SuccessRate >= successRateGate, \"인증바이너리해시불일치_전수성공_백도어의심\",\n    HashMismatch, \"인증바이너리해시불일치_백도어의심\",\n    \"인증프로세스_100%성공률_이상\")\n| extend Severity = \"High\"\n| project LastSeen, System, SuccessCount, FailCount, TotalCount, SuccessRate, CurrentHash, BaselineHash, HashMismatch, TriggerReason, Severity\n| order by LastSeen desc",
+        "queryFrequency": "PT10M",
+        "queryPeriod": "P1D",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "Credential Access",
+          "Defense Evasion"
+        ],
+        "techniques": [
+          "T1556"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT5H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Host"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S64 - Authentication Process Tamper (Auth-Stub Backdoor) - {{System}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | SuccessRate={{SuccessRate}} | HashMismatch={{HashMismatch}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "SuccessRate": "SuccessRate",
+          "CurrentHash": "CurrentHash",
+          "HashMismatch": "HashMismatch"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "System"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

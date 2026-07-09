@@ -1,0 +1,82 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/5c11c0ad-1f57-4685-a30b-658f3eb9da3e')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/5c11c0ad-1f57-4685-a30b-658f3eb9da3e')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV Campaign C8 - GNSS/RF Jamming → Navigation Reject/Mission Fail → AOI Excursion/Mission Fail",
+        "description": "3단계 킬체인(2/3 단계 이상 관측 시 트리거, near-miss 허용): GNSS재밍→항법거부→AOI이탈/임무실패. 체인: GNSS/RF Jamming(S23) → Navigation Reject/Mission Fail(S109) → AOI Excursion/Mission Fail(S5). 연결키: UAVId. MITRE: T1499, T1565.002",
+        "severity": "High",
+        "enabled": true,
+        "query": "let windowSize = 1h;\n\n// S23: GNSS/RF Jamming\nlet S23 =\n    UAVDatalinkConn_CL\n    | where TimeGenerated > ago(windowSize)\n    | where ConnEvent == 'signal_jam' or RssiDrop_dB > 15\n    | extend Stage = 'S23', UAVId = tostring(UAVId)\n    | where isnotempty(UAVId)\n    | project TimeGenerated, Stage, UAVId;\n\n// S109: Navigation Reject/Mission Fail\nlet S109 =\n    UAVMission_CL\n    | where TimeGenerated > ago(windowSize)\n    | where EventType in ('nav_reject','mission_fail')\n    | extend Stage = 'S109', UAVId = tostring(UAVId)\n    | where isnotempty(UAVId)\n    | project TimeGenerated, Stage, UAVId;\n\n// S5: AOI Excursion/Mission Fail\nlet S5 =\n    UAVAlarm_CL\n    | where TimeGenerated > ago(windowSize)\n    | where AlarmType in ('AOI_BREACH','MISSION_ABORT','NAV_FAIL')\n    | extend Stage = 'S5', UAVId = tostring(UAVId)\n    | where isnotempty(UAVId)\n    | project TimeGenerated, Stage, UAVId;\n\nunion S23, S109, S5\n| summarize StagesSeen = make_set(Stage), StageCount = dcount(Stage), FirstSeen = min(TimeGenerated), LastSeen = max(TimeGenerated) by UAVId\n| where StageCount >= 2\n| extend CampaignType = \"C8_GNSS재밍_항법거부_AOI이탈\"\n| extend StepSummary = strcat(\"Stages=\", tostring(StagesSeen), \" | First=\", tostring(FirstSeen), \" | Last=\", tostring(LastSeen))\n| extend Severity = \"High\"\n| project FirstSeen, LastSeen, UAVId, StagesSeen, StageCount, CampaignType, StepSummary, Severity",
+        "queryFrequency": "PT10M",
+        "queryPeriod": "PT1H",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "Impact"
+        ],
+        "techniques": [
+          "T1499",
+          "T1565.002"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": true,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT2H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Host"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "[CAMPAIGN] UAV Campaign C8 - GNSS/RF Jamming → Navigation Reject/Mission Fail → AOI Excursion/Mission Fail - {{UAVId}}",
+          "alertDescriptionFormat": "CampaignType={{CampaignType}} | Steps={{StepSummary}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "CampaignType": "CampaignType",
+          "StepSummary": "StepSummary",
+          "UAVId": "UAVId",
+          "StageCount": "StageCount"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "UAVId"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

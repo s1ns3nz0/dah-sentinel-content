@@ -1,0 +1,94 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/db5d3078-169d-4be1-aacf-e2dc6a2bea99')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/db5d3078-169d-4be1-aacf-e2dc6a2bea99')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S57 - Cron / World-Writable PATH Hijacking",
+        "description": "UAVHostAudit_CL에서 world-writable 디렉터리(/tmp,/var/tmp,/dev/shm) 내부에 새로운 cron 엔트리가 생성되는 PATH 하이재킹형 지속성 확보 탐지. MITRE: T1053.003,T1546",
+        "severity": "High",
+        "enabled": true,
+        "query": "let alertWindow = 15m;\nUAVHostAudit_CL\n| where TimeGenerated > ago(alertWindow)\n| where EventType == \"cron_add\"\n| where FilePath startswith \"/tmp\" or FilePath startswith \"/var/tmp\" or FilePath startswith \"/dev/shm\"\n    or ExecArgs has_any (\"/tmp\", \"/var/tmp\", \"/dev/shm\")\n| extend TriggerReason = strcat(\"cron_worldwritable_PATH하이재킹_\", FilePath)\n| extend Severity = \"High\"\n| project TimeGenerated, UAVId, ActorId, Binary, ExecArgs, FilePath, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "queryFrequency": "PT5M",
+        "queryPeriod": "PT15M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "Persistence",
+          "Privilege Escalation"
+        ],
+        "techniques": [
+          "T1053",
+          "T1546"
+        ],
+        "subTechniques": [
+          "T1053.003"
+        ],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT5H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Host"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S57 - Cron / World-Writable PATH Hijacking - {{UAVId}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | FilePath={{FilePath}} | ExecArgs={{ExecArgs}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "FilePath": "FilePath",
+          "ExecArgs": "ExecArgs",
+          "Binary": "Binary"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "UAVId"
+              }
+            ]
+          },
+          {
+            "entityType": "Account",
+            "fieldMappings": [
+              {
+                "identifier": "Name",
+                "columnName": "ActorId"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

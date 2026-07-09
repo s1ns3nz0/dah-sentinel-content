@@ -1,0 +1,81 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/748f37ea-8d25-4983-a81d-6e797a37a2f7')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/748f37ea-8d25-4983-a81d-6e797a37a2f7')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S10 - Barometer Spoofing (Altitude Stealthy Drift)",
+        "description": "UAVSensorFault_CL의 baro(기압계) 센서에서 매 표본의 DeltaRate가 EkfInnovationGate 미만으로 유지되어 EKF에 매번 Accepted=true로 수용되면서도, 관측 구간 시작~끝 사이 ActualValue(고도) 누적 변화량이 게이트의 5배를 초과하는 완만한 램프 주입 패턴 탐지. 고도 기만으로 지형충돌/조기착륙 유발 가능. MITRE ICS ATT&CK: T0806 / EMB3D 센서변조(스텔스 램프 인젝션)",
+        "severity": "Medium",
+        "enabled": true,
+        "query": "let alertWindow = 1h;\nlet minSamples = 5;\nlet stealthMargin = 5.0;\nUAVSensorFault_CL\n| where TimeGenerated > ago(alertWindow)\n| where SensorType == 'baro'\n| where Accepted == true\n| where abs(DeltaRate) < EkfInnovationGate\n| summarize\n    (FirstTime, FirstActual) = arg_min(TimeGenerated, ActualValue),\n    (LastTime, LastActual) = arg_max(TimeGenerated, ActualValue),\n    SampleCount = count(),\n    AcceptedCount = countif(Accepted),\n    MaxAbsDeltaRate = max(abs(DeltaRate)),\n    MinGate = min(EkfInnovationGate)\n    by UAVId, SensorType\n| where SampleCount >= minSamples and AcceptedCount == SampleCount\n| extend CumulativeDrift = abs(LastActual - FirstActual)\n| where MaxAbsDeltaRate < MinGate\n| where CumulativeDrift > (MinGate * stealthMargin)\n| extend TriggerReason = strcat('기압계_스텔스_고도드리프트_누적', tostring(round(CumulativeDrift,4)), '_게이트', tostring(round(MinGate,4)))\n| extend Severity = 'Medium'\n| project FirstTime, LastTime, UAVId, SensorType, SampleCount, CumulativeDrift, MaxAbsDeltaRate, MinGate, TriggerReason, Severity\n| order by LastTime desc",
+        "queryFrequency": "PT10M",
+        "queryPeriod": "PT1H",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "Impact"
+        ],
+        "techniques": [
+          "T1565"
+        ],
+        "subTechniques": [
+          "T1565.002"
+        ],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT2H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Host"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S10 - Barometer Spoofing (Altitude Stealthy Drift) - {{UAVId}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Severity={{Severity}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "CumulativeDrift": "CumulativeDrift"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "UAVId"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

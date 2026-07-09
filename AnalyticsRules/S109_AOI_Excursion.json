@@ -1,0 +1,79 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/da512084-ad95-4782-9866-753bcf9384f8')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/da512084-ad95-4782-9866-753bcf9384f8')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S109 - AOI Excursion (Unauthorized Area of Interest Departure)",
+        "description": "UAV가 AOI_Boundary_List 구역을 이탈하고 최소속도 이상 비행 중 탐지. 실제 컬럼: Groundspeed_ms(Groundspeed 아님), MissionId 없음(UAVId 기반). AOI는 MinLat/MaxLat/MinLon/MaxLon 방식으로 판정. MITRE ICS ATT&CK: T0831 Manipulation of Control (승인되지 않은 항로 변경으로 비행 통제권이 조작되어 지정 구역을 이탈)",
+        "severity": "Medium",
+        "enabled": true,
+        "query": "let alertWindow = 15m;\nlet minSpeed = toscalar(\n    _GetWatchlist('UAV_Threshold_List')\n    | where ThresholdKey == 'MinGroundspeed_ms'\n    | project toreal(Value));\n// AOI 박스 3개를 개별 scalar로 추출 (Watch List 행 수 고정 가정)\nlet aoi1MinLat = toscalar(_GetWatchlist('AOI_Boundary_List') | where MissionId == 'mpd_recon' | project toreal(MinLat));\nlet aoi1MaxLat = toscalar(_GetWatchlist('AOI_Boundary_List') | where MissionId == 'mpd_recon' | project toreal(MaxLat));\nlet aoi1MinLon = toscalar(_GetWatchlist('AOI_Boundary_List') | where MissionId == 'mpd_recon' | project toreal(MinLon));\nlet aoi1MaxLon = toscalar(_GetWatchlist('AOI_Boundary_List') | where MissionId == 'mpd_recon' | project toreal(MaxLon));\nlet aoi2MinLat = toscalar(_GetWatchlist('AOI_Boundary_List') | where MissionId == 'mpd_attack' | project toreal(MinLat));\nlet aoi2MaxLat = toscalar(_GetWatchlist('AOI_Boundary_List') | where MissionId == 'mpd_attack' | project toreal(MaxLat));\nlet aoi2MinLon = toscalar(_GetWatchlist('AOI_Boundary_List') | where MissionId == 'mpd_attack' | project toreal(MinLon));\nlet aoi2MaxLon = toscalar(_GetWatchlist('AOI_Boundary_List') | where MissionId == 'mpd_attack' | project toreal(MaxLon));\nlet aoi3MinLat = toscalar(_GetWatchlist('AOI_Boundary_List') | where MissionId == 'mpd_escort' | project toreal(MinLat));\nlet aoi3MaxLat = toscalar(_GetWatchlist('AOI_Boundary_List') | where MissionId == 'mpd_escort' | project toreal(MaxLat));\nlet aoi3MinLon = toscalar(_GetWatchlist('AOI_Boundary_List') | where MissionId == 'mpd_escort' | project toreal(MinLon));\nlet aoi3MaxLon = toscalar(_GetWatchlist('AOI_Boundary_List') | where MissionId == 'mpd_escort' | project toreal(MaxLon));\nUAVTelemetry_CL\n| where TimeGenerated > ago(alertWindow)\n| where MsgType == 'GLOBAL_POSITION_INT'\n| where Groundspeed_ms > minSpeed\n| where isnotnull(Lat) and isnotnull(Lon)\n| extend InAoi1 = Lat >= aoi1MinLat and Lat <= aoi1MaxLat and Lon >= aoi1MinLon and Lon <= aoi1MaxLon\n| extend InAoi2 = Lat >= aoi2MinLat and Lat <= aoi2MaxLat and Lon >= aoi2MinLon and Lon <= aoi2MaxLon\n| extend InAoi3 = Lat >= aoi3MinLat and Lat <= aoi3MaxLat and Lon >= aoi3MinLon and Lon <= aoi3MaxLon\n| where not(InAoi1) and not(InAoi2) and not(InAoi3)\n| summarize ExcursionCount=count(), FirstSeen=min(TimeGenerated), AvgLat=avg(Lat), AvgLon=avg(Lon)\n    by UAVId, bin(TimeGenerated, 5m)\n| where ExcursionCount >= 3\n| extend TriggerReason = strcat(\"AOI_이탈_\", tostring(ExcursionCount), \"회_UAVId:\", UAVId)\n| extend Severity = \"Medium\"\n| project FirstSeen, UAVId, ExcursionCount, AvgLat, AvgLon, TriggerReason, Severity\n| order by FirstSeen desc",
+        "queryFrequency": "PT5M",
+        "queryPeriod": "PT20M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "Impact"
+        ],
+        "techniques": [
+          "T1499"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT5H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Host"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S109 - AOI Excursion (Unauthorized Area of Interest Departure) - {{UAVId}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Severity={{Severity}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "ExcursionCount": "ExcursionCount"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "UAVId"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

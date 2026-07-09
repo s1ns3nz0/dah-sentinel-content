@@ -1,0 +1,80 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/e57d38c8-c40f-4626-9c94-ef66c7815c16')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/e57d38c8-c40f-4626-9c94-ef66c7815c16')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S50 - GDT NTP Time Server Spoofing",
+        "description": "GDT(지상 데이터터미널) NTP 타임서버 스푸핑 탐지 — UAVDatalinkInfra_CL의 ntp_sync 이벤트에서 동기화 대상 호스트(RemoteHost)가 Trusted_NTP_Source_List에 없거나, 시간 오프셋(NumericValue, ms)이 UAV_Threshold_List의 MaxNtpOffsetMs를 초과한 경우를 탐지 — 정상 NTP 소스가 아닌 곳으로부터의 시간 조작은 로그 타임스탬프 위조/재전송(replay) 공격의 발판이 됨. MITRE: T1195",
+        "severity": "High",
+        "enabled": true,
+        "query": "let maxOffsetMs = toscalar(\n    _GetWatchlist('UAV_Threshold_List')\n    | where ThresholdKey == 'MaxNtpOffsetMs'\n    | project toreal(Value));\nlet trustedNtp = _GetWatchlist('Trusted_NTP_Source_List') | project NtpHost;\nlet alertWindow = 10m;\nUAVDatalinkInfra_CL\n| where TimeGenerated > ago(alertWindow)\n| where EventType == \"ntp_sync\"\n| where abs(toreal(NumericValue)) > maxOffsetMs or RemoteHost !in (trustedNtp)\n| extend TriggerReason = case(\n    RemoteHost !in (trustedNtp) and abs(toreal(NumericValue)) > maxOffsetMs, \"GDT_NTP_비인가서버_오프셋급증_동시\",\n    RemoteHost !in (trustedNtp), \"GDT_NTP_비인가_타임서버\",\n    \"GDT_NTP_오프셋_임계초과\")\n| extend Severity = \"High\"\n| project TimeGenerated, UAVId, DeviceId, RemoteHost, NumericValue, IntegrityStatus, Operator, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "queryFrequency": "PT5M",
+        "queryPeriod": "PT15M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "InitialAccess"
+        ],
+        "techniques": [
+          "T1195"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT2H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Host"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S50 - GDT NTP Time Server Spoofing - {{UAVId}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | RemoteHost={{RemoteHost}} | OffsetMs={{NumericValue}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "RemoteHost": "RemoteHost",
+          "NumericValue": "NumericValue"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "UAVId"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

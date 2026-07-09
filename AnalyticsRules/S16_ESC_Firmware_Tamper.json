@@ -1,0 +1,81 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/987483a4-c3a0-4bb8-90c5-8f4aaaf35806')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/987483a4-c3a0-4bb8-90c5-8f4aaaf35806')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S16 - ESC Firmware Tampering (Persistent Motor Compromise)",
+        "description": "UAVFirmware_CL에서 ESC 컴포넌트로의 flash_write 이벤트 중 FirmwareHash가 Watchlist(Approved_Firmware_Hash_List)에 없거나 Signed=false인 경우 탐지. 공격자가 서명 미검증/비인가 해시의 변조 펌웨어를 ESC에 플래시해 모터 제어를 재부팅 후에도 지속 장악(persistence)하려는 시도. MITRE Enterprise ATT&CK: T1495 Firmware Corruption / MITRE ICS ATT&CK: T0879",
+        "severity": "High",
+        "enabled": true,
+        "query": "let alertWindow = 1h;\nlet ApprovedHashes = _GetWatchlist('Approved_Firmware_Hash_List') | project Hash;\nUAVFirmware_CL\n| where TimeGenerated > ago(alertWindow)\n| where FlashEventType == 'flash_write'\n| where ComponentId startswith 'ESC'\n| extend isUnapprovedHash = FirmwareHash !in (ApprovedHashes)\n| extend isUnsigned = Signed == false\n| where isUnapprovedHash or isUnsigned\n| extend TriggerReason = case(\n    isUnsigned, strcat('ESC_미서명_펌웨어_플래시_', ComponentId),\n    strcat('ESC_비인가_해시_펌웨어_플래시_', ComponentId))\n| extend Severity = 'High'\n| project TimeGenerated, UAVId, ComponentId, FirmwareHash, Signed, FlashEventType, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "queryFrequency": "PT10M",
+        "queryPeriod": "PT1H",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "Persistence",
+          "Impact"
+        ],
+        "techniques": [
+          "T1495"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT2H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Host"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S16 - ESC Firmware Tampering (Persistent Motor Compromise) - {{UAVId}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Severity={{Severity}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "ComponentId": "ComponentId",
+          "FirmwareHash": "FirmwareHash"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "UAVId"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

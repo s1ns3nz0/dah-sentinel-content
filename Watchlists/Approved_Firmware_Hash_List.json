@@ -25,7 +25,7 @@
         "contentType": "Text/Csv",
         "numberOfLinesToSkip": 0,
         "itemsSearchKey": "Hash",
-        "rawContent": "Hash,UAVId,Version,ApprovedDate,Description\r\nsha256:0000000000000000000000000000000000000000000000000000000000000001,MPD-001,v1.0.0,2026-01-01,MPD 기본 펌웨어 (pgse-stub approved_firmware.json)"
+        "rawContent": "Hash,UAVId,Version,ApprovedDate,Description\r\nsha256:0000000000000000000000000000000000000000000000000000000000000001,MPD-001,v1.0.0,2026-01-01,MPD 기본 펌웨어 (pgse-stub approved_firmware.json)\r\nsha256:0000000000000000000000000000000000000000000000000000000000000002,MODEM-GDT-01,v2.3.1,2026-01-01,GDT SATCOM 모뎀 승인 펌웨어 (S48)"
       },
       "apiVersion": "2022-08-01"
     }

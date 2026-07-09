@@ -1,0 +1,83 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/f3f04ce4-c761-4e3e-9b1e-b94b19e6236e')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/f3f04ce4-c761-4e3e-9b1e-b94b19e6236e')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV Campaign C33 - BLOS Command Forgery → Autonomy Hijack → VTOL Transition Failure",
+        "description": "3단계 킬체인(2/3 단계 이상 관측 시 트리거, near-miss 허용): 자율무력: BLOS 명령위조→자율 하이재킹→VTOL 천이 실패. 체인: BLOS Command Forgery(S117) → Autonomy Hijack(S118) → VTOL Transition Failure(S125). 연결키: UAVId. MITRE: T1557, T1499.004",
+        "severity": "High",
+        "enabled": true,
+        "query": "let windowSize = 30m;\n\n// S117: BLOS Command Forgery\nlet S117 =\n    UAVOpmode_CL\n    | where TimeGenerated > ago(windowSize)\n    | where EventType == 'blos_cmd_forgery'\n    | extend Stage = 'S117', UAVId = tostring(UAVId)\n    | where isnotempty(UAVId)\n    | project TimeGenerated, Stage, UAVId;\n\n// S118: Autonomy Hijack\nlet S118 =\n    UAVOpmode_CL\n    | where TimeGenerated > ago(windowSize)\n    | where EventType == 'autonomy_hijack'\n    | extend Stage = 'S118', UAVId = tostring(UAVId)\n    | where isnotempty(UAVId)\n    | project TimeGenerated, Stage, UAVId;\n\n// S125: VTOL Transition Failure\nlet S125 =\n    UAVOpmode_CL\n    | where TimeGenerated > ago(windowSize)\n    | where EventType == 'vtol_transition_fail'\n    | extend Stage = 'S125', UAVId = tostring(UAVId)\n    | where isnotempty(UAVId)\n    | project TimeGenerated, Stage, UAVId;\n\nunion S117, S118, S125\n| summarize StagesSeen = make_set(Stage), StageCount = dcount(Stage), FirstSeen = min(TimeGenerated), LastSeen = max(TimeGenerated) by UAVId\n| where StageCount >= 2\n| extend CampaignType = \"C33_자율무력_BLOS명령위조_자율하이재킹_VTOL천이실패\"\n| extend StepSummary = strcat(\"Stages=\", tostring(StagesSeen), \" | First=\", tostring(FirstSeen), \" | Last=\", tostring(LastSeen))\n| extend Severity = \"High\"\n| project FirstSeen, LastSeen, UAVId, StagesSeen, StageCount, CampaignType, StepSummary, Severity",
+        "queryFrequency": "PT10M",
+        "queryPeriod": "PT30M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT1H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "CredentialAccess",
+          "Impact"
+        ],
+        "techniques": [
+          "T1557",
+          "T1499.004"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": true,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT1H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Host"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "[CAMPAIGN] UAV Campaign C33 - BLOS Command Forgery → Autonomy Hijack → VTOL Transition Failure - {{UAVId}}",
+          "alertDescriptionFormat": "CampaignType={{CampaignType}} | Steps={{StepSummary}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "CampaignType": "CampaignType",
+          "StepSummary": "StepSummary",
+          "UAVId": "UAVId",
+          "StageCount": "StageCount"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "UAVId"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

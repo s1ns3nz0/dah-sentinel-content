@@ -1,0 +1,81 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/67850190-e43a-4eb2-a4d2-0141a3510df8')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/67850190-e43a-4eb2-a4d2-0141a3510df8')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S40 - Anti-Forensics (Log Deletion / Black Box Tamper)",
+        "description": "드론 anti-forensics 탐지 — UAVAuditLog_CL에서 명시적 삭제/절단/블랙박스 와이프/타임스탬프 역행 이벤트(log_delete, log_truncate, blackbox_wipe, timestamp_rewind), 또는 로그 보존 비율(RecordCountAfter/RecordCountBefore)이 UAV_Threshold_List의 MinAuditLogRetentionRatio 미만으로 급감한 경우를 탐지. MITRE: T1070",
+        "severity": "High",
+        "enabled": true,
+        "query": "let minRetentionRatio = toscalar(\n    _GetWatchlist('UAV_Threshold_List')\n    | where ThresholdKey == 'MinAuditLogRetentionRatio'\n    | project toreal(Value));\nlet alertWindow = 15m;\nUAVAuditLog_CL\n| where TimeGenerated > ago(alertWindow)\n| extend RetentionRatio = iff(RecordCountBefore > 0, todouble(RecordCountAfter) / todouble(RecordCountBefore), 1.0)\n| where EventType in (\"log_delete\", \"log_truncate\", \"blackbox_wipe\", \"timestamp_rewind\")\n    or RetentionRatio < minRetentionRatio\n    or TimestampDeltaSec < 0\n| extend TriggerReason = case(\n    EventType == \"blackbox_wipe\", \"안티포렌식_블랙박스_와이프\",\n    EventType == \"timestamp_rewind\" or TimestampDeltaSec < 0, \"안티포렌식_타임스탬프_역행조작\",\n    EventType in (\"log_delete\", \"log_truncate\"), \"안티포렌식_로그삭제_절단\",\n    \"안티포렌식_로그건수_급감\")\n| extend Severity = \"High\"\n| project TimeGenerated, UAVId, LogSource, EventType, RecordCountBefore, RecordCountAfter, RetentionRatio, TimestampDeltaSec, Operator, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "queryFrequency": "PT5M",
+        "queryPeriod": "PT15M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "DefenseEvasion"
+        ],
+        "techniques": [
+          "T1070"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT2H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Host"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S40 - Anti-Forensics (Log Deletion / Black Box Tamper) - {{UAVId}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | RetentionRatio={{RetentionRatio}} | TimestampDeltaSec={{TimestampDeltaSec}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "LogSource": "LogSource",
+          "RetentionRatio": "RetentionRatio",
+          "Operator": "Operator"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "UAVId"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

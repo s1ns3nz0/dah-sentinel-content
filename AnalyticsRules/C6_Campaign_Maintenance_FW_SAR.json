@@ -31,6 +31,7 @@
           "Persistence"
         ],
         "techniques": [
+          "T1195",
           "T1020"
         ],
         "subTechniques": [],

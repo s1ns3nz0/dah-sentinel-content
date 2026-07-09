@@ -1,0 +1,81 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/40299aa3-8930-4111-97ed-7c04c1436537')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/40299aa3-8930-4111-97ed-7c04c1436537')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S38 - Maintenance Implant (Component Replace + Hash Mismatch within 30min)",
+        "description": "정비 임플란트 탐지 — UAVMaintenance_CL의 component_replace 이벤트 후 30분 이내 UAVPgse_CL에서 HashMatch==0(false) 또는 SbomForbiddenCount>0 발생 시 정비 절차를 악용한 하드웨어/펌웨어 임플란트 삽입으로 판단. 실제 컬럼: HashMatch는 SByte(0=false,1=true). MITRE ICS ATT&CK: T0864 Transient Cyber Asset",
+        "severity": "High",
+        "enabled": true,
+        "query": "let alertWindow = 2h;\nlet Maintenance =\n    UAVMaintenance_CL\n    | where TimeGenerated > ago(alertWindow)\n    | where EventType == 'component_replace'\n    | project T1=TimeGenerated, UAVId, ComponentName, Operator;\nlet PgseViolation =\n    UAVPgse_CL\n    | where TimeGenerated > ago(alertWindow)\n    | where HashMatch == 0 or SbomForbiddenCount > 0\n    | project T2=TimeGenerated, UAVId, HashMatch, SbomForbiddenCount, FailReason;\nMaintenance\n| join kind=inner (PgseViolation) on UAVId\n| where T2 >= T1 and T2 <= T1 + 30m\n| extend TriggerReason = case(\n    HashMatch == 0 and SbomForbiddenCount > 0, strcat(\"정비후_해시불일치_금지SBOM_동시_\", ComponentName),\n    HashMatch == 0, strcat(\"정비후_펌웨어_해시불일치_\", ComponentName),\n    strcat(\"정비후_금지SBOM_\", ComponentName))\n| extend Severity = \"High\"\n| project T1, T2, UAVId, ComponentName, Operator, HashMatch, SbomForbiddenCount, TriggerReason, Severity\n| order by T1 desc",
+        "queryFrequency": "PT10M",
+        "queryPeriod": "PT2H",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "InitialAccess",
+          "Persistence"
+        ],
+        "techniques": [
+          "T1200"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT2H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Account"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S38 - Maintenance Implant (Component Replace + Hash Mismatch within 30min) - {{Operator}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Severity={{Severity}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "ComponentName": "ComponentName",
+          "Operator": "Operator"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Account",
+            "fieldMappings": [
+              {
+                "identifier": "Name",
+                "columnName": "Operator"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

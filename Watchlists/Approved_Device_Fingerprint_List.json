@@ -1,0 +1,33 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspaceName": {
+      "type": "string",
+      "metadata": {
+        "description": "Workspace name for Log Analytics where Sentinel is setup"
+      }
+    }
+  },
+  "resources": [
+    {
+      "name": "[concat(parameters('workspaceName'), '/Microsoft.SecurityInsights/Approved_Device_Fingerprint_List')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/Watchlists",
+      "kind": "",
+      "properties": {
+        "displayName": "Approved_Device_Fingerprint_List",
+        "source": "Approved_Device_Fingerprint_List.csv",
+        "description": "Operator-to-known-device/geography binding — detects credential theft espionage patterns where valid credentials are reused from an unrecognized device or anomalous location (S35, T1078)",
+        "provider": "DAH-BlueTeam",
+        "isDeleted": false,
+        "labels": [],
+        "defaultDuration": "P1000Y",
+        "contentType": "Text/Csv",
+        "numberOfLinesToSkip": 0,
+        "itemsSearchKey": "OperatorId",
+        "rawContent": "OperatorId,DeviceFingerprint,ApprovedCountry,Description\r\nsgt.yang,fp:a1b2c3d4e5f60001,KR,분대장 지급 GCS 태블릿\r\nlt.kim,fp:a1b2c3d4e5f60002,KR,소대장 지급 GCS 노트북\r\ncapt.park,fp:a1b2c3d4e5f60003,KR,중대장 지급 승인단말\r\nmaj.cho,fp:a1b2c3d4e5f60004,KR,작전장교 지급 승인단말\r\ncol.lee,fp:a1b2c3d4e5f60005,KR,대대장 지급 관리단말"
+      },
+      "apiVersion": "2022-08-01"
+    }
+  ]
+}

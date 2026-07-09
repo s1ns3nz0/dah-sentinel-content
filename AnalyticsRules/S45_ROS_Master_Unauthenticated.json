@@ -1,0 +1,90 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/9b05b21d-d9a2-4a2d-a48a-2bb3c5c2376e')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/9b05b21d-d9a2-4a2d-a48a-2bb3c5c2376e')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S45 - Unauthenticated ROS Master Access",
+        "description": "무인증 ROS 마스터 접근 탐지 — UAVRos_CL의 master_connect 이벤트에서 AuthStatus=unauthenticated(예: 인증 없는 rosnode list류 접속) 이거나, 접속 PeerIp가 Approved_ROS_Node_List에 없는 경우 탐지. 두 조건 동시 충족 시 신뢰도 상향. MITRE: T1190",
+        "severity": "High",
+        "enabled": true,
+        "query": "let approvedPeers = _GetWatchlist('Approved_ROS_Node_List') | project PeerIp;\nlet alertWindow = 10m;\nUAVRos_CL\n| where TimeGenerated > ago(alertWindow)\n| where EventType == \"master_connect\"\n| where AuthStatus == \"unauthenticated\" or PeerIp !in (approvedPeers)\n| extend TriggerReason = case(\n    AuthStatus == \"unauthenticated\" and PeerIp !in (approvedPeers), \"ROS_마스터_무인증_비인가PeerIp_동시\",\n    AuthStatus == \"unauthenticated\", \"ROS_마스터_무인증_접속\",\n    \"ROS_마스터_비인가_PeerIp_접속\")\n| extend Severity = \"High\"\n| project TimeGenerated, UAVId, NodeName, PeerIp, TopicName, AuthStatus, CommandSummary, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "queryFrequency": "PT5M",
+        "queryPeriod": "PT15M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "InitialAccess"
+        ],
+        "techniques": [
+          "T1190"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT2H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Host",
+              "IP"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S45 - Unauthenticated ROS Master Access - {{UAVId}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | PeerIp={{PeerIp}} | AuthStatus={{AuthStatus}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "PeerIp": "PeerIp",
+          "NodeName": "NodeName"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "UAVId"
+              }
+            ]
+          },
+          {
+            "entityType": "IP",
+            "fieldMappings": [
+              {
+                "identifier": "Address",
+                "columnName": "PeerIp"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

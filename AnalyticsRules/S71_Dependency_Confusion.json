@@ -1,0 +1,78 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/edcabe44-3b99-43c8-8c60-229ae02e9911')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/edcabe44-3b99-43c8-8c60-229ae02e9911')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S71 - Dependency Confusion Attack",
+        "description": "내부 패키지명과 동일한 이름이 공개 레지스트리(RegistrySource=public)에서 비정상적으로 높은 버전으로 설치(VersionJump)되는 의존성 혼동 공격을 탐지. MITRE: T1195.001",
+        "severity": "Medium",
+        "enabled": true,
+        "query": "let alertWindow = 15m;\nlet maxVersionJump = 2;\nUAVSupplyChain_CL\n| where TimeGenerated > ago(alertWindow)\n| where EventType == 'PackageInstall'\n| where RegistrySource == 'public'\n| where toint(VersionJump) >= maxVersionJump\n| extend TriggerReason = strcat(\"의존성혼동_공개레지스트리_버전점프_\", PackageName, \"_jump:\", VersionJump)\n| extend Severity = \"Medium\"\n| project TimeGenerated, PackageName, RegistrySource, VersionJump, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "queryFrequency": "PT5M",
+        "queryPeriod": "PT15M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "Initial Access"
+        ],
+        "techniques": [
+          "T1195"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": false,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT2H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S71 - Dependency Confusion Attack - {{PackageName}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | RegistrySource={{RegistrySource}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "PackageName": "PackageName",
+          "VersionJump": "VersionJump"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "PackageName"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

@@ -1,0 +1,89 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/ab51f61e-6211-4a55-b515-565cae2ae699')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/ab51f61e-6211-4a55-b515-565cae2ae699')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S121 - Flight Mode Falsified Reporting (Reported vs Actual Mismatch)",
+        "description": "UAVOpmode_CL에서 OpmodeField='flight_mode_reported_vs_actual'인 레코드 중 ExpectedValue(실제 비행모드)와 ObservedValue(운용자에게 보고된 비행모드)가 불일치하는 위조 보고 탐지(Authorized 여부 무관 — 보고값 자체 조작). 실제 컬럼: OpmodeField/ExpectedValue/ObservedValue/ChangedBy/Authorized(SByte). MITRE: T0832 Manipulation of View (실제 비행모드와 다른 값을 운용자 화면에 보고해 상황인식을 조작)",
+        "severity": "Medium",
+        "enabled": true,
+        "query": "let alertWindow = 10m;\nUAVOpmode_CL\n| where TimeGenerated > ago(alertWindow)\n| where OpmodeField == 'flight_mode_reported_vs_actual'\n| where ExpectedValue != ObservedValue\n| extend TriggerReason = strcat(\"비행모드_위조보고_실제:\", ExpectedValue, \"_보고:\", ObservedValue)\n| project TimeGenerated, UAVId, OpmodeField, ExpectedValue, ObservedValue, ChangedBy, Authorized, Seq, TriggerReason\n| order by TimeGenerated desc",
+        "queryFrequency": "PT5M",
+        "queryPeriod": "PT15M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "Collection",
+          "Impact"
+        ],
+        "techniques": [
+          "T1565"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT5H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Host"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S121 - Flight Mode Falsified Reporting (Reported vs Actual Mismatch) - {{UAVId}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | ChangedBy={{ChangedBy}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "Authorized": "Authorized"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "UAVId"
+              }
+            ]
+          },
+          {
+            "entityType": "Account",
+            "fieldMappings": [
+              {
+                "identifier": "Name",
+                "columnName": "ChangedBy"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

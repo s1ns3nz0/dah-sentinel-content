@@ -1,0 +1,79 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/045b1b65-8157-4768-aeed-1f8d3cf46fd8')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/045b1b65-8157-4768-aeed-1f8d3cf46fd8')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S83 - Video Stream RTSP Hijacking",
+        "description": "영상스트림 RTSP 세션(SessionId)의 DESCRIBE/PLAY 요청 클라이언트(ClientIp)가 기대 클라이언트(ExpectedClient)와 불일치하는 스트림 하이재킹을 탐지. MITRE: T1557",
+        "severity": "High",
+        "enabled": true,
+        "query": "let alertWindow = 10m;\nUAVImagery_CL\n| where TimeGenerated > ago(alertWindow)\n| where RTSPMethod in ('DESCRIBE', 'PLAY')\n| where isnotempty(ExpectedClient) and ClientIp != ExpectedClient\n| extend TriggerReason = strcat(\"RTSP_세션하이재킹_\", SessionId, \"_client:\", ClientIp, \"_expected:\", ExpectedClient)\n| extend Severity = \"High\"\n| project TimeGenerated, UAVId, SessionId, RTSPMethod, ClientIp, ExpectedClient, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "queryFrequency": "PT5M",
+        "queryPeriod": "PT15M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "Collection",
+          "Credential Access"
+        ],
+        "techniques": [
+          "T1557"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": false,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT2H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S83 - RTSP Stream Hijacking - {{SessionId}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | ClientIp={{ClientIp}} | ExpectedClient={{ExpectedClient}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "SessionId": "SessionId",
+          "RTSPMethod": "RTSPMethod"
+        },
+        "entityMappings": [
+          {
+            "entityType": "IP",
+            "fieldMappings": [
+              {
+                "identifier": "Address",
+                "columnName": "ClientIp"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

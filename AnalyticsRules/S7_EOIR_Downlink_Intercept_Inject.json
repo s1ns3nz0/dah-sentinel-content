@@ -1,0 +1,80 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/917724d9-bf16-44ee-9942-ca3c7c775612')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/917724d9-bf16-44ee-9942-ca3c7c775612')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S7 - EO/IR Downlink Interception and Frame Injection",
+        "description": "UAVImagery_CL의 EO/IR 영상 다운링크에서 프레임 무결성 검증 실패(FrameHashValid=false), 동일 StreamId 내 SessionId가 짧은 시간에 복수로 전환(세션 하이재킹), 또는 프레임 출발지(FrameSourceIP)가 스트림의 기대 출발지(ExpectedSourceIP)와 불일치하는 정황을 탐지. 감청 후 중계·재주입(MITM relay) 공격 패턴. MITRE Enterprise ATT&CK: T1557 Adversary-in-the-Middle (Collection/영상 감청·프레임 주입)",
+        "severity": "High",
+        "enabled": true,
+        "query": "let alertWindow = 10m;\nUAVImagery_CL\n| where TimeGenerated > ago(alertWindow)\n| extend isBadHash = FrameHashValid == false\n| extend isSourceMismatch = isnotempty(ExpectedSourceIP) and FrameSourceIP != ExpectedSourceIP\n| where isBadHash or isSourceMismatch\n| summarize\n    BadHashCount = countif(isBadHash),\n    SourceMismatchCount = countif(isSourceMismatch),\n    DistinctSessions = dcount(SessionId),\n    DistinctSourceIPs = dcount(FrameSourceIP),\n    SampleFrameSeq = max(FrameSeq)\n    by UAVId, StreamId, bin(TimeGenerated, 1m)\n| where BadHashCount > 0 or SourceMismatchCount > 0 or DistinctSessions > 1\n| extend TriggerReason = case(\n    BadHashCount > 0, strcat('영상프레임_무결성검증실패_', tostring(BadHashCount), '건'),\n    DistinctSessions > 1, strcat('영상세션_하이재킹_의심_세션', tostring(DistinctSessions), '개'),\n    strcat('영상프레임_출발지불일치_', tostring(SourceMismatchCount), '건'))\n| extend Severity = 'High'\n| project TimeGenerated, UAVId, StreamId, BadHashCount, SourceMismatchCount, DistinctSessions, DistinctSourceIPs, SampleFrameSeq, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "queryFrequency": "PT5M",
+        "queryPeriod": "PT15M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "Collection",
+          "CommandAndControl"
+        ],
+        "techniques": [
+          "T1557"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT2H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Host"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S7 - EO/IR Downlink Interception and Frame Injection - {{UAVId}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Severity={{Severity}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "StreamId": "StreamId"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "UAVId"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

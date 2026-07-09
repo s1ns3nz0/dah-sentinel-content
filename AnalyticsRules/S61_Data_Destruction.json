@@ -1,0 +1,90 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/a4536b12-8dd8-4046-8a5b-570370833fd8')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/a4536b12-8dd8-4046-8a5b-570370833fd8')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S61 - Data Destruction (Logs / Mission / SAR Frames)",
+        "description": "UAVHostAudit_CL에서 로그/미션/SAR 프레임 디렉터리 대상 rm -rf류 대량 파일삭제 명령 패턴(5건 이상) 탐지. 증거인멸 또는 임무데이터 파괴 의심. MITRE: T0809,T1485",
+        "severity": "High",
+        "enabled": true,
+        "query": "let alertWindow = 15m;\nlet sensitiveDirs = dynamic([\"/var/log/uav\", \"/data/mission\", \"/data/sar_frames\"]);\nUAVHostAudit_CL\n| where TimeGenerated > ago(alertWindow)\n| where EventType == \"bulk_delete\"\n| where ExecArgs matches regex @\"rm\\s+-[a-zA-Z]*r[a-zA-Z]*f|rm\\s+-[a-zA-Z]*f[a-zA-Z]*r\"\n| where FilePath has_any (sensitiveDirs)\n| where AffectedCount >= 5\n| extend TriggerReason = strcat(\"데이터파괴_로그미션SAR프레임_대량삭제_\", FilePath, \"_\", tostring(AffectedCount), \"개\")\n| extend Severity = \"High\"\n| project TimeGenerated, UAVId, ActorId, Binary, ExecArgs, FilePath, AffectedCount, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "queryFrequency": "PT5M",
+        "queryPeriod": "PT15M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "Impact"
+        ],
+        "techniques": [
+          "T1485"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT5H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Host"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S61 - Data Destruction (Logs / Mission / SAR Frames) - {{UAVId}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | FilePath={{FilePath}} | AffectedCount={{AffectedCount}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "FilePath": "FilePath",
+          "AffectedCount": "AffectedCount",
+          "ExecArgs": "ExecArgs"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "UAVId"
+              }
+            ]
+          },
+          {
+            "entityType": "Account",
+            "fieldMappings": [
+              {
+                "identifier": "Name",
+                "columnName": "ActorId"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

@@ -1,0 +1,85 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/80f6e853-bd29-42ec-b2a6-478f838da56b')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/80f6e853-bd29-42ec-b2a6-478f838da56b')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S96 - Cryptographic Key Material Exfiltration (Signing/Session/TLS)",
+        "description": "UAVExfilFlow_CL에서 KeyType(signing/session/tls)이 지정된 암호키 접근/유출 이벤트 중 AccessorIdentity가 Approved_Operators_List에 비등록이거나, UAV_Threshold_List의 OffHoursStart/OffHoursEnd 기준 야간 시간대에 발생한 것을 탐지. 서명키·세션토큰·TLS키 유출은 UAV 도메인 특성상 표준 자격증명 저장소 개념과 완전히 일치하지 않아 근사매핑으로 분류(techniques 필드 미기재). MITRE: T1552 Unsecured Credentials, T1555 Credentials from Password Stores (근사매핑)",
+        "severity": "High",
+        "enabled": true,
+        "query": "let alertWindow = 15m;\nlet ApprovedOps = _GetWatchlist('Approved_Operators_List') | project OperatorId;\nlet offHoursStart = toscalar(_GetWatchlist('UAV_Threshold_List') | where ThresholdKey == 'OffHoursStart' | project toint(Value) | take 1);\nlet offHoursEnd = toscalar(_GetWatchlist('UAV_Threshold_List') | where ThresholdKey == 'OffHoursEnd' | project toint(Value) | take 1);\nUAVExfilFlow_CL\n| where TimeGenerated > ago(alertWindow)\n| where isnotempty(KeyType)\n| extend AccessHour = hourofday(TimeGenerated)\n| extend isUnknownAccessor = AccessorIdentity !in (ApprovedOps)\n| extend isOffHours = (AccessHour >= offHoursStart or AccessHour < offHoursEnd)\n| where isUnknownAccessor or isOffHours\n| extend TriggerReason = case(\n    isUnknownAccessor, strcat(\"암호키유출_비인가접근자_\", AccessorIdentity, \"_KeyType_\", KeyType),\n    strcat(\"암호키유출_야간시간대_\", tostring(AccessHour), \"시_KeyType_\", KeyType))\n| extend Severity = \"High\"\n| project TimeGenerated, UAVId, Operator, AccessorIdentity, KeyType, AssetType, DestIp, DestPort, BytesTransferred, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "queryFrequency": "PT5M",
+        "queryPeriod": "PT20M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "CredentialAccess"
+        ],
+        "techniques": [],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": false,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT5H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S96 - Cryptographic Key Material Exfiltration - {{UAVId}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | KeyType={{KeyType}} | AccessorIdentity={{AccessorIdentity}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "KeyType": "KeyType",
+          "AccessorIdentity": "AccessorIdentity"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "UAVId"
+              }
+            ]
+          },
+          {
+            "entityType": "Account",
+            "fieldMappings": [
+              {
+                "identifier": "Name",
+                "columnName": "AccessorIdentity"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

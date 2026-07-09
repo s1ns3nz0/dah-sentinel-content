@@ -1,0 +1,81 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/cdbb64d7-7030-4f48-bf14-b82d58d1e91b')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/cdbb64d7-7030-4f48-bf14-b82d58d1e91b')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S8 - DShot/ESC Motor Manipulation (Autopilot Mixer Bypass)",
+        "description": "UAVActuator_CL에서 CommandSource가 autopilot_mixer가 아니거나 BypassAutopilot=true인 DShot/ESC 모터 명령 탐지. 공격자가 비행제어기의 믹서 로직을 우회해 개별 모터에 직접 out-of-band 명령을 주입, 특정 모터 지속 장악/추력 조작을 시도하는 정황. MITRE ICS ATT&CK: T0855 / EMB3D 비인가명령주입",
+        "severity": "High",
+        "enabled": true,
+        "query": "let alertWindow = 10m;\nUAVActuator_CL\n| where TimeGenerated > ago(alertWindow)\n| extend isBypass = BypassAutopilot == true or CommandSource != 'autopilot_mixer'\n| where isBypass\n| summarize\n    EventCount = count(),\n    DistinctMotors = dcount(MotorId),\n    MaxCommandValue = max(CommandValue),\n    MinCommandValue = min(CommandValue),\n    SourceSet = make_set(CommandSource)\n    by UAVId, bin(TimeGenerated, 1m)\n| where EventCount > 0\n| extend TriggerReason = strcat('DShot_ESC_비인가_직접명령_', tostring(DistinctMotors), '개모터_', tostring(EventCount), '건')\n| extend Severity = 'High'\n| project TimeGenerated, UAVId, EventCount, DistinctMotors, MaxCommandValue, MinCommandValue, SourceSet, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "queryFrequency": "PT5M",
+        "queryPeriod": "PT15M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "Impact"
+        ],
+        "techniques": [
+          "T1565"
+        ],
+        "subTechniques": [
+          "T1565.002"
+        ],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT2H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Host"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S8 - DShot/ESC Motor Manipulation (Autopilot Mixer Bypass) - {{UAVId}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Severity={{Severity}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "DistinctMotors": "DistinctMotors"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "UAVId"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

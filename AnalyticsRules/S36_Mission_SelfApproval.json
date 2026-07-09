@@ -1,0 +1,81 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/aa3b418a-43aa-4edb-ae63-2e377a43f11b')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/aa3b418a-43aa-4edb-ae63-2e377a43f11b')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S36 - Mission Plan Self-Approval (2-Person Control Bypass)",
+        "description": "임무계획 2인통제 우회 탐지. [A] Planner == Approver(자기승인) [B] Approver가 Approved_MPS_Planner_List상 ApproverAuthority=true가 아닌 자(승인권한 없는 자의 승인) 탐지. MITRE: T1204, T1078",
+        "severity": "High",
+        "enabled": true,
+        "query": "let alertWindow = 10m;\nlet PlannerAuth =\n    _GetWatchlist('Approved_MPS_Planner_List')\n    | project OperatorId, ApproverAuthority;\nUAVMission_CL\n| where TimeGenerated > ago(alertWindow)\n| join kind=leftouter (PlannerAuth) on $left.Approver == $right.OperatorId\n| extend approverHasAuthority = isnotnull(ApproverAuthority) and tobool(ApproverAuthority) == true\n| extend isSelfApproval = (Planner == Approver)\n| extend isUnauthorizedApprover = not(approverHasAuthority)\n| where isSelfApproval or isUnauthorizedApprover\n| extend TriggerReason = case(\n    isSelfApproval, strcat(\"임무계획_2인통제_자기승인_\", Planner),\n    strcat(\"임무계획_승인권한없는_Approver_\", Approver))\n| extend Severity = \"High\"\n| project TimeGenerated, PlanId, Planner, Approver, UAVId, ROE, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "queryFrequency": "PT5M",
+        "queryPeriod": "PT15M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "Execution",
+          "Impact"
+        ],
+        "techniques": [
+          "T1204",
+          "T1078"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT2H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Account"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S36 - Mission Plan Self-Approval (2-Person Control Bypass) - {{Planner}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Severity={{Severity}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "PlanId": "PlanId"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Account",
+            "fieldMappings": [
+              {
+                "identifier": "Name",
+                "columnName": "Planner"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

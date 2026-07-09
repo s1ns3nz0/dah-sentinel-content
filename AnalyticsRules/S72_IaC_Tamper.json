@@ -1,0 +1,78 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/4e7509ab-842f-4116-b201-5eb4e0318e22')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/4e7509ab-842f-4116-b201-5eb4e0318e22')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S72 - IaC (Terraform/Helm) Manifest Tampering",
+        "description": "IaC(Terraform/Helm) 매니페스트 적용(IaCApply) 시 Approved_Operators_List 상 approver/superadmin 권한의 승인자(DiffApprovedBy) 확인 없이 변경된 ManifestPath를 탐지. MITRE: T1195",
+        "severity": "High",
+        "enabled": true,
+        "query": "let alertWindow = 15m;\nlet ApprovedApprovers = _GetWatchlist('Approved_Operators_List') | where Role in ('approver','superadmin') | project OperatorId;\nUAVSupplyChain_CL\n| where TimeGenerated > ago(alertWindow)\n| where EventType == 'IaCApply'\n| extend isUnapproved = isempty(DiffApprovedBy) or DiffApprovedBy !in (ApprovedApprovers)\n| where isUnapproved\n| extend TriggerReason = strcat(\"IaC_비인가변경_\", ManifestPath, \"_승인자:\", iif(isempty(DiffApprovedBy), \"없음\", DiffApprovedBy))\n| extend Severity = \"High\"\n| project TimeGenerated, ManifestPath, DiffApprovedBy, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "queryFrequency": "PT5M",
+        "queryPeriod": "PT15M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "Initial Access"
+        ],
+        "techniques": [
+          "T1195"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": false,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT2H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S72 - IaC Manifest Tampering - {{ManifestPath}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | DiffApprovedBy={{DiffApprovedBy}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "ManifestPath": "ManifestPath",
+          "DiffApprovedBy": "DiffApprovedBy"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "ManifestPath"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

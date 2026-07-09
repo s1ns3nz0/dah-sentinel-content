@@ -1,0 +1,82 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/7260d37d-bb1d-477c-829d-27df87e59540')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/7260d37d-bb1d-477c-829d-27df87e59540')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S6 - Parameter Mass Reset / Factory Reset Burst (Failsafe Nullification)",
+        "description": "UAVConfigAudit_CL에서 param_reset/factory_reset 이벤트를 포함하며 1분 구간 파라미터 변경 건수가 Watchlist(UAV_Threshold_List.MaxParamSetPerMin)의 3배를 초과하는 대량 리셋 버스트 탐지. 정상적 개별 파라미터 튜닝과 달리 짧은 시간에 다수 파라미터(Failsafe 포함)가 일괄 초기화되어 안전장치가 우회되는 정황. MITRE ICS ATT&CK: T0836 / EMB3D 파라미터변조",
+        "severity": "Medium",
+        "enabled": true,
+        "query": "let alertWindow = 15m;\nlet maxParamSetPerMin = toscalar(\n    _GetWatchlist('UAV_Threshold_List')\n    | where ThresholdKey == 'MaxParamSetPerMin'\n    | project toreal(Value));\nlet burstMultiplier = 3.0;\nUAVConfigAudit_CL\n| where TimeGenerated > ago(alertWindow)\n| where EventType in ('param_changed', 'param_reset', 'factory_reset')\n| summarize\n    ResetCount = countif(EventType in ('param_reset', 'factory_reset')),\n    ChangeCount = count(),\n    DistinctParams = dcount(ParamId)\n    by UAVId, bin(TimeGenerated, 1m)\n| where ResetCount > 0 and ChangeCount > (maxParamSetPerMin * burstMultiplier)\n| extend TriggerReason = strcat('파라미터_대량리셋_버스트_', tostring(ChangeCount), '건/분_', tostring(DistinctParams), '개파라미터_리셋', tostring(ResetCount), '건')\n| extend Severity = 'Medium'\n| project TimeGenerated, UAVId, ResetCount, ChangeCount, DistinctParams, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "queryFrequency": "PT5M",
+        "queryPeriod": "PT20M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "DefenseEvasion",
+          "Impact"
+        ],
+        "techniques": [
+          "T1562"
+        ],
+        "subTechniques": [
+          "T1562.001"
+        ],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT2H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Host"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S6 - Parameter Mass Reset / Factory Reset Burst (Failsafe Nullification) - {{UAVId}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Severity={{Severity}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "ChangeCount": "ChangeCount"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "UAVId"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

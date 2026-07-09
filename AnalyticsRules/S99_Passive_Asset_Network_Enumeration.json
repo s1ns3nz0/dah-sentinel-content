@@ -1,0 +1,79 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/7706cb2f-31f6-4003-bf21-f3a5b1c87413')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/7706cb2f-31f6-4003-bf21-f3a5b1c87413')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S99 - Passive Asset and Network Structure Enumeration",
+        "description": "수동 자산·네트워크 구조 열거 탐지. UAVPassiveCollect_CL의 EnumerationType(network|cve_db) 레코드를 SourceIp/30분 단위로 집계해, 동일 소스가 5회 이상 반복적으로 네트워크 구조를 스캔하거나 CVE DB를 조회한 경우를 탐지. 능동 스캔 없이 공개정보·구성정보만으로 공격표면을 매핑하는 수동 정찰. MITRE: T1590, T1596",
+        "severity": "Low",
+        "enabled": true,
+        "query": "let alertWindow = 30m;\nlet enumCountGate = 5;\nUAVPassiveCollect_CL\n| where TimeGenerated > ago(alertWindow)\n| where isnotempty(EnumerationType)\n| summarize EnumCount = count(), Types = make_set(EnumerationType) by SourceIp, bin(TimeGenerated, 30m)\n| where EnumCount >= enumCountGate\n| extend TriggerReason = strcat('수동정찰_자산네트워크열거_', SourceIp, '_', tostring(EnumCount), '건')\n| extend Severity = 'Low'\n| project TimeGenerated, EnumCount, Types, TriggerReason, Severity, SourceIp\n| order by TimeGenerated desc",
+        "queryFrequency": "PT15M",
+        "queryPeriod": "PT1H",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "Reconnaissance"
+        ],
+        "techniques": [
+          "T1590",
+          "T1596"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": false,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT5H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S99 - Passive Asset/Network Enumeration - {{SourceIp}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Types={{Types}} | Severity={{Severity}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "EnumCount": "EnumCount",
+          "Types": "Types"
+        },
+        "entityMappings": [
+          {
+            "entityType": "IP",
+            "fieldMappings": [
+              {
+                "identifier": "Address",
+                "columnName": "SourceIp"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

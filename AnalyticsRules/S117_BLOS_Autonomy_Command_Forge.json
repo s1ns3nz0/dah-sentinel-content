@@ -1,0 +1,89 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/df62065a-7860-4fe9-b8ba-bddcc91a578c')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/df62065a-7860-4fe9-b8ba-bddcc91a578c')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S117 - BLOS SATCOM Autonomy Command Delay/Forge",
+        "description": "UAVOpmode_CL에서 OpmodeField='blos_autonomy_command'인 SATCOM 경유 자율명령 중 Authorized=0(SByte), 비인가 발신자(Approved_Operators_List 미포함), 또는 ExpectedValue/ObservedValue 불일치(위조 의심)를 탐지. 실제 컬럼: OpmodeField/ExpectedValue/ObservedValue/ChangedBy/Authorized(SByte). MITRE: T0856 Spoof Reporting Message (BLOS 구간에서 자율명령을 지연·위조해 실제 상태와 다른 명령을 주입)",
+        "severity": "High",
+        "enabled": true,
+        "query": "let alertWindow = 10m;\nlet ApprovedOps = _GetWatchlist('Approved_Operators_List') | project OperatorId;\nUAVOpmode_CL\n| where TimeGenerated > ago(alertWindow)\n| where OpmodeField == 'blos_autonomy_command'\n| extend isUnapproved = ChangedBy !in (ApprovedOps)\n| extend isMismatch = ExpectedValue != ObservedValue\n| where Authorized == 0 or isUnapproved or isMismatch\n| extend TriggerReason = case(\n    isUnapproved, strcat(\"BLOS_자율명령_비인가발신자_\", ChangedBy),\n    isMismatch, strcat(\"BLOS_자율명령_위조의심_\", ExpectedValue, \"->\", ObservedValue),\n    strcat(\"BLOS_자율명령_비인가_\", UAVId))\n| project TimeGenerated, UAVId, OpmodeField, ExpectedValue, ObservedValue, ChangedBy, Authorized, Seq, TriggerReason\n| order by TimeGenerated desc",
+        "queryFrequency": "PT5M",
+        "queryPeriod": "PT15M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "Collection",
+          "Impact"
+        ],
+        "techniques": [
+          "T1565"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT5H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Host"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S117 - BLOS SATCOM Autonomy Command Delay/Forge - {{UAVId}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | ChangedBy={{ChangedBy}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "Authorized": "Authorized"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "UAVId"
+              }
+            ]
+          },
+          {
+            "entityType": "Account",
+            "fieldMappings": [
+              {
+                "identifier": "Name",
+                "columnName": "ChangedBy"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

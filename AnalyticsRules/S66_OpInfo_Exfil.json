@@ -1,0 +1,88 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/76dc53d8-437c-40b5-b697-43dfd0de3059')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/76dc53d8-437c-40b5-b697-43dfd0de3059')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S66 - Operational Information Theft (EO/IR, SAR, Target Coordinates)",
+        "description": "UAVExfilFlow_CL에서 EO/IR·SAR·표적좌표 등 기밀 작전정보 자산이 짧은 시간창 내 3회 이상 copy 후 stage로 이어지는 대량 복사-스테이징 패턴 탐지. MITRE: T0882",
+        "severity": "High",
+        "enabled": true,
+        "query": "let alertWindow = 15m;\nlet seqWindow = 5m;\nlet classifiedTypes = dynamic([\"EO_IR\", \"SAR\", \"TargetCoord\"]);\nlet minCopies = 3;\nlet CopyEvents =\n    UAVExfilFlow_CL\n    | where TimeGenerated > ago(alertWindow)\n    | where AssetType in (classifiedTypes) and ActionType == \"copy\"\n    | project CopyTime = TimeGenerated, SourceAsset, AssetType, Operator, BytesTransferred, TimeBin = bin(TimeGenerated, seqWindow);\nlet StageEvents =\n    UAVExfilFlow_CL\n    | where TimeGenerated > ago(alertWindow)\n    | where AssetType in (classifiedTypes) and ActionType == \"stage\"\n    | project StageTime = TimeGenerated, SourceAsset, AssetType, DestinationHost, Channel, TimeBin = bin(TimeGenerated, seqWindow);\nCopyEvents\n| join kind=inner (StageEvents) on SourceAsset, AssetType, TimeBin\n| where StageTime >= CopyTime\n| summarize CopyCount = count(), FirstCopy = min(CopyTime), LastStage = max(StageTime), TotalBytes = sum(BytesTransferred)\n    by SourceAsset, AssetType, Operator, DestinationHost, Channel\n| where CopyCount >= minCopies\n| extend TriggerReason = strcat(\"작전정보탈취_대량복사후스테이징_\", AssetType, \"_\", SourceAsset)\n| extend Severity = \"High\"\n| project FirstCopy, LastStage, SourceAsset, AssetType, Operator, DestinationHost, Channel, CopyCount, TotalBytes, TriggerReason, Severity\n| order by LastStage desc",
+        "queryFrequency": "PT5M",
+        "queryPeriod": "PT15M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "Collection"
+        ],
+        "techniques": [],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT5H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Host"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S66 - Operational Information Theft (EO/IR, SAR, Target Coordinates) - {{SourceAsset}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | AssetType={{AssetType}} | CopyCount={{CopyCount}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "AssetType": "AssetType",
+          "CopyCount": "CopyCount",
+          "DestinationHost": "DestinationHost"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "SourceAsset"
+              }
+            ]
+          },
+          {
+            "entityType": "Account",
+            "fieldMappings": [
+              {
+                "identifier": "Name",
+                "columnName": "Operator"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

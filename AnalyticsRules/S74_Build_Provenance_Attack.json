@@ -1,0 +1,78 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/cac02181-68ba-4578-9ce6-a30778c44bb7')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/cac02181-68ba-4578-9ce6-a30778c44bb7')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S74 - Build Provenance/Reproducibility Integrity Attack",
+        "description": "빌드 증명(BuildAttest) 이벤트에서 프로버넌스 증명(ProvenanceAttested)이 실패한 BuildId를 탐지. 재현 불가능하거나 증명되지 않은 빌드 산출물의 공급망 유입 시도. MITRE: T1195",
+        "severity": "High",
+        "enabled": true,
+        "query": "let alertWindow = 15m;\nUAVSupplyChain_CL\n| where TimeGenerated > ago(alertWindow)\n| where EventType == 'BuildAttest'\n| where ProvenanceAttested == false\n| extend TriggerReason = strcat(\"빌드_프로버넌스_미인증_\", BuildId)\n| extend Severity = \"High\"\n| project TimeGenerated, BuildId, ProvenanceAttested, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "queryFrequency": "PT5M",
+        "queryPeriod": "PT15M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "Initial Access"
+        ],
+        "techniques": [
+          "T1195"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": false,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT2H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S74 - Build Provenance Integrity Attack - {{BuildId}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | ProvenanceAttested={{ProvenanceAttested}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "BuildId": "BuildId",
+          "ProvenanceAttested": "ProvenanceAttested"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "BuildId"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

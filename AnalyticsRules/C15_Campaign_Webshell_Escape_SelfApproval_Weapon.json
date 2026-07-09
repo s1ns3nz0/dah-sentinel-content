@@ -1,0 +1,85 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/a821223b-eaf4-4735-96d9-6e421f3663b8')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/a821223b-eaf4-4735-96d9-6e421f3663b8')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV Campaign C15 - Webshell Upload → Container Escape → Mission Self-Approval → Weapon Arm",
+        "description": "4단계 킬체인(3/4 단계 이상 관측 시 트리거, near-miss 허용): 웹셸→컨테이너escape→임무 자기승인→무장(IT→OT). 체인: Webshell Upload(S54) → Container Escape(S56) → Mission Self-Approval(S36) → Weapon Arm(S3). 연결키: Operator. MITRE: T1505.003, T1611, T1078",
+        "severity": "High",
+        "enabled": true,
+        "query": "let windowSize = 2h;\n\n// S54: Webshell Upload\nlet S54 =\n    UAVWebAccess_CL\n    | where TimeGenerated > ago(windowSize)\n    | where EventType == 'webshell_upload'\n    | extend Stage = 'S54', Operator = tostring(Operator)\n    | where isnotempty(Operator)\n    | project TimeGenerated, Stage, Operator;\n\n// S56: Container Escape\nlet S56 =\n    UAVContainerOps_CL\n    | where TimeGenerated > ago(windowSize)\n    | where EventType == 'escape_detected'\n    | extend Stage = 'S56', Operator = tostring(Operator)\n    | where isnotempty(Operator)\n    | project TimeGenerated, Stage, Operator;\n\n// S36: Mission Self-Approval\nlet S36 =\n    UAVMission_CL\n    | where TimeGenerated > ago(windowSize)\n    | where Planner == Approver and Operator == Planner\n    | extend Stage = 'S36', Operator = tostring(Operator)\n    | where isnotempty(Operator)\n    | project TimeGenerated, Stage, Operator;\n\n// S3: Weapon Arm\nlet S3 =\n    UAVWeapon_CL\n    | where TimeGenerated > ago(windowSize)\n    | where EventType in ('arm','fire')\n    | extend Stage = 'S3', Operator = tostring(Operator)\n    | where isnotempty(Operator)\n    | project TimeGenerated, Stage, Operator;\n\nunion S54, S56, S36, S3\n| summarize StagesSeen = make_set(Stage), StageCount = dcount(Stage), FirstSeen = min(TimeGenerated), LastSeen = max(TimeGenerated) by Operator\n| where StageCount >= 3\n| extend CampaignType = \"C15_웹셸_컨테이너escape_임무자기승인_무장\"\n| extend StepSummary = strcat(\"Stages=\", tostring(StagesSeen), \" | First=\", tostring(FirstSeen), \" | Last=\", tostring(LastSeen))\n| extend Severity = \"High\"\n| project FirstSeen, LastSeen, Operator, StagesSeen, StageCount, CampaignType, StepSummary, Severity",
+        "queryFrequency": "PT10M",
+        "queryPeriod": "PT2H",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT3H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "InitialAccess",
+          "PrivilegeEscalation",
+          "Impact"
+        ],
+        "techniques": [
+          "T1505.003",
+          "T1611",
+          "T1078"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": true,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT3H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Account"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "[CAMPAIGN] UAV Campaign C15 - Webshell Upload → Container Escape → Mission Self-Approval → Weapon Arm - {{Operator}}",
+          "alertDescriptionFormat": "CampaignType={{CampaignType}} | Steps={{StepSummary}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "CampaignType": "CampaignType",
+          "StepSummary": "StepSummary",
+          "Operator": "Operator",
+          "StageCount": "StageCount"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Account",
+            "fieldMappings": [
+              {
+                "identifier": "Name",
+                "columnName": "Operator"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

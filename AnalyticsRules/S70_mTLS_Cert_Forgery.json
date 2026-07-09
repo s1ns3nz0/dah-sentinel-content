@@ -1,0 +1,78 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/5c07fbac-1f4c-4b56-95a5-d517dea2f9cc')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/5c07fbac-1f4c-4b56-95a5-d517dea2f9cc')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S70 - mTLS Certificate Forgery",
+        "description": "mTLS 인증서 발급 이벤트에서 기대 발급기관(CertIssuerExpected)과 실제 발급기관(CertIssuerActual)이 불일치하는 위조/비인가 CA 서명 인증서를 탐지. MITRE: T1649",
+        "severity": "High",
+        "enabled": true,
+        "query": "let alertWindow = 10m;\nUAVSupplyChain_CL\n| where TimeGenerated > ago(alertWindow)\n| where EventType == 'CertIssue'\n| extend isIssuerMismatch = (CertIssuerExpected != CertIssuerActual)\n| where isIssuerMismatch\n| extend TriggerReason = strcat(\"mTLS_발급자불일치_\", CertSerial, \"_기대:\", CertIssuerExpected, \"_실제:\", CertIssuerActual)\n| extend Severity = \"High\"\n| project TimeGenerated, CertSerial, CertIssuerExpected, CertIssuerActual, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "queryFrequency": "PT5M",
+        "queryPeriod": "PT15M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "Credential Access"
+        ],
+        "techniques": [
+          "T1649"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": false,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT2H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S70 - mTLS Certificate Forgery - {{CertSerial}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "CertIssuerExpected": "CertIssuerExpected",
+          "CertIssuerActual": "CertIssuerActual"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "CertSerial"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

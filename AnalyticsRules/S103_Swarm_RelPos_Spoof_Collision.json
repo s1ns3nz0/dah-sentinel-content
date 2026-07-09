@@ -1,0 +1,78 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/0b05cad8-7d0b-4f71-a1ae-cdb688b43293')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/0b05cad8-7d0b-4f71-a1ae-cdb688b43293')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S103 - Relative Position Spoofing (Collision Induction)",
+        "description": "UAVSwarmComms_CL의 relative_position 메시지에서 RelativePositionReported가 RelativePositionExpectedRange(동적 배열 [min,max], meter)를 벗어난 상대위치 스푸핑·충돌유도 탐지. 기대 최소값 미만(과도한 근접)은 충돌 위험이 높아 High, 기대 최대값 초과(과도한 이격)는 Medium으로 세분화. MITRE: T0806 Brute Force I/O (ICS — description 참조)",
+        "severity": "High",
+        "enabled": true,
+        "query": "let alertWindow = 10m;\nUAVSwarmComms_CL\n| where TimeGenerated > ago(alertWindow)\n| where MessageType == \"relative_position\"\n| where isnotnull(RelativePositionReported) and isnotempty(RelativePositionExpectedRange)\n| extend ExpMin = todouble(RelativePositionExpectedRange[0]), ExpMax = todouble(RelativePositionExpectedRange[1])\n| where RelativePositionReported < ExpMin or RelativePositionReported > ExpMax\n| extend TriggerReason = strcat(\"상대위치스푸핑_충돌유도_보고값:\", tostring(RelativePositionReported), \"m_기대범위:\", tostring(ExpMin), \"-\", tostring(ExpMax), \"m\")\n| extend Severity = iff(RelativePositionReported < ExpMin, \"High\", \"Medium\")\n| project TimeGenerated, SwarmId, MemberId, UAVId, MessageType, RelativePositionReported, ExpMin, ExpMax, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "queryFrequency": "PT5M",
+        "queryPeriod": "PT15M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "Impact"
+        ],
+        "techniques": [],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": false,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT5H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S103 - Relative Position Spoofing (Collision Induction) - {{UAVId}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Severity={{Severity}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "RelativePositionReported": "RelativePositionReported",
+          "ExpMin": "ExpMin",
+          "ExpMax": "ExpMax",
+          "SwarmId": "SwarmId"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "UAVId"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

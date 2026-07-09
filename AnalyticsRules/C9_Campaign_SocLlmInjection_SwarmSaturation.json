@@ -1,0 +1,83 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/52d9ca3b-e95b-4727-adcb-bdcb056f6d67')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/52d9ca3b-e95b-4727-adcb-bdcb056f6d67')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV Campaign C9 - SOC LLM Prompt Injection → SOC Alert Flood (Swarm Saturation)",
+        "description": "2단계 킬체인(2/2 단계 이상 관측 시 트리거, near-miss 허용): SOC LLM 인젝션→군집포화(대응 무력화). 체인: SOC LLM Prompt Injection(S90) → SOC Alert Flood (Swarm Saturation)(S100). 연결키: Operator. MITRE: T1565.001, T1499",
+        "severity": "High",
+        "enabled": true,
+        "query": "let windowSize = 1h;\n\n// S90: SOC LLM Prompt Injection\nlet S90 =\n    UAVAiInference_CL\n    | where TimeGenerated > ago(windowSize)\n    | where InjectionDetected == true\n    | extend Stage = 'S90', Operator = tostring(Operator)\n    | where isnotempty(Operator)\n    | project TimeGenerated, Stage, Operator;\n\n// S100: SOC Alert Flood (Swarm Saturation)\nlet S100 =\n    UAVSocLoad_CL\n    | where TimeGenerated > ago(windowSize)\n    | where EventType == 'alert_flood' or AlertsPerMin > 50\n    | extend Stage = 'S100', Operator = tostring(Operator)\n    | where isnotempty(Operator)\n    | project TimeGenerated, Stage, Operator;\n\nunion S90, S100\n| summarize StagesSeen = make_set(Stage), StageCount = dcount(Stage), FirstSeen = min(TimeGenerated), LastSeen = max(TimeGenerated) by Operator\n| where StageCount >= 2\n| extend CampaignType = \"C9_SOC_LLM인젝션_군집포화\"\n| extend StepSummary = strcat(\"Stages=\", tostring(StagesSeen), \" | First=\", tostring(FirstSeen), \" | Last=\", tostring(LastSeen))\n| extend Severity = \"High\"\n| project FirstSeen, LastSeen, Operator, StagesSeen, StageCount, CampaignType, StepSummary, Severity",
+        "queryFrequency": "PT10M",
+        "queryPeriod": "PT1H",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "DefenseEvasion",
+          "Impact"
+        ],
+        "techniques": [
+          "T1565.001",
+          "T1499"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": true,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT2H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Account"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "[CAMPAIGN] UAV Campaign C9 - SOC LLM Prompt Injection → SOC Alert Flood (Swarm Saturation) - {{Operator}}",
+          "alertDescriptionFormat": "CampaignType={{CampaignType}} | Steps={{StepSummary}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "CampaignType": "CampaignType",
+          "StepSummary": "StepSummary",
+          "Operator": "Operator",
+          "StageCount": "StageCount"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Account",
+            "fieldMappings": [
+              {
+                "identifier": "Name",
+                "columnName": "Operator"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

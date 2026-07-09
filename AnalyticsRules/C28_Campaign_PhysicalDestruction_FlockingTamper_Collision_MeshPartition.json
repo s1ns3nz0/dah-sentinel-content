@@ -1,0 +1,82 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/2f6d95d5-d960-44bf-b0dd-1fca14b79893')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/2f6d95d5-d960-44bf-b0dd-1fca14b79893')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV Campaign C28 - Flocking Parameter Tamper → Collision Course → Mesh Partition",
+        "description": "3단계 킬체인(2/3 단계 이상 관측 시 트리거, near-miss 허용): 물리파괴: flocking 변조→충돌 유도→메시 분단(회복 차단). 체인: Flocking Parameter Tamper(S106) → Collision Course(S103) → Mesh Partition(S108). 연결키: SwarmId. MITRE: T1565.001, T1499",
+        "severity": "High",
+        "enabled": true,
+        "query": "let windowSize = 30m;\n\n// S106: Flocking Parameter Tamper\nlet S106 =\n    UAVSwarmComms_CL\n    | where TimeGenerated > ago(windowSize)\n    | where EventType == 'flocking_param_tamper'\n    | extend Stage = 'S106', SwarmId = tostring(SwarmId)\n    | where isnotempty(SwarmId)\n    | project TimeGenerated, Stage, SwarmId;\n\n// S103: Collision Course\nlet S103 =\n    UAVSwarmComms_CL\n    | where TimeGenerated > ago(windowSize)\n    | where EventType == 'collision_course'\n    | extend Stage = 'S103', SwarmId = tostring(SwarmId)\n    | where isnotempty(SwarmId)\n    | project TimeGenerated, Stage, SwarmId;\n\n// S108: Mesh Partition\nlet S108 =\n    UAVSwarmComms_CL\n    | where TimeGenerated > ago(windowSize)\n    | where EventType == 'mesh_partition'\n    | extend Stage = 'S108', SwarmId = tostring(SwarmId)\n    | where isnotempty(SwarmId)\n    | project TimeGenerated, Stage, SwarmId;\n\nunion S106, S103, S108\n| summarize StagesSeen = make_set(Stage), StageCount = dcount(Stage), FirstSeen = min(TimeGenerated), LastSeen = max(TimeGenerated) by SwarmId\n| where StageCount >= 2\n| extend CampaignType = \"C28_물리파괴_flocking변조_충돌유도_메시분단\"\n| extend StepSummary = strcat(\"Stages=\", tostring(StagesSeen), \" | First=\", tostring(FirstSeen), \" | Last=\", tostring(LastSeen))\n| extend Severity = \"High\"\n| project FirstSeen, LastSeen, SwarmId, StagesSeen, StageCount, CampaignType, StepSummary, Severity",
+        "queryFrequency": "PT10M",
+        "queryPeriod": "PT30M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT1H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "Impact"
+        ],
+        "techniques": [
+          "T1565.001",
+          "T1499"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": true,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT1H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Host"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "[CAMPAIGN] UAV Campaign C28 - Flocking Parameter Tamper → Collision Course → Mesh Partition - {{SwarmId}}",
+          "alertDescriptionFormat": "CampaignType={{CampaignType}} | Steps={{StepSummary}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "CampaignType": "CampaignType",
+          "StepSummary": "StepSummary",
+          "SwarmId": "SwarmId",
+          "StageCount": "StageCount"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "SwarmId"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

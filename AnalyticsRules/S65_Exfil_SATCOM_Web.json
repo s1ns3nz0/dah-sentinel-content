@@ -1,0 +1,91 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/3866e385-4563-4f84-b312-59c2bf4fa2e8')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/3866e385-4563-4f84-b312-59c2bf4fa2e8')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S65 - Exfiltration via SATCOM / Web Service (REST)",
+        "description": "UAVExfilFlow_CL에서 SATCOM 대체매체 또는 REST 웹서비스 채널을 통해 C2_Whitelisted_GCS_List에 없는 비인가 목적지로 500MB 초과 대량 전송되는 유출 탐지. MITRE: T1011,T1567",
+        "severity": "Medium",
+        "enabled": true,
+        "query": "let alertWindow = 15m;\nlet bytesGate = 500000000;\nlet WhitelistedGcs = _GetWatchlist('C2_Whitelisted_GCS_List') | project GCS_IP;\nUAVExfilFlow_CL\n| where TimeGenerated > ago(alertWindow)\n| where Channel in (\"satcom\", \"web\")\n| where DestinationHost !in (WhitelistedGcs)\n| summarize TotalBytes = sum(BytesTransferred), TransferCount = count(), LastEvent = max(TimeGenerated) by SourceAsset, Channel, DestinationHost, Operator\n| where TotalBytes > bytesGate\n| extend TriggerReason = strcat(\"유출_비인가목적지_\", Channel, \"_\", DestinationHost, \"_\", tostring(TotalBytes / 1000000), \"MB\")\n| extend Severity = \"Medium\"\n| project LastEvent, SourceAsset, Channel, DestinationHost, Operator, TotalBytes, TransferCount, TriggerReason, Severity\n| order by LastEvent desc",
+        "queryFrequency": "PT10M",
+        "queryPeriod": "PT15M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "Exfiltration"
+        ],
+        "techniques": [
+          "T1011",
+          "T1567"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT5H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Host"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S65 - Exfiltration via SATCOM / Web Service (REST) - {{SourceAsset}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | DestinationHost={{DestinationHost}} | TotalBytes={{TotalBytes}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "Channel": "Channel",
+          "DestinationHost": "DestinationHost",
+          "TotalBytes": "TotalBytes"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "SourceAsset"
+              }
+            ]
+          },
+          {
+            "entityType": "IP",
+            "fieldMappings": [
+              {
+                "identifier": "Address",
+                "columnName": "DestinationHost"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

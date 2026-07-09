@@ -1,0 +1,90 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/097efcfd-c3b2-467e-bba7-cd8ba60cdbfa')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/097efcfd-c3b2-467e-bba7-cd8ba60cdbfa')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S95 - Staged Bandwidth-Limited Split Exfiltration",
+        "description": "UAVExfilFlow_CL에서 StagingDirEvent=true 스테이징 이벤트 발생 후 30분 이내 동일 UAVId에서 ChunkCount>=10건, 청크당 2MB 미만(대역폭 제한 회피)으로 분할된 유출 흐름 탐지. MITRE: T1074 Data Staged, T1030 Data Transfer Size Limits",
+        "severity": "High",
+        "enabled": true,
+        "query": "let alertWindow = 30m;\nlet minChunkCount = 10;\nlet maxChunkSizeBytes = 2000000.0;\nlet maxReplayWindow = 30m;\nlet StagingEvents = UAVExfilFlow_CL\n    | where TimeGenerated > ago(alertWindow)\n    | where StagingDirEvent == true\n    | project StageTime = TimeGenerated, UAVId;\nlet ChunkedFlows = UAVExfilFlow_CL\n    | where TimeGenerated > ago(alertWindow)\n    | where ChunkCount >= minChunkCount and ChunkSizeBytes > 0 and ChunkSizeBytes < maxChunkSizeBytes;\nChunkedFlows\n| join kind=inner (StagingEvents) on UAVId\n| where TimeGenerated >= StageTime and TimeGenerated - StageTime <= maxReplayWindow\n| summarize arg_max(TimeGenerated, Operator, AssetType, DestIp, DestPort, BytesTransferred, ChunkCount, ChunkSizeBytes, StageTime) by UAVId\n| extend TriggerReason = strcat(\"스테이징후_분할유출_\", tostring(ChunkCount), \"청크x\", tostring(toint(ChunkSizeBytes/1000)), \"KB_스테이징후\", tostring(datetime_diff('minute', TimeGenerated, StageTime)), \"분\")\n| extend Severity = \"High\"\n| project TimeGenerated, UAVId, Operator, AssetType, DestIp, DestPort, BytesTransferred, ChunkCount, ChunkSizeBytes, StageTime, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "queryFrequency": "PT10M",
+        "queryPeriod": "PT1H",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "Collection",
+          "Exfiltration"
+        ],
+        "techniques": [
+          "T1074",
+          "T1030"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": false,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT5H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S95 - Staged Bandwidth-Limited Split Exfiltration - {{UAVId}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | ChunkCount={{ChunkCount}} | ChunkSizeBytes={{ChunkSizeBytes}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "ChunkCount": "ChunkCount",
+          "ChunkSizeBytes": "ChunkSizeBytes",
+          "StageTime": "StageTime"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "UAVId"
+              }
+            ]
+          },
+          {
+            "entityType": "Account",
+            "fieldMappings": [
+              {
+                "identifier": "Name",
+                "columnName": "Operator"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

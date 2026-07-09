@@ -1,0 +1,81 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/8a6f8d41-0660-477a-a5fd-76f0cbf57580')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/8a6f8d41-0660-477a-a5fd-76f0cbf57580')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S52 - Container Resource Exhaustion DoS (SYN Flood)",
+        "description": "UAVContainerOps_CL에서 컨테이너 CPU 고갈(>90%)과 연결 폭증(>200)이 5분 이상 2개 이상 구간에서 동시 지속되는 SYN flood형 리소스 고갈 DoS 탐지. MITRE: T0816,T1499",
+        "severity": "High",
+        "enabled": true,
+        "query": "let alertWindow = 20m;\nlet cpuGate = 90.0;\nlet connGate = 200;\nUAVContainerOps_CL\n| where TimeGenerated > ago(alertWindow)\n| summarize MaxCpu = max(CpuUsagePct), MaxConn = max(ConnCount) by ContainerName, UAVId, TimeBin = bin(TimeGenerated, 5m)\n| where MaxCpu > cpuGate and MaxConn > connGate\n| summarize SustainedBins = count(), FirstBin = min(TimeBin), LastBin = max(TimeBin), PeakCpu = max(MaxCpu), PeakConn = max(MaxConn) by ContainerName, UAVId\n| extend DurationMin = datetime_diff(\"minute\", LastBin, FirstBin)\n| where SustainedBins >= 2 and DurationMin >= 5\n| extend TriggerReason = strcat(ContainerName, \"_SYNflood_CPU고갈_\", tostring(toint(PeakCpu)), \"%_Conn\", tostring(PeakConn))\n| extend Severity = \"High\"\n| project LastBin, FirstBin, ContainerName, UAVId, PeakCpu, PeakConn, SustainedBins, DurationMin, TriggerReason, Severity\n| order by LastBin desc",
+        "queryFrequency": "PT5M",
+        "queryPeriod": "PT20M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "Impact"
+        ],
+        "techniques": [
+          "T1499"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT5H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Host"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S52 - Container Resource Exhaustion DoS (SYN Flood) - {{ContainerName}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | PeakCpu={{PeakCpu}} | PeakConn={{PeakConn}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "ContainerName": "ContainerName",
+          "PeakCpu": "PeakCpu",
+          "PeakConn": "PeakConn"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "UAVId"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

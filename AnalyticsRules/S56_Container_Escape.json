@@ -1,0 +1,90 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/84587cb4-4003-4df5-8813-869126259cb1')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/84587cb4-4003-4df5-8813-869126259cb1')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S56 - Container Escape (Privileged / docker.sock hostPath)",
+        "description": "UAVContainerOps_CL에서 privileged=true 또는 /var/run/docker.sock hostPath 마운트로 생성되는 컨테이너 탐지. 컨테이너 탈출을 통한 호스트 장악 위험. MITRE: T1611",
+        "severity": "High",
+        "enabled": true,
+        "query": "let alertWindow = 15m;\nUAVContainerOps_CL\n| where TimeGenerated > ago(alertWindow)\n| where Action == \"create\"\n| where Privileged == true or HostPathMount == \"/var/run/docker.sock\"\n| extend TriggerReason = case(\n    Privileged == true and HostPathMount == \"/var/run/docker.sock\", strcat(ContainerName, \"_privileged_dockersock마운트_컨테이너탈출위험\"),\n    Privileged == true, strcat(ContainerName, \"_privileged_컨테이너생성\"),\n    strcat(ContainerName, \"_dockersock마운트_컨테이너탈출위험\"))\n| extend Severity = \"High\"\n| project TimeGenerated, UAVId, ContainerName, Namespace, ActorId, Privileged, HostPathMount, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "queryFrequency": "PT5M",
+        "queryPeriod": "PT15M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "Privilege Escalation"
+        ],
+        "techniques": [
+          "T1611"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT5H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Host"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S56 - Container Escape (Privileged / docker.sock hostPath) - {{ContainerName}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Privileged={{Privileged}} | HostPathMount={{HostPathMount}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "ContainerName": "ContainerName",
+          "Privileged": "Privileged",
+          "HostPathMount": "HostPathMount"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "UAVId"
+              }
+            ]
+          },
+          {
+            "entityType": "Account",
+            "fieldMappings": [
+              {
+                "identifier": "Name",
+                "columnName": "ActorId"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

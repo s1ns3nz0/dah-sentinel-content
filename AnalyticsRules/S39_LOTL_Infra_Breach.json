@@ -1,0 +1,93 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/e5692313-bfe3-4b04-932a-ea451cf6d972')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/e5692313-bfe3-4b04-932a-ea451cf6d972')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S39 - Living-off-the-Land Ground Infrastructure Compromise",
+        "description": "Volt Typhoon 스타일 LOTL(Living-off-the-Land) 지상 인프라 침해 탐지. UAVOpAudit_CL의 admin_cmd_exec 이벤트 중 관리도구(powershell/wmic/certutil/mshta/rundll32/psexec/bitsadmin/regsvr32 등)가 Approved_Operators_List에 없는 계정으로 실행되거나, 비정상 ParentProcess(services.exe/wmiprvse.exe/svchost.exe)에서 기동된 경우를 탐지. MITRE: T1059, T1570",
+        "severity": "High",
+        "enabled": true,
+        "query": "let approvedOps = _GetWatchlist('Approved_Operators_List') | project OperatorId;\nlet lotlTools = dynamic([\"powershell.exe\", \"pwsh.exe\", \"wmic.exe\", \"certutil.exe\", \"mshta.exe\", \"rundll32.exe\", \"psexec.exe\", \"bitsadmin.exe\", \"regsvr32.exe\"]);\nlet suspiciousParents = dynamic([\"services.exe\", \"wmiprvse.exe\", \"svchost.exe\"]);\nlet alertWindow = 15m;\nUAVOpAudit_CL\n| where TimeGenerated > ago(alertWindow)\n| where EventType == \"admin_cmd_exec\"\n| where ProcessName has_any (lotlTools)\n| extend isUnexpectedAccount = Operator !in (approvedOps)\n| extend isSuspiciousParent = ParentProcess in (suspiciousParents)\n| where isUnexpectedAccount or isSuspiciousParent\n| extend TriggerReason = case(\n    isUnexpectedAccount and isSuspiciousParent, \"LOTL_비인가계정_비정상Parent_동시\",\n    isUnexpectedAccount, strcat(\"LOTL_비인가계정_관리도구실행_\", Operator),\n    strcat(\"LOTL_비정상_ParentProcess_\", ParentProcess))\n| extend Severity = \"High\"\n| project TimeGenerated, TargetHost, Operator, ClientIp, ProcessName, ParentProcess, CommandLine, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "queryFrequency": "PT5M",
+        "queryPeriod": "PT15M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "Execution",
+          "LateralMovement"
+        ],
+        "techniques": [
+          "T1059",
+          "T1570"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT2H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Host",
+              "Account"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S39 - Living-off-the-Land Ground Infrastructure Compromise - {{TargetHost}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | ProcessName={{ProcessName}} | ParentProcess={{ParentProcess}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "ProcessName": "ProcessName",
+          "ParentProcess": "ParentProcess",
+          "Operator": "Operator"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "TargetHost"
+              }
+            ]
+          },
+          {
+            "entityType": "Account",
+            "fieldMappings": [
+              {
+                "identifier": "Name",
+                "columnName": "Operator"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

@@ -1,0 +1,78 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/df17c55e-310e-4b5e-bcb6-281d49316d8a')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/df17c55e-310e-4b5e-bcb6-281d49316d8a')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S67 - Container Registry Image Tampering",
+        "description": "컨테이너 레지스트리에 푸시된 이미지의 Digest가 기대값(ImageDigestExpected)과 실제값(ImageDigestActual)이 불일치하거나, Approved_Operators_List에 없는 비인가 계정(PushedBy)의 푸시를 탐지. 공급망 무결성 훼손(이미지 변조/스푸핑) 징후. MITRE: T1195.002",
+        "severity": "High",
+        "enabled": true,
+        "query": "let alertWindow = 10m;\nlet ApprovedOps = _GetWatchlist('Approved_Operators_List') | project OperatorId;\nUAVSupplyChain_CL\n| where TimeGenerated > ago(alertWindow)\n| where EventType == 'RegistryPush'\n| extend isDigestMismatch = (ImageDigestExpected != ImageDigestActual)\n| extend isUnknownPusher = PushedBy !in (ApprovedOps)\n| where isDigestMismatch or isUnknownPusher\n| extend TriggerReason = case(\n    isDigestMismatch and isUnknownPusher, strcat(\"레지스트리_다이제스트불일치_비인가푸시_\", PushedBy),\n    isDigestMismatch, strcat(\"레지스트리_다이제스트불일치_\", Registry),\n    strcat(\"레지스트리_비인가_푸시자_\", PushedBy))\n| extend Severity = \"High\"\n| project TimeGenerated, Registry, PushedBy, ImageDigestExpected, ImageDigestActual, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "queryFrequency": "PT5M",
+        "queryPeriod": "PT15M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "Initial Access"
+        ],
+        "techniques": [
+          "T1195"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": false,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT2H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S67 - Container Registry Image Tampering - {{Registry}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Expected={{ImageDigestExpected}} | Actual={{ImageDigestActual}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "Registry": "Registry",
+          "PushedBy": "PushedBy"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Account",
+            "fieldMappings": [
+              {
+                "identifier": "Name",
+                "columnName": "PushedBy"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

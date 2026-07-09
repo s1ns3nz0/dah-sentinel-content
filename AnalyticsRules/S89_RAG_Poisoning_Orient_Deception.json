@@ -1,0 +1,78 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/8c78b3a4-b9e9-4e91-baed-6cb0e8302ba0')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/8c78b3a4-b9e9-4e91-baed-6cb0e8302ba0')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S89 - Orient-Stage Deception via RAG Poisoning Reframing",
+        "description": "OODA Orient 단계 기만/RAG 포이즈닝 재프레임 탐지. UAVAiInference_CL의 InferenceType='rag_query' 레코드 중 검색된 근거가 신뢰 소스와 모순되는 건수(ContradictionCount)가 높고 동시에 응답 불확실성 급등(UncertaintySpike)이 관측되는 경우를 탐지. 오염된 검색 코퍼스로 SOC/지휘통제 판단(Orient)을 왜곡시키려는 시도. MITRE: AML.T0051",
+        "severity": "Medium",
+        "enabled": true,
+        "query": "let alertWindow = 15m;\nlet contradictionGate = 3;\nlet uncertaintyGate = 0.4;\nUAVAiInference_CL\n| where TimeGenerated > ago(alertWindow)\n| where InferenceType == 'rag_query'\n| where ContradictionCount >= contradictionGate and UncertaintySpike >= uncertaintyGate\n| extend TriggerReason = strcat('RAG포이즈닝_Orient기만_모순', tostring(ContradictionCount), '건_불확실성', tostring(UncertaintySpike))\n| extend Severity = 'Medium'\n| project TimeGenerated, ModelEndpoint, RequesterId, QueryText, ContradictionCount, UncertaintySpike, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "queryFrequency": "PT10M",
+        "queryPeriod": "PT20M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "DefenseEvasion"
+        ],
+        "techniques": [
+          "T1565"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": false,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT5H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S89 - RAG Poisoning Orient Deception - {{ModelEndpoint}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Severity={{Severity}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "ContradictionCount": "ContradictionCount",
+          "UncertaintySpike": "UncertaintySpike"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "ModelEndpoint"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

@@ -1,0 +1,88 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/671dead6-061f-4165-b16b-2fb6cc274a2a')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/671dead6-061f-4165-b16b-2fb6cc274a2a')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S115 - Control Mode Transition Attack (Manual/Auto Hijack)",
+        "description": "UAVOpmode_CL에서 OpmodeField='control_mode_transition'(Manual↔Auto)이 Authorized=0(SByte)으로 발생하는 비인가 제어권 전환 탐지. 실제 컬럼: OpmodeField/ExpectedValue/ObservedValue/ChangedBy/Authorized(SByte). MITRE: T0827 Loss of Control (조종권을 비인가로 강제 전환시켜 운용자 통제권을 상실시킴)",
+        "severity": "High",
+        "enabled": true,
+        "query": "let alertWindow = 10m;\nUAVOpmode_CL\n| where TimeGenerated > ago(alertWindow)\n| where OpmodeField == 'control_mode_transition'\n| where Authorized == 0\n| summarize FlipCount = count(), FirstSeen = min(TimeGenerated), LastExpected = max(ExpectedValue), LastObserved = max(ObservedValue)\n    by UAVId, ChangedBy, bin(TimeGenerated, 5m)\n| where FlipCount >= 1\n| extend TriggerReason = strcat(\"제어권전환_비인가_\", tostring(FlipCount), \"회_\", UAVId, \"_\", LastExpected, \"->\", LastObserved)\n| project FirstSeen, UAVId, ChangedBy, FlipCount, LastExpected, LastObserved, TriggerReason\n| order by FirstSeen desc",
+        "queryFrequency": "PT5M",
+        "queryPeriod": "PT15M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "Impact"
+        ],
+        "techniques": [
+          "T1489"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT5H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Host"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S115 - Control Mode Transition Attack (Manual/Auto Hijack) - {{UAVId}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | ChangedBy={{ChangedBy}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "FlipCount": "FlipCount"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "UAVId"
+              }
+            ]
+          },
+          {
+            "entityType": "Account",
+            "fieldMappings": [
+              {
+                "identifier": "Name",
+                "columnName": "ChangedBy"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

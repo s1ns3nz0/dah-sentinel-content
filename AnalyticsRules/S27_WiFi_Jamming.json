@@ -1,0 +1,81 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/08425db0-d2f1-409d-abc7-6914abeb245e')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/08425db0-d2f1-409d-abc7-6914abeb245e')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S27 - WiFi RF Jamming (Loss of Control)",
+        "description": "UAVWifi_CL에서 PacketLossPct(패킷 손실률)와 NoiseFloorDbm(RF 잡음 바닥)이 동시에 임계(손실률 20% 초과, 잡음 -75dBm 초과)를 넘으면 WiFi 재밍에 의한 통제 상실 징후로 탐지. MITRE: T1498",
+        "severity": "Medium",
+        "enabled": true,
+        "query": "let alertWindow = 10m;\nlet packetLossGate = 20.0;\nlet noiseFloorGate = -75.0;\nUAVWifi_CL\n| where TimeGenerated > ago(alertWindow)\n| where PacketLossPct > packetLossGate and NoiseFloorDbm > noiseFloorGate\n| summarize AvgLoss = avg(PacketLossPct), AvgNoise = avg(NoiseFloorDbm), LastSeen = max(TimeGenerated) by UAVId, BSSID\n| extend TriggerReason = strcat('WiFi_재밍_통제상실_PacketLoss:', tostring(round(AvgLoss,1)), '%_Noise:', tostring(round(AvgNoise,1)), 'dBm')\n| extend Severity = 'Medium'\n| project TimeGenerated = LastSeen, UAVId, BSSID, AvgLoss, AvgNoise, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "queryFrequency": "PT5M",
+        "queryPeriod": "PT15M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "Impact"
+        ],
+        "techniques": [
+          "T1498"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT2H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Host"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S27 - WiFi RF Jamming (Loss of Control) - {{UAVId}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | AvgLoss={{AvgLoss}} | AvgNoise={{AvgNoise}} | Severity={{Severity}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "AvgLoss": "AvgLoss",
+          "AvgNoise": "AvgNoise",
+          "Severity": "Severity"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "UAVId"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

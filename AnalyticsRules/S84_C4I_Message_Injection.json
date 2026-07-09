@@ -1,0 +1,78 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/666775d0-dfea-4c12-9303-9f88a3cebef5')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/666775d0-dfea-4c12-9303-9f88a3cebef5')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S84 - C4I Message Injection (Forged Order)",
+        "description": "C4I 메시지 발신 출처(MessageOrigin)가 존재하나 서명 검증이 실패(SignatureValid=false)한 주문 유형(OrderType)의 위조 명령 주입을 탐지. MITRE: T1565",
+        "severity": "High",
+        "enabled": true,
+        "query": "let alertWindow = 10m;\nUAVC4I_CL\n| where TimeGenerated > ago(alertWindow)\n| where isnotempty(MessageOrigin)\n| where SignatureValid == false\n| extend TriggerReason = strcat(\"C4I_메시지주입_서명무효_\", OrderType, \"_origin:\", MessageOrigin)\n| extend Severity = \"High\"\n| project TimeGenerated, OrderId, MessageOrigin, SignatureValid, OrderType, IssuedBy, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "queryFrequency": "PT5M",
+        "queryPeriod": "PT15M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "Impact"
+        ],
+        "techniques": [
+          "T1565"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": false,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT2H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S84 - C4I Message Injection - {{OrderType}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | MessageOrigin={{MessageOrigin}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "OrderType": "OrderType",
+          "MessageOrigin": "MessageOrigin"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Account",
+            "fieldMappings": [
+              {
+                "identifier": "Name",
+                "columnName": "IssuedBy"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

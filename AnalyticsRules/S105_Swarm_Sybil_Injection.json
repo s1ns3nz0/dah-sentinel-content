@@ -1,0 +1,77 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/70fea90d-aa49-4745-a5ba-2e918cdfe40a')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/70fea90d-aa49-4745-a5ba-2e918cdfe40a')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S105 - Sybil Member Injection into Swarm",
+        "description": "UAVSwarmComms_CL의 member_roster 메시지에서 MemberCountObserved가 MemberCountExpected를 초과하거나, UnknownMemberIds 중 Approved_SystemId_List에 등록되지 않은 진짜 미확인 멤버(TrulyUnknownMembers)가 존재하는 Sybil 위장 멤버 주입 탐지. MITRE: T0859 Valid Accounts (ICS — description 참조)",
+        "severity": "High",
+        "enabled": true,
+        "query": "let alertWindow = 10m;\nlet KnownSystemIdsArr = toscalar(_GetWatchlist('Approved_SystemId_List') | summarize make_list(UAVId));\nUAVSwarmComms_CL\n| where TimeGenerated > ago(alertWindow)\n| where MessageType == \"member_roster\"\n| extend TrulyUnknownMembers = set_difference(UnknownMemberIds, KnownSystemIdsArr)\n| where MemberCountObserved > MemberCountExpected or array_length(TrulyUnknownMembers) > 0\n| extend TriggerReason = strcat(\"Sybil위장멤버주입_기대:\", tostring(MemberCountExpected), \"_관측:\", tostring(MemberCountObserved), \"_미확인멤버:\", tostring(TrulyUnknownMembers))\n| extend Severity = \"High\"\n| project TimeGenerated, SwarmId, MemberId, UAVId, MessageType, MemberCountExpected, MemberCountObserved, TrulyUnknownMembers, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "queryFrequency": "PT5M",
+        "queryPeriod": "PT15M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "InitialAccess"
+        ],
+        "techniques": [],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": false,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT5H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S105 - Sybil Member Injection into Swarm - {{UAVId}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Severity={{Severity}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "MemberCountExpected": "MemberCountExpected",
+          "MemberCountObserved": "MemberCountObserved",
+          "SwarmId": "SwarmId"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "UAVId"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

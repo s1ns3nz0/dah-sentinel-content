@@ -1,0 +1,79 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/e9c09d51-8d9d-4e97-8738-1d7880414b98')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/e9c09d51-8d9d-4e97-8738-1d7880414b98')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S87 - Detection Rule PR Backdoor Mitigation Injection",
+        "description": "RuleUpdate PR을 통한 백도어 완화조건 주입 탐지. UAVRuleChangeAudit_CL에서 리뷰가 필요(ReviewRequired=true)한데 승인자(ApprovedBy)가 비어있는 자기병합, 또는 임계값 변경폭(ChangePctMagnitude)이 50% 이상인 대폭 완화 변경을 탐지. 탐지 규칙 임계값을 몰래 느슨하게 바꿔 향후 공격을 무탐지 처리하려는 공급망성 백도어 시도. MITRE: T1565",
+        "severity": "High",
+        "enabled": true,
+        "query": "let alertWindow = 30m;\nlet magnitudeGate = 50.0;\nUAVRuleChangeAudit_CL\n| where TimeGenerated > ago(alertWindow)\n| where (ReviewRequired == true and isempty(ApprovedBy)) or abs(ChangePctMagnitude) >= magnitudeGate\n| extend TriggerReason = case(\n    ReviewRequired == true and isempty(ApprovedBy), strcat('룰변경_승인누락_', RuleId),\n    abs(ChangePctMagnitude) >= magnitudeGate, strcat('룰변경_임계값_대폭완화_', RuleId, '_', tostring(ChangePctMagnitude), 'pct'),\n    'Unknown')\n| extend Severity = 'High'\n| project TimeGenerated, RuleId, ThresholdBefore, ThresholdAfter, ChangePctMagnitude, ApprovedBy, ReviewRequired, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "queryFrequency": "PT15M",
+        "queryPeriod": "PT1H",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "DefenseEvasion",
+          "Persistence"
+        ],
+        "techniques": [
+          "T1565"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": false,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT5H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S87 - Detection Rule PR Backdoor - {{RuleId}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | ApprovedBy={{ApprovedBy}} | Severity={{Severity}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "RuleId": "RuleId",
+          "ChangePctMagnitude": "ChangePctMagnitude"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Account",
+            "fieldMappings": [
+              {
+                "identifier": "Name",
+                "columnName": "ApprovedBy"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

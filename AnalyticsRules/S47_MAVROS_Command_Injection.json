@@ -1,0 +1,80 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/d4ae2c0c-200c-400c-8413-8189856aff88')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/d4ae2c0c-200c-400c-8413-8189856aff88')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S47 - MAVROS Command Injection (Mission Planner Bypass)",
+        "description": "MAVROS 명령 주입 탐지 — 정상 임무 플래너 경로(Approved_ROS_Node_List의 Role=mission_planner)를 우회해 setpoint 토픽(/mavros/setpoint_raw/local, /mavros/setpoint_velocity/cmd_vel, /mavros/setpoint_position/local)에 직접 명령을 publish하는 비인가 노드를 탐지. MITRE ICS ATT&CK: T0831 Manipulation of Control",
+        "severity": "High",
+        "enabled": true,
+        "query": "let plannerNodes = _GetWatchlist('Approved_ROS_Node_List') | where Role == \"mission_planner\" | project NodeName;\nlet setpointTopics = dynamic([\"/mavros/setpoint_raw/local\", \"/mavros/setpoint_velocity/cmd_vel\", \"/mavros/setpoint_position/local\"]);\nlet alertWindow = 10m;\nUAVRos_CL\n| where TimeGenerated > ago(alertWindow)\n| where EventType == \"topic_publish\"\n| where TopicName in (setpointTopics)\n| where NodeName !in (plannerNodes)\n| extend TriggerReason = strcat(\"MAVROS_설정점명령_임무플래너_우회_\", NodeName)\n| extend Severity = \"High\"\n| project TimeGenerated, UAVId, NodeName, PeerIp, TopicName, CommandSummary, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "queryFrequency": "PT5M",
+        "queryPeriod": "PT15M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "Impact"
+        ],
+        "techniques": [
+          "T1499"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT2H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Host"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S47 - MAVROS Command Injection (Mission Planner Bypass) - {{UAVId}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | NodeName={{NodeName}} | TopicName={{TopicName}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "NodeName": "NodeName",
+          "TopicName": "TopicName"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "UAVId"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

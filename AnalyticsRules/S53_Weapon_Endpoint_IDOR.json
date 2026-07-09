@@ -1,0 +1,90 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/14722870-7f77-46aa-94c7-9e71102a245f')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/14722870-7f77-46aa-94c7-9e71102a245f')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S53 - Weapon Endpoint IDOR (Auth Bypass)",
+        "description": "UAVWebAccess_CL에서 무기(/weapon,/arm,/fire) 엔드포인트에 대해 Operator_UAV_Binding_List 미등록 바인딩(IDOR: 타 UAV 리소스 ID로 200 성공 응답)을 탐지. 인증우회형 직접객체참조 취약점 악용 의심. MITRE: T1078",
+        "severity": "High",
+        "enabled": true,
+        "query": "let alertWindow = 15m;\nlet Binding =\n    _GetWatchlist('Operator_UAV_Binding_List')\n    | project Operator = OperatorId, ResourceId = AllowedUAVId, Role;\nUAVWebAccess_CL\n| where TimeGenerated > ago(alertWindow)\n| where Path has_any (\"/weapon\", \"/arm\", \"/fire\")\n| where StatusCode == 200\n| join kind=leftouter (Binding) on Operator, ResourceId\n| extend RequestedByOwnerAccount = isnotnull(Role)\n| where not(RequestedByOwnerAccount)\n| extend TriggerReason = strcat(\"IDOR_무기엔드포인트_비인가접근_\", Operator, \"_\", ResourceId)\n| extend Severity = \"High\"\n| project TimeGenerated, Operator, ClientIp, Method, Path, ResourceId, StatusCode, RequestedByOwnerAccount, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "queryFrequency": "PT5M",
+        "queryPeriod": "PT15M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "Initial Access"
+        ],
+        "techniques": [
+          "T1078"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT5H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Account"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S53 - Weapon Endpoint IDOR (Auth Bypass) - {{Operator}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Path={{Path}} | ResourceId={{ResourceId}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "Path": "Path",
+          "ResourceId": "ResourceId",
+          "Method": "Method"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Account",
+            "fieldMappings": [
+              {
+                "identifier": "Name",
+                "columnName": "Operator"
+              }
+            ]
+          },
+          {
+            "entityType": "IP",
+            "fieldMappings": [
+              {
+                "identifier": "Address",
+                "columnName": "ClientIp"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

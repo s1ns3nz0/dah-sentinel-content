@@ -1,0 +1,90 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/8d3ae6a7-c384-4629-9e47-52a4615de64d')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/8d3ae6a7-c384-4629-9e47-52a4615de64d')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S58 - Archive Zip Slip (Path Traversal)",
+        "description": "UAVArchiveExtract_CL에서 아카이브 엔트리(../ 등) 경로순회로 압축 해제 경로가 지정된 추출 루트(ExtractRoot) 밖으로 이탈하는 Zip Slip 탐지. MITRE: T1195",
+        "severity": "Medium",
+        "enabled": true,
+        "query": "let alertWindow = 15m;\nUAVArchiveExtract_CL\n| where TimeGenerated > ago(alertWindow)\n| where TraversalDetected == true\n| where not(ExtractPathResolved startswith ExtractRoot)\n| extend TriggerReason = strcat(\"ZipSlip_경로순회_\", ArchiveEntry, \"_to_\", ExtractPathResolved)\n| extend Severity = \"Medium\"\n| project TimeGenerated, UAVId, ArchiveName, ArchiveEntry, ExtractPathResolved, ExtractRoot, UploadedBy, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "queryFrequency": "PT5M",
+        "queryPeriod": "PT15M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "Initial Access"
+        ],
+        "techniques": [
+          "T1195"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT5H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Host"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S58 - Archive Zip Slip (Path Traversal) - {{UAVId}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | ArchiveEntry={{ArchiveEntry}} | ExtractPathResolved={{ExtractPathResolved}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "ArchiveEntry": "ArchiveEntry",
+          "ExtractPathResolved": "ExtractPathResolved",
+          "UploadedBy": "UploadedBy"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "UAVId"
+              }
+            ]
+          },
+          {
+            "entityType": "Account",
+            "fieldMappings": [
+              {
+                "identifier": "Name",
+                "columnName": "UploadedBy"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

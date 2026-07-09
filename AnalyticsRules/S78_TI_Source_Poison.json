@@ -1,0 +1,79 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/70df30cb-0e8d-4194-a0aa-2c572f0d9cd4')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/70df30cb-0e8d-4194-a0aa-2c572f0d9cd4')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S78 - Threat Intel Source Poisoning (Untrusted Source Injection)",
+        "description": "Trusted_TI_Source_List에 등록되지 않은 외부 소스(Source)로부터의 IOC 주입 또는 단시간 IOC 버스트를 탐지. UAV EO/IR·SIGINT·HUMINT 등 인가된 소스 외 유입 시 표적정보 오염 위험. MITRE: T1080",
+        "severity": "High",
+        "enabled": true,
+        "query": "let alertWindow = 10m;\nlet TrustedSources = _GetWatchlist('Trusted_TI_Source_List') | project SourceId;\nUAVTiFeed_CL\n| where TimeGenerated > ago(alertWindow)\n| where Source !in (TrustedSources)\n| summarize Count=count(), FirstSeen=min(TimeGenerated) by Source\n| extend TriggerReason = strcat(\"TI_비신뢰_소스_\", Source)\n| extend Severity = \"High\"\n| project TimeGenerated=FirstSeen, Source, Count, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "queryFrequency": "PT5M",
+        "queryPeriod": "PT15M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "Lateral Movement"
+        ],
+        "techniques": [
+          "T1080"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT2H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Host"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S78 - Threat Intel Source Poisoning - {{Source}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Severity={{Severity}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "Severity": "Severity"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "Source"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

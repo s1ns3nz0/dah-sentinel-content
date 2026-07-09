@@ -1,0 +1,82 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/94888266-7bfb-42fc-8fc9-2c393637eeb4')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/94888266-7bfb-42fc-8fc9-2c393637eeb4')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S21 - Ground Segment Lateral Movement (impacket/crackmapexec Signatures)",
+        "description": "UAVLateralMove_CL에서 지상통제 세그먼트(GCS/C4I 호스트) 간 SMB/WMI 계열 공격 툴 시그니처(impacket-wmiexec, impacket-psexec, crackmapexec 등) 또는 NTLM-Relay/Guest 인증 사용을 탐지. 단일 SourceHost가 다수 PeerIp로 확산 시도 시 High로 상향. MITRE: T1570, T1021",
+        "severity": "High",
+        "enabled": true,
+        "query": "let alertWindow = 15m;\nlet knownTools = dynamic(['impacket-wmiexec', 'impacket-psexec', 'impacket-smbexec', 'impacket-secretsdump', 'impacket-atexec', 'crackmapexec', 'evil-winrm']);\nUAVLateralMove_CL\n| where TimeGenerated > ago(alertWindow)\n| where ToolSignature in (knownTools) or AuthMethod in ('NTLM-Relay', 'Guest')\n| summarize AttemptCount = count(), PeerCount = dcount(PeerIp), Tools = make_set(ToolSignature), Auths = make_set(AuthMethod), LastSeen = max(TimeGenerated) by SourceHost\n| extend TriggerReason = strcat('측면이동_툴시그니처_', tostring(Tools), '_대상수:', tostring(PeerCount))\n| extend Severity = iff(PeerCount >= 3, 'High', 'Medium')\n| project TimeGenerated = LastSeen, SourceHost, AttemptCount, PeerCount, Tools, Auths, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "queryFrequency": "PT15M",
+        "queryPeriod": "PT15M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "LateralMovement"
+        ],
+        "techniques": [
+          "T1570",
+          "T1021"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT2H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Host"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S21 - Ground Segment Lateral Movement (impacket/crackmapexec Signatures) - {{SourceHost}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Severity={{Severity}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "AttemptCount": "AttemptCount",
+          "PeerCount": "PeerCount",
+          "Severity": "Severity"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "SourceHost"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

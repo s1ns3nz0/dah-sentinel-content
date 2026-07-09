@@ -1,0 +1,79 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/10e6da43-5252-4873-aaaf-11faf1e2e878')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/10e6da43-5252-4873-aaaf-11faf1e2e878')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S5 - Failsafe Alarm Suppression (Arming Checks Disabled under Low Battery)",
+        "description": "UAVAlarm_CL에서 ArmingChecksBypassed=true 등 경보 억제 이벤트가 발생하면서 동시에 UAVTelemetry_CL 배터리 잔량 15% 이하(SYS_STATUS.BatteryRemaining_pct)인 상태를 동일 UAVId·시간창에서 상관분석해 탐지. 정상적 Failsafe가 발동해야 할 위험 상태에서 경보/암 체크가 억제된 정황. MITRE ICS ATT&CK: T0878 / EMB3D 경보억제",
+        "severity": "High",
+        "enabled": true,
+        "query": "let alertWindow = 15m;\nlet battThreshold = 15;\nlet SuppressEvent =\n    UAVAlarm_CL\n    | where TimeGenerated > ago(alertWindow)\n    | where ArmingChecksBypassed == true or AlarmText has_any ('Arming Checks Disabled', 'failsafe', 'GCS Failsafe')\n    | project T_suppress=TimeGenerated, UAVId, AlarmType, AlarmText, Source;\nlet BattLow =\n    UAVTelemetry_CL\n    | where TimeGenerated > ago(alertWindow)\n    | where MsgType == 'SYS_STATUS'\n    | where BatteryRemaining_pct < battThreshold\n    | summarize LowCount=count(), MinBatt=min(BatteryRemaining_pct) by UAVId;\nSuppressEvent\n| join kind=inner (BattLow) on UAVId\n| extend TriggerReason = strcat('Failsafe_경보억제_배터리_', tostring(MinBatt), '%_이하_', AlarmText)\n| extend Severity = 'High'\n| project T_suppress, UAVId, AlarmType, AlarmText, Source, LowCount, MinBatt, TriggerReason, Severity\n| order by T_suppress desc",
+        "queryFrequency": "PT5M",
+        "queryPeriod": "PT20M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "DefenseEvasion"
+        ],
+        "techniques": [
+          "T1562"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT2H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Host"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S5 - Failsafe Alarm Suppression (Arming Checks Disabled under Low Battery) - {{UAVId}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Severity={{Severity}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "MinBatt": "MinBatt"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "UAVId"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

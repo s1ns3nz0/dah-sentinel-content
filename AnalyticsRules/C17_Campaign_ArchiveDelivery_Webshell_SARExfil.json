@@ -1,0 +1,84 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/e5320e76-024d-4cc2-89ca-f566117a9821')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/e5320e76-024d-4cc2-89ca-f566117a9821')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV Campaign C17 - Archive Supply-Chain (Zip Slip) → Webshell Upload → Exfil (SAR/Auth)",
+        "description": "3단계 킬체인(2/3 단계 이상 관측 시 트리거, near-miss 허용): 아카이브 전달→웹셸→SAR 유출. 체인: Archive Supply-Chain (Zip Slip)(S58) → Webshell Upload(S54) → Exfil (SAR/Auth)(S92). 연결키: Operator. MITRE: T1195.002, T1505.003, T1041",
+        "severity": "High",
+        "enabled": true,
+        "query": "let windowSize = 2h;\n\n// S58: Archive Supply-Chain (Zip Slip)\nlet S58 =\n    UAVArchiveExtract_CL\n    | where TimeGenerated > ago(windowSize)\n    | where ZipSlipDetected == true\n    | extend Stage = 'S58', Operator = tostring(Operator)\n    | where isnotempty(Operator)\n    | project TimeGenerated, Stage, Operator;\n\n// S54: Webshell Upload\nlet S54 =\n    UAVWebAccess_CL\n    | where TimeGenerated > ago(windowSize)\n    | where EventType == 'webshell_upload'\n    | extend Stage = 'S54', Operator = tostring(Operator)\n    | where isnotempty(Operator)\n    | project TimeGenerated, Stage, Operator;\n\n// S92: Exfil (SAR/Auth)\nlet S92 =\n    UAVExfilFlow_CL\n    | where TimeGenerated > ago(windowSize)\n    | where DataClass in ('sar_imagery','auth_token')\n    | extend Stage = 'S92', Operator = tostring(Operator)\n    | where isnotempty(Operator)\n    | project TimeGenerated, Stage, Operator;\n\nunion S58, S54, S92\n| summarize StagesSeen = make_set(Stage), StageCount = dcount(Stage), FirstSeen = min(TimeGenerated), LastSeen = max(TimeGenerated) by Operator\n| where StageCount >= 2\n| extend CampaignType = \"C17_아카이브전달_웹셸_SAR유출\"\n| extend StepSummary = strcat(\"Stages=\", tostring(StagesSeen), \" | First=\", tostring(FirstSeen), \" | Last=\", tostring(LastSeen))\n| extend Severity = \"High\"\n| project FirstSeen, LastSeen, Operator, StagesSeen, StageCount, CampaignType, StepSummary, Severity",
+        "queryFrequency": "PT10M",
+        "queryPeriod": "PT2H",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT3H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "InitialAccess",
+          "Exfiltration"
+        ],
+        "techniques": [
+          "T1195.002",
+          "T1505.003",
+          "T1041"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": true,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT3H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Account"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "[CAMPAIGN] UAV Campaign C17 - Archive Supply-Chain (Zip Slip) → Webshell Upload → Exfil (SAR/Auth) - {{Operator}}",
+          "alertDescriptionFormat": "CampaignType={{CampaignType}} | Steps={{StepSummary}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "CampaignType": "CampaignType",
+          "StepSummary": "StepSummary",
+          "Operator": "Operator",
+          "StageCount": "StageCount"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Account",
+            "fieldMappings": [
+              {
+                "identifier": "Name",
+                "columnName": "Operator"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

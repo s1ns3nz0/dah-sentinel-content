@@ -1,0 +1,79 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/a6bfbc9a-e285-4d77-b617-e750afc16702')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/a6bfbc9a-e285-4d77-b617-e750afc16702')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S91 - Model Extraction via Covert Query Ladder",
+        "description": "모델 추출(비밀 질의 사다리) 탐지. UAVAiInference_CL의 InferenceType='model_query' 레코드를 QuerySequenceId로 묶어, 반복탐침 점수(RepeatedProbingScore)와 단계 수(StepCount)가 동시에 높은 시퀀스를 탐지. 결정경계·가중치를 추정하기 위해 체계적으로 점증하는 질의를 던지는 모델 추출/역공학 시도. MITRE: AML.T0024",
+        "severity": "Medium",
+        "enabled": true,
+        "query": "let alertWindow = 30m;\nlet probingScoreGate = 0.7;\nlet stepCountGate = 50;\nUAVAiInference_CL\n| where TimeGenerated > ago(alertWindow)\n| where InferenceType == 'model_query'\n| where RepeatedProbingScore >= probingScoreGate and StepCount >= stepCountGate\n| extend TriggerReason = strcat('모델추출_비밀질의사다리_', QuerySequenceId, '_Step', tostring(StepCount))\n| extend Severity = 'Medium'\n| project TimeGenerated, ModelEndpoint, RequesterId, QuerySequenceId, StepCount, RepeatedProbingScore, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "queryFrequency": "PT15M",
+        "queryPeriod": "PT1H",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "Exfiltration",
+          "Collection"
+        ],
+        "techniques": [
+          "T1020"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": false,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT5H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S91 - Model Extraction Query Ladder - {{RequesterId}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Severity={{Severity}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "QuerySequenceId": "QuerySequenceId",
+          "RepeatedProbingScore": "RepeatedProbingScore"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Account",
+            "fieldMappings": [
+              {
+                "identifier": "Name",
+                "columnName": "RequesterId"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

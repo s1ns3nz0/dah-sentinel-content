@@ -1,0 +1,82 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/09f677c0-fedd-41e4-91ae-c3cc561b597d')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/09f677c0-fedd-41e4-91ae-c3cc561b597d')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S4 - Failsafe Threshold Tampering (FS_THR_ENABLE etc. to 0)",
+        "description": "Failsafe 임계 파라미터(FS_THR_ENABLE/FS_GCS_ENABLE/FS_EKF_ACTION/FS_CRASH_CHECK/FS_LAND_AERR)가 0으로 설정되거나 이전 값 대비 50% 이하로 급감할 때 탐지. UAVConfigAudit_CL의 ParamValueBefore/ParamValueAfter(Double) 비교 기반. MITRE ICS ATT&CK: T0838 / EMB3D 경보설정변조",
+        "severity": "High",
+        "enabled": true,
+        "query": "let alertWindow = 15m;\nlet fsParams = dynamic(['FS_THR_ENABLE','FS_GCS_ENABLE','FS_EKF_ACTION','FS_CRASH_CHECK','FS_LAND_AERR']);\nUAVConfigAudit_CL\n| where TimeGenerated > ago(alertWindow)\n| where ParamId in (fsParams)\n| extend isDisabling = ParamValueAfter == 0\n    or (isnotnull(ParamValueBefore) and ParamValueBefore > 0 and ParamValueAfter < ParamValueBefore * 0.5)\n| where isDisabling\n| extend TriggerReason = strcat('Failsafe_임계값_비활성화_', ParamId, '_', tostring(ParamValueBefore), '→', tostring(ParamValueAfter))\n| extend Severity = 'High'\n| project TimeGenerated, UAVId, ParamId, ParamValueBefore, ParamValueAfter, Source, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "queryFrequency": "PT5M",
+        "queryPeriod": "PT20M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "DefenseEvasion",
+          "Impact"
+        ],
+        "techniques": [
+          "T1562"
+        ],
+        "subTechniques": [
+          "T1562.001"
+        ],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT2H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Host"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S4 - Failsafe Threshold Tampering (FS_THR_ENABLE etc. to 0) - {{UAVId}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Severity={{Severity}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "ParamId": "ParamId"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "UAVId"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

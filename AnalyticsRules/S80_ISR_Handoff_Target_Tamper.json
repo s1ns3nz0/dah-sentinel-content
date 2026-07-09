@@ -1,0 +1,78 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/d91915f3-e8e0-4c57-91e5-dc50174cb32b')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/d91915f3-e8e0-4c57-91e5-dc50174cb32b')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S80 - Cross-segment ISR Handoff Target Data Tampering",
+        "description": "Cross-segment(예: AF-to-Army) ISR 핸드오프 시 표적좌표(TargetCoordBefore/After)가 변경되고 변경자(HandoffOperator)가 Approved_Operators_List에 없는 비인가자인 경우를 탐지. 핸드오프 구간 표적정보 조작 위험. MITRE: T1565, T0832",
+        "severity": "High",
+        "enabled": true,
+        "query": "let alertWindow = 10m;\nlet ApprovedOps = _GetWatchlist('Approved_Operators_List') | project OperatorId;\nUAVIsrHandoff_CL\n| where TimeGenerated > ago(alertWindow)\n| where EventType == 'TargetHandoff'\n| extend isCoordChanged = (TargetCoordBefore != TargetCoordAfter)\n| extend isUnapprovedOperator = HandoffOperator !in (ApprovedOps)\n| where isCoordChanged and isUnapprovedOperator\n| extend TriggerReason = strcat(\"ISR핸드오프_표적좌표변조_\", Boundary, \"_변경자:\", HandoffOperator)\n| extend Severity = \"High\"\n| project TimeGenerated, Boundary, TargetCoordBefore, TargetCoordAfter, HandoffOperator, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "queryFrequency": "PT5M",
+        "queryPeriod": "PT15M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "Impact"
+        ],
+        "techniques": [
+          "T1565"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": false,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT2H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S80 - ISR Handoff Target Data Tampering - {{Boundary}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Before={{TargetCoordBefore}} | After={{TargetCoordAfter}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "Boundary": "Boundary",
+          "HandoffOperator": "HandoffOperator"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Account",
+            "fieldMappings": [
+              {
+                "identifier": "Name",
+                "columnName": "HandoffOperator"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

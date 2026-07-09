@@ -1,0 +1,94 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/6a6fdfeb-f2cc-4a82-b9a8-247bee1fca73')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/6a6fdfeb-f2cc-4a82-b9a8-247bee1fca73')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S55 - SUID/GTFOBins Privilege Escalation",
+        "description": "UAVHostAudit_CL에서 SUID 비트가 설정된 GTFOBins 알려진 바이너리(bash,find,vim,python 등)가 EUID=0으로 실행되는 권한상승 탐지. MITRE: T1548.001,T1068",
+        "severity": "High",
+        "enabled": true,
+        "query": "let alertWindow = 15m;\nlet gtfobins = dynamic([\"bash\",\"find\",\"vim\",\"python\",\"python3\",\"perl\",\"nmap\",\"cp\",\"awk\",\"less\",\"more\",\"env\",\"nice\",\"tar\",\"git\",\"nano\"]);\nUAVHostAudit_CL\n| where TimeGenerated > ago(alertWindow)\n| where EventType == \"exec_suid\"\n| where SetuidBit == true\n| where EUID == 0\n| extend BinaryName = tostring(split(Binary, \"/\")[-1])\n| where BinaryName in (gtfobins)\n| extend TriggerReason = strcat(\"GTFOBins_SUID_권한상승_\", BinaryName)\n| extend Severity = \"High\"\n| project TimeGenerated, UAVId, ActorId, Binary, BinaryName, ExecArgs, EUID, SetuidBit, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "queryFrequency": "PT5M",
+        "queryPeriod": "PT15M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "Privilege Escalation",
+          "Defense Evasion"
+        ],
+        "techniques": [
+          "T1548",
+          "T1068"
+        ],
+        "subTechniques": [
+          "T1548.001"
+        ],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT5H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Host"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S55 - SUID/GTFOBins Privilege Escalation - {{UAVId}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Binary={{Binary}} | ExecArgs={{ExecArgs}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "Binary": "Binary",
+          "ExecArgs": "ExecArgs",
+          "EUID": "EUID"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "UAVId"
+              }
+            ]
+          },
+          {
+            "entityType": "Account",
+            "fieldMappings": [
+              {
+                "identifier": "Name",
+                "columnName": "ActorId"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

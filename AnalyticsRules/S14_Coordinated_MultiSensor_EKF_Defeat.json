@@ -1,0 +1,81 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/a11e19aa-63e5-4011-84b1-e8f284709c99')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/a11e19aa-63e5-4011-84b1-e8f284709c99')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S14 - Coordinated Multi-Sensor Fault (EKF Defeat)",
+        "description": "UAVSensorFault_CL에서 서로 다른 2개 이상 SensorType(gyro/accel/baro/mag/airspeed)이 동일 10분 구간에 동시에 stealthy 조건(Accepted=true 이면서 abs(DeltaRate) < EkfInnovationGate)을 만족하는 정황을 상관분석. 단일 센서 스텔스 드리프트(S9~S12)는 각각 게이트 하회로 개별 탐지가 어려우나, 다중 센서가 동시에 게이트 이하로 조작되면 EKF 센서퓨전 자체를 무력화하려는 협조 공격으로 판단. MITRE ICS ATT&CK: T0835 / EMB3D 다중센서 협조폴트",
+        "severity": "High",
+        "enabled": true,
+        "query": "let alertWindow = 30m;\nlet corrWindow = 10m;\nUAVSensorFault_CL\n| where TimeGenerated > ago(alertWindow)\n| where Accepted == true\n| where abs(DeltaRate) < EkfInnovationGate\n| summarize\n    DistinctSensors = dcount(SensorType),\n    SensorList = make_set(SensorType),\n    SampleCount = count(),\n    AvgDeltaRate = avg(DeltaRate),\n    AvgGate = avg(EkfInnovationGate)\n    by UAVId, bin(TimeGenerated, corrWindow)\n| where DistinctSensors >= 2\n| extend TriggerReason = strcat('다중센서_협조_EKF무력화_의심_', tostring(DistinctSensors), '개센서_', tostring(SensorList))\n| extend Severity = 'High'\n| project TimeGenerated, UAVId, DistinctSensors, SensorList, SampleCount, AvgDeltaRate, AvgGate, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "queryFrequency": "PT10M",
+        "queryPeriod": "PT30M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "Impact"
+        ],
+        "techniques": [
+          "T1565"
+        ],
+        "subTechniques": [
+          "T1565.001"
+        ],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT2H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Host"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S14 - Coordinated Multi-Sensor Fault (EKF Defeat) - {{UAVId}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | Severity={{Severity}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "DistinctSensors": "DistinctSensors"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "UAVId"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

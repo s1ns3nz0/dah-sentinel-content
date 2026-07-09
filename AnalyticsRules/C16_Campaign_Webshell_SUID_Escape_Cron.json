@@ -1,0 +1,86 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/c6acd2ae-e385-4264-a89c-4ff081f1bb50')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/c6acd2ae-e385-4264-a89c-4ff081f1bb50')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV Campaign C16 - Webshell Upload → SUID Privilege Escalation → Container Escape → Cron Persistence",
+        "description": "4단계 킬체인(3/4 단계 이상 관측 시 트리거, near-miss 허용): 웹셸→SUID→escape→cron(순수 IT 권한상승·완전 사각). 체인: Webshell Upload(S54) → SUID Privilege Escalation(S55) → Container Escape(S56) → Cron Persistence(S57). 연결키: Operator. MITRE: T1505.003, T1548, T1611, T1053.003",
+        "severity": "High",
+        "enabled": true,
+        "query": "let windowSize = 3h;\n\n// S54: Webshell Upload\nlet S54 =\n    UAVWebAccess_CL\n    | where TimeGenerated > ago(windowSize)\n    | where EventType == 'webshell_upload'\n    | extend Stage = 'S54', Operator = tostring(Operator)\n    | where isnotempty(Operator)\n    | project TimeGenerated, Stage, Operator;\n\n// S55: SUID Privilege Escalation\nlet S55 =\n    UAVHostAudit_CL\n    | where TimeGenerated > ago(windowSize)\n    | where EventType == 'suid_privesc'\n    | extend Stage = 'S55', Operator = tostring(Operator)\n    | where isnotempty(Operator)\n    | project TimeGenerated, Stage, Operator;\n\n// S56: Container Escape\nlet S56 =\n    UAVContainerOps_CL\n    | where TimeGenerated > ago(windowSize)\n    | where EventType == 'escape_detected'\n    | extend Stage = 'S56', Operator = tostring(Operator)\n    | where isnotempty(Operator)\n    | project TimeGenerated, Stage, Operator;\n\n// S57: Cron Persistence\nlet S57 =\n    UAVHostAudit_CL\n    | where TimeGenerated > ago(windowSize)\n    | where EventType == 'cron_persistence'\n    | extend Stage = 'S57', Operator = tostring(Operator)\n    | where isnotempty(Operator)\n    | project TimeGenerated, Stage, Operator;\n\nunion S54, S55, S56, S57\n| summarize StagesSeen = make_set(Stage), StageCount = dcount(Stage), FirstSeen = min(TimeGenerated), LastSeen = max(TimeGenerated) by Operator\n| where StageCount >= 3\n| extend CampaignType = \"C16_웹셸_SUID_escape_cron_순수IT\"\n| extend StepSummary = strcat(\"Stages=\", tostring(StagesSeen), \" | First=\", tostring(FirstSeen), \" | Last=\", tostring(LastSeen))\n| extend Severity = \"High\"\n| project FirstSeen, LastSeen, Operator, StagesSeen, StageCount, CampaignType, StepSummary, Severity",
+        "queryFrequency": "PT10M",
+        "queryPeriod": "PT3H",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT4H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "InitialAccess",
+          "PrivilegeEscalation",
+          "Persistence"
+        ],
+        "techniques": [
+          "T1505.003",
+          "T1548",
+          "T1611",
+          "T1053.003"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": true,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT4H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Account"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "[CAMPAIGN] UAV Campaign C16 - Webshell Upload → SUID Privilege Escalation → Container Escape → Cron Persistence - {{Operator}}",
+          "alertDescriptionFormat": "CampaignType={{CampaignType}} | Steps={{StepSummary}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "CampaignType": "CampaignType",
+          "StepSummary": "StepSummary",
+          "Operator": "Operator",
+          "StageCount": "StageCount"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Account",
+            "fieldMappings": [
+              {
+                "identifier": "Name",
+                "columnName": "Operator"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

@@ -1,0 +1,79 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/bd4e02f9-6377-4eec-ab11-16e350424c3c')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/bd4e02f9-6377-4eec-ab11-16e350424c3c')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S85 - SOC Incident Report Forgery (False State Assertion)",
+        "description": "SOC 사건보고서 위조(거짓 사건보고) 탐지. UAVSocReport_CL에서 보고서에 기재된 사건 상태(IncidentStated)가 원시 경보 데이터로부터 재구성한 실제 상태(TrueStateFromRawAlerts)와 불일치하거나, 무결성 서명(IntegritySigned)이 누락된 보고서를 탐지. 파이프라인이 정상 생성한 보고서는 항상 서명되므로 미서명 보고서는 사후 변조 또는 우회 작성 의심. MITRE: T1565",
+        "severity": "High",
+        "enabled": true,
+        "query": "let alertWindow = 15m;\nUAVSocReport_CL\n| where TimeGenerated > ago(alertWindow)\n| where IntegritySigned == false or IncidentStated != TrueStateFromRawAlerts\n| extend TriggerReason = case(\n    IntegritySigned == false, strcat('SOC보고서_무결성서명_누락_', ReportId),\n    IncidentStated != TrueStateFromRawAlerts, strcat('SOC보고서_상태불일치_', IncidentStated, '_vs_', TrueStateFromRawAlerts),\n    'Unknown')\n| extend Severity = 'High'\n| project TimeGenerated, ReportId, IncidentStated, TrueStateFromRawAlerts, IntegritySigned, AuthoredBy, TriggerReason, Severity\n| order by TimeGenerated desc",
+        "queryFrequency": "PT10M",
+        "queryPeriod": "PT20M",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "DefenseEvasion",
+          "Impact"
+        ],
+        "techniques": [
+          "T1565"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": false,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT5H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S85 - SOC Incident Report Forgery - {{ReportId}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | AuthoredBy={{AuthoredBy}} | Severity={{Severity}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "ReportId": "ReportId",
+          "IntegritySigned": "IntegritySigned"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Account",
+            "fieldMappings": [
+              {
+                "identifier": "Name",
+                "columnName": "AuthoredBy"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}

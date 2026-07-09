@@ -1,0 +1,80 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/301dd51a-a521-4da2-8dd9-18019780f470')]",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/301dd51a-a521-4da2-8dd9-18019780f470')]",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "kind": "Scheduled",
+      "apiVersion": "2023-12-01-preview",
+      "properties": {
+        "displayName": "UAV S131 - Input Capture via Anomalous VNC/NoVNC Session Volume",
+        "description": "[Goal] GCS 원격 VNC(noVNC) 세션에서 비정상적으로 큰 수신 바이트(화면·입력 스트림 캡처 의심)를 탐지한다.\n\n[Categorization] Collection / T1056(Input Capture). ATT&CK Enterprise 매핑.\n\n[Strategy Abstract] UAVGcsAccess_CL의 Transport='novnc' disconnect 이벤트에서 BytesReceived가 최근 24h 정상 세션의 P99 x 1.5를 초과하면 탐지 — S1(GNSS)과 동일한 동적 baseline 게이트 패턴.\n\n[Technical Context] UAVGcsAccess_CL(Transport/Action/BytesReceived/DurationSec/Operator) 기반. 실측 스키마 확인(2026-07) — 정상 세션 P99*1.5 게이트 실측값 약 55767 bytes(2026-07 기준, 재계산 필요).\n\n[Blind Spots & Assumptions] 정상 장시간 화면공유(원격지원 등)와 실제 입력캡처를 구분 못함 — Operator 화이트리스트 없음. 바이트를 나눠서 여러 짧은 세션으로 쪼개면 회피 가능(연속값 룰의 구조적 한계).\n\n[False Positives] 정상 원격지원/트레이닝 세션이 오탐 가능 — Approved_Operators_List 대조 추가 검토 필요.\n\n[Validation] UAVGcsAccess_CL에 Transport='novnc' disconnect + BytesReceived 임계 초과 이벤트로 발화 확인(2026-07 실측 baseline 계산 확인, 시드셋엔 전부 정상 세션이라 실매칭 없음).\n\n[Priority Rationale] 운용자 입력/화면 유출은 임무 기밀성 직결 — Medium(오탐 가능성 고려, 다른 신호와 상관 시 격상).",
+        "severity": "Medium",
+        "enabled": true,
+        "query": "let baselineWindow = 24h;\nlet alertWindow = 15m;\nlet gateMultiplier = toscalar(_GetWatchlist('UAV_Threshold_List') | where ThresholdKey == 'VncByteGateMultiplier' | project toreal(Value));\nlet dynamicBytesGate = toscalar(\n    UAVGcsAccess_CL\n    | where TimeGenerated > ago(baselineWindow)\n    | where Transport == \"novnc\" and Action == \"disconnect\"\n    | summarize gate = percentile(BytesReceived, 99) * gateMultiplier\n);\nUAVGcsAccess_CL\n| where TimeGenerated > ago(alertWindow)\n| where Transport == \"novnc\" and Action == \"disconnect\"\n| where BytesReceived > dynamicBytesGate\n| extend TriggerReason = strcat(\"VNC세션대량수신의심_\", Operator, \"_\", tostring(BytesReceived), \"bytes\")\n| project TimeGenerated, Operator, ClientIp, SessionId, DurationSec, BytesReceived, BytesSent, TriggerReason\n| order by TimeGenerated desc",
+        "queryFrequency": "PT15M",
+        "queryPeriod": "P1D",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionDuration": "PT2H",
+        "suppressionEnabled": false,
+        "startTimeUtc": null,
+        "tactics": [
+          "Collection"
+        ],
+        "techniques": [
+          "T1056"
+        ],
+        "subTechniques": [],
+        "alertRuleTemplateName": null,
+        "incidentConfiguration": {
+          "createIncident": false,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT5H",
+            "matchingMethod": "AllEntities",
+            "groupByEntities": [
+              "Account"
+            ],
+            "groupByAlertDetails": [],
+            "groupByCustomDetails": []
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "UAV S131 - Input Capture (VNC) - {{Operator}}",
+          "alertDescriptionFormat": "TriggerReason={{TriggerReason}} | BytesReceived={{BytesReceived}}",
+          "alertDynamicProperties": []
+        },
+        "customDetails": {
+          "TriggerReason": "TriggerReason",
+          "BytesReceived": "BytesReceived",
+          "SessionId": "SessionId"
+        },
+        "entityMappings": [
+          {
+            "entityType": "Account",
+            "fieldMappings": [
+              {
+                "identifier": "Name",
+                "columnName": "Operator"
+              }
+            ]
+          }
+        ],
+        "sentinelEntitiesMappings": null,
+        "templateVersion": null
+      }
+    }
+  ]
+}
